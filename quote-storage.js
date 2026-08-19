@@ -50,6 +50,16 @@
                 clearTimeout(autoSaveTimer);
                 unsavedChanges = false;
             }
+            if (quoteStorageDocumentState === 'closed') {
+                window._loadedQuoteData = {};
+                window._currentQuoteData = {};
+                window._selectedQuoteClient = null;
+                window._selectedQuoteProperty = null;
+                window._propertyMemoryReminderAcknowledgements = [];
+                if (window.QuoteDrPropertyMemory && typeof window.QuoteDrPropertyMemory.setQuoteReminderAcknowledgements === 'function') {
+                    window.QuoteDrPropertyMemory.setQuoteReminderAcknowledgements([]);
+                }
+            }
         }
 
         function quoteStorageHasOpenDocument() {
@@ -570,8 +580,13 @@
             try {
                 var session = JSON.parse(localStorage.getItem('ald_session_quote') || 'null');
                 if (session && String(session.supabaseId || '') === rowId) {
-                    var sessionTime = quoteStorageEditTime(session);
-                    if (sessionTime > best.time) best = { data: Object.assign({}, session), source: 'session', time: sessionTime };
+                    if (quoteDataIsPortalLockedForBuilder(session)) {
+                        localStorage.removeItem('ald_session_quote');
+                        console.warn('A portal-locked session snapshot was not restored for editing.');
+                    } else {
+                        var sessionTime = quoteStorageEditTime(session);
+                        if (sessionTime > best.time) best = { data: Object.assign({}, session), source: 'session', time: sessionTime };
+                    }
                 }
             } catch (e) {}
 
@@ -1003,6 +1018,7 @@
                 try { localStorage.removeItem('ald_active_quote_id'); } catch (e) {}
             }
             var loadedData = window._loadedQuoteData || window._currentQuoteData || {};
+            var selectedClient = window._selectedQuoteClient || {};
             var dividerLabels = (typeof getQuoteDividerLabels === 'function') ? getQuoteDividerLabels() : { singular: 'Room', plural: 'Rooms' };
             if (isChangeOrder && supabaseId && window._parentQuoteId && supabaseId === window._parentQuoteId) {
                 supabaseId = null;
@@ -1026,6 +1042,8 @@
                 status: status,
                 quoteTitle:     document.getElementById('quoteTitle')?.value     || '',
                 clientName:     document.getElementById('clientName')?.value     || '',
+                clientId:       selectedClient.id || loadedData.clientId || loadedData.client_id || '',
+                clientNumber:   selectedClient.clientNumber || selectedClient.client_number || loadedData.clientNumber || loadedData.client_number || null,
                 quoteNumber:    document.getElementById('quoteNumber')?.value    || '',
                 projectAddress: document.getElementById('projectAddress')?.value || '',
                 propertyMemoryReminderAcknowledgements: Array.isArray(window._propertyMemoryReminderAcknowledgements)
@@ -1174,6 +1192,20 @@
             initDone = false; // suppress markUnsaved during load
             if (document.getElementById('quoteTitle'))     document.getElementById('quoteTitle').value     = data.quoteTitle || data.clientName || data.client_name || '';
             if (document.getElementById('clientName'))     document.getElementById('clientName').value     = data.clientName || data.client_name || '';
+            window._selectedQuoteClient = {
+                id: data.clientId || data.client_id || '',
+                clientNumber: data.clientNumber || data.client_number || null,
+                name: data.clientName || data.client_name || '',
+                phone: data.clientPhone || data.phone || '',
+                email: data.clientEmail || data.email || '',
+                address: data.projectAddress || data.project_address || ''
+            };
+            var clientNumberBadge = document.getElementById('clientNumberBadge');
+            var clientNumberLabel = window.QuoteDrDocumentNumbers ? QuoteDrDocumentNumbers.clientLabel(data.clientNumber || data.client_number) : '';
+            if (clientNumberBadge) {
+                clientNumberBadge.textContent = clientNumberLabel;
+                clientNumberBadge.style.display = clientNumberLabel ? '' : 'none';
+            }
             if (document.getElementById('quoteNumber'))    document.getElementById('quoteNumber').value    = data.quoteNumber || data.quote_number || '';
             if (document.getElementById('quoteStatus'))    document.getElementById('quoteStatus').value    = data.status || 'draft';
             if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = data.projectAddress || data.project_address || '';
@@ -1397,28 +1429,26 @@ async function saveQuote() {
             var nameInput = document.getElementById('saveQuoteNameInput');
             if (nameInput && nameInput.value.trim()) _saveDialogData.quoteTitle = nameInput.value.trim();
 
-            // Block save if quote number is already used
-            var qNum = (document.getElementById('quoteNumber')?.value || '').trim();
-            var usedNums = getUsedQuoteNumbers();
-            if (qNum && usedNums.includes(qNum) && !window._supabaseQuoteId) {
-                var errEl = document.getElementById('saveQuoteNumError');
-                if (errEl) {
-                    errEl.style.display = 'block';
-                    errEl.textContent = '\u26a0\ufe0f Quote number "' + qNum + '" is already used. Change it before saving as new.';
-                    setTimeout(function(){ errEl.style.display = 'none'; }, 5000);
-                } else {
-                    qdAlert('Quote number "' + qNum + '" is already used. Change the quote number before saving as new.');
-                }
-                return;
-            }
-
-            _saveDialogData.supabaseId = null; // Force new insert
-            _saveDialogData.forceNew = true;
-            window._supabaseQuoteId = null;
-            localStorage.removeItem("ald_active_quote_id");
             var saveBtn = document.getElementById('saveAsNewBtn');
             if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...'; }
             try {
+                if (!window.QuoteDrDocumentNumbers) throw new Error('Document numbering is unavailable. Reload QuoteDr and try again.');
+                var reservation = await QuoteDrDocumentNumbers.reserve('quote', {
+                    id: _saveDialogData.clientId || _saveDialogData.client_id || window._selectedQuoteClient?.id || '',
+                    clientNumber: _saveDialogData.clientNumber || _saveDialogData.client_number || window._selectedQuoteClient?.clientNumber || null,
+                    name: _saveDialogData.clientName || _saveDialogData.client_name || '',
+                    phone: _saveDialogData.clientPhone || _saveDialogData.phone || '',
+                    email: _saveDialogData.clientEmail || _saveDialogData.email || '',
+                    address: _saveDialogData.projectAddress || _saveDialogData.project_address || ''
+                });
+                _saveDialogData.quoteNumber = reservation.documentNumber;
+                _saveDialogData.clientId = reservation.client && reservation.client.id || _saveDialogData.clientId || '';
+                _saveDialogData.clientNumber = reservation.clientNumber || _saveDialogData.clientNumber || null;
+                _saveDialogData.supabaseId = null;
+                _saveDialogData.forceNew = true;
+                window._supabaseQuoteId = null;
+                localStorage.removeItem("ald_active_quote_id");
+                if (document.getElementById('quoteNumber')) document.getElementById('quoteNumber').value = reservation.documentNumber;
                 var result = await saveQuoteToSupabase(_saveDialogData);
                 if (result && !result.error && result.state === 'cloud_saved' && result.data) {
                     var saved = Array.isArray(result.data) ? result.data[0] : result.data;
@@ -2159,7 +2189,7 @@ async function saveQuote() {
                             }
                             result.data.forEach(function(sc) {
                                 if (!sc.name) return;
-                                var cloudClient = { id: sc.id || '', name: sc.name, phone: sc.phone || '', email: sc.email || '', address: sc.address || '', city: sc.city || '', notes: sc.notes || '', crm: sc.crm || {} };
+                                var cloudClient = { id: sc.id || '', clientNumber: sc.client_number || sc.clientNumber || null, name: sc.name, phone: sc.phone || '', email: sc.email || '', address: sc.address || '', city: sc.city || '', notes: sc.notes || '', crm: sc.crm || {} };
                                 if (typeof normalizeClientRecord !== 'function') {
                                     if (!existing[sc.name]) existing[sc.name] = cloudClient;
                                     return;
@@ -2172,6 +2202,7 @@ async function saveQuote() {
                                 var normalizedLocal = normalizeClientRecord(existing[sc.name], sc.name);
                                 existing[sc.name] = normalizeClientRecord(Object.assign({}, normalizedCloud, normalizedLocal, {
                                     id: normalizedLocal.id || normalizedCloud.id,
+                                    clientNumber: normalizedCloud.clientNumber || normalizedLocal.clientNumber || null,
                                     crm: Object.assign({}, normalizedCloud.crm || {}, normalizedLocal.crm || {}),
                                     properties: (normalizedCloud.properties || []).concat(normalizedLocal.properties || [])
                                 }), sc.name);

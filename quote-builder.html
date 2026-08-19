@@ -2458,6 +2458,7 @@
     <script src="card-payment-rules.js?v=2026080301"></script>
     <script src="supabase-v2.js?v=2026081902"></script>
     <script src="account-access.js?v=2026080701"></script>
+    <script src="document-numbering.js?v=2026081901"></script>
     <script src="ai-voice-rule-matcher.js?v=2026081902"></script>
     <script src="ai-voice-audio-recorder.js?v=2026081901"></script>
     <script src="save-coordinator.js?v=2026081801"></script>
@@ -2704,14 +2705,7 @@ if (location.search.includes('debug')) {
                             <div class="quote-number-block" data-account-field="quotes.number" data-account-field-access="write">
                                 <div class="quote-number-heading">
                                     <label><strong>Quote #:</strong><button type="button" class="qd-inline-help-btn" title="Help with quote numbers" aria-label="Help with quote numbers" onclick="QuoteDrModalHelp.openInline('quoteNumber'); return false;"><i class="fas fa-question"></i></button></label>
-                                    <div class="quote-number-actions" aria-label="Quote number actions">
-                                        <button type="button" onclick="randomizeQuoteNumber()" class="btn btn-sm btn-outline-secondary" title="Generate a random unused quote number">
-                                            <i class="fas fa-random"></i><span class="action-text">Randomize</span>
-                                        </button>
-                                        <button type="button" onclick="nextQuoteNumber()" class="btn btn-sm btn-outline-primary" title="Use the next number in sequence after your highest sent quote">
-                                            <i class="fas fa-sort-numeric-up"></i><span class="action-text">Next</span>
-                                        </button>
-                                    </div>
+                                    <span class="badge bg-light text-secondary border">Account assigned</span>
                                 </div>
                                 <input type="text" id="quoteNumber" class="form-control quote-number-input" placeholder="2026-001" oninput="checkQuoteNumberDuplicate()">
                                 <span id="quoteNumWarning" style="display:none; color:#dc3545; font-size:0.85rem;"><i class="fas fa-exclamation-triangle"></i> Already used!</span>
@@ -2738,7 +2732,7 @@ if (location.search.includes('debug')) {
                     <!-- Client Information Section -->
                     <div class="col-md-12 autocomplete-container contact-lookup-field" data-account-field="quotes.client_name" data-account-field-access="write">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="mb-0" for="clientName"><strong>Client Name (Type to search):</strong></label>
+                            <label class="mb-0" for="clientName"><strong>Client Name (Type to search):</strong> <span id="clientNumberBadge" class="badge text-bg-light border ms-1" style="display:none;"></span></label>
                             <div class="d-flex gap-2">
                                 <button onclick="saveCurrentClient()" class="btn btn-sm btn-outline-success" title="Save current client info to database">
                                     <i class="fas fa-user-plus"></i> Save Client
@@ -8440,70 +8434,6 @@ Example:
                     localStorage.setItem('ald_used_quote_numbers', JSON.stringify(merged));
                 }
             } catch(e) { console.warn('Used quote numbers cloud sync failed:', e); }
-        }
-
-        function generateQuoteNumber() {
-            return nextQuoteNumberValue();
-        }
-
-        async function syncQuoteNumberFromCloud() {
-            try {
-                if (typeof listQuoteSummariesFromSupabase !== 'function') return;
-                const quotesResult = await listQuoteSummariesFromSupabase();
-                if (quotesResult.error || !quotesResult.data || quotesResult.data.length === 0) return;
-                var maxNum = 0;
-                quotesResult.data.forEach(function(q) {
-                    if (q.quote_number) {
-                        var m = String(q.quote_number).match(/(\d+)$/);
-                        if (m) { var n = parseInt(m[1]); if (n > maxNum) maxNum = n; }
-                    }
-                });
-                // Store max so nextQuoteNumberValue picks it up via getUsedQuoteNumbers
-                var used = [];
-                try { used = JSON.parse(localStorage.getItem('ald_used_quote_numbers') || '[]'); } catch(e) {}
-                var year = new Date().getFullYear();
-                var synced = year + '-' + String(maxNum).padStart(3, '0');
-                if (maxNum > 0 && used.indexOf(synced) === -1) {
-                    used.push(synced);
-                    localStorage.setItem('ald_used_quote_numbers', JSON.stringify(used));
-                }
-            } catch(e) { console.warn('syncQuoteNumberFromCloud:', e); }
-        }
-
-        function nextQuoteNumberValue() {
-            var prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}');
-            var year = new Date().getFullYear();
-            var used = getUsedQuoteNumbers();
-            // Extract numeric parts from used numbers for this year
-            var usedNums = used.map(function(n) {
-                var m = String(n).match(/(\d+)$/);
-                return m ? parseInt(m[1]) : 0;
-            });
-            var max = usedNums.length > 0 ? Math.max.apply(null, usedNums) : 0;
-            var next = max + 1;
-            var num = year + '-' + String(next).padStart(3, '0');
-            if (prefs.showPrefix !== false && prefs.prefix) return prefs.prefix + '-' + num;
-            return num;
-        }
-
-        function nextQuoteNumber() {
-            document.getElementById('quoteNumber').value = nextQuoteNumberValue();
-            checkQuoteNumberDuplicate();
-        }
-
-        function randomizeQuoteNumber() {
-            var prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}');
-            var year = new Date().getFullYear();
-            var used = getUsedQuoteNumbers();
-            var candidate, attempts = 0;
-            do {
-                var rand = Math.floor(Math.random() * 9000) + 1000;
-                var num = year + '-' + rand;
-                candidate = (prefs.showPrefix !== false && prefs.prefix) ? prefs.prefix + '-' + num : num;
-                attempts++;
-            } while (used.includes(candidate) && attempts < 500);
-            document.getElementById('quoteNumber').value = candidate;
-            checkQuoteNumberDuplicate();
         }
 
         function checkQuoteNumberDuplicate() {
@@ -14990,6 +14920,8 @@ Example:
                 projectAddress: document.getElementById('projectAddress')?.value || 'Project Address',
                 email: document.getElementById('clientEmail')?.value || '',
                 phone: document.getElementById('clientPhone')?.value || '',
+                clientId: window._selectedQuoteClient?.id || window._loadedQuoteData?.clientId || window._loadedQuoteData?.client_id || '',
+                clientNumber: window._selectedQuoteClient?.clientNumber || window._loadedQuoteData?.clientNumber || window._loadedQuoteData?.client_number || null,
                 quoteNumber: document.getElementById('quoteNumber')?.value || '',
                 rooms: JSON.parse(JSON.stringify(rooms || [])),
                 categoryStyles: JSON.parse(JSON.stringify(categoryStyles || {})),
@@ -15093,6 +15025,15 @@ Example:
                 if (cardPaymentReview.cardPayment) invoiceData.card_payment = cardPaymentReview.cardPayment;
             }
             invoiceData.paymentSettings = clientSafePaymentSettings(invoiceData.paymentSettings);
+            try {
+                if (typeof qdEnsureInvoiceDocumentNumber !== 'function') {
+                    throw new Error('Invoice numbering is unavailable. Reload QuoteDr and try again.');
+                }
+                await qdEnsureInvoiceDocumentNumber(invoiceData);
+            } catch(numberingError) {
+                qdAlert('Could not create the invoice number: ' + (numberingError && numberingError.message || 'Try again.'));
+                return null;
+            }
             var invoiceBaseUrl = getInvoiceBaseUrl();
             var invoiceUrl = invoiceBaseUrl + '?invoice=' + invoiceId;
             localStorage.setItem(invoiceId, JSON.stringify(invoiceData));
@@ -15122,6 +15063,7 @@ Example:
                 return Promise.resolve(invoiceState);
             }
             return saveInvoiceForSharing(invoiceState.invoiceData).then(function(result) {
+                if (result && result.error) throw result.error;
                 if (result && result.data && result.data.id) {
                     invoiceState.invoiceData.supabaseId = result.data.id;
                     var previewUrl = new URL(invoiceState.invoiceBaseUrl, window.location.href);
@@ -17679,6 +17621,21 @@ Example:
             var parentData = collectQuoteData();
             var parentStyle = resolveChangeOrderParentStyle(parentData);
             var parentId = window._supabaseQuoteId;
+            var changeOrderReservation = null;
+            try {
+                if (!window.QuoteDrDocumentNumbers) throw new Error('Document numbering is unavailable. Reload QuoteDr and try again.');
+                changeOrderReservation = await QuoteDrDocumentNumbers.reserve('change_order', {
+                    id: parentData.clientId || parentData.client_id || window._selectedQuoteClient?.id || '',
+                    clientNumber: parentData.clientNumber || parentData.client_number || window._selectedQuoteClient?.clientNumber || null,
+                    name: parentData.clientName || parentData.client_name || '',
+                    phone: parentData.clientPhone || parentData.phone || '',
+                    email: parentData.clientEmail || parentData.email || '',
+                    address: parentData.projectAddress || parentData.project_address || ''
+                });
+            } catch(numberingError) {
+                qdAlert('Could not reserve the change order number: ' + (numberingError && numberingError.message || 'Try again.'));
+                return;
+            }
             var nextNumber = 1;
             var previousApprovedTotal = 0;
             try {
@@ -17720,6 +17677,9 @@ Example:
                 parentQuoteNumber: parentData.quoteNumber || '',
                 parentQuoteTotal: parentData.grandTotal || 0,
                 changeOrderNumber: nextNumber,
+                quoteNumber: changeOrderReservation.documentNumber,
+                clientId: changeOrderReservation.client && changeOrderReservation.client.id || parentData.clientId || '',
+                clientNumber: changeOrderReservation.clientNumber || parentData.clientNumber || null,
                 style: parentStyle
             });
             if (parentStyle && typeof applyQuoteStyleToControls === 'function') {
@@ -17734,7 +17694,7 @@ Example:
             localStorage.removeItem('ald_active_quote_id');
 
             if (document.getElementById('quoteNumber')) {
-                document.getElementById('quoteNumber').value = (parentData.quoteNumber || 'Quote') + '-CO' + nextNumber;
+                document.getElementById('quoteNumber').value = changeOrderReservation.documentNumber;
             }
             if (document.getElementById('quoteStatus')) document.getElementById('quoteStatus').value = 'draft';
             if (document.getElementById('quoteTitle')) document.getElementById('quoteTitle').value = 'Change Order #' + nextNumber;
@@ -17884,12 +17844,6 @@ Example:
         updateMeasurementUnitLabels();
         updateQuoteDividerLabels();
         renderRooms();
-
-        // Generate numbers only for an intentionally opened document. The
-        // closed launcher state must never manufacture a saveable blank quote.
-        if (typeof quoteStorageHasOpenDocument === 'function' && quoteStorageHasOpenDocument() && !document.getElementById('quoteNumber').value) {
-            document.getElementById('quoteNumber').value = generateQuoteNumber();
-        }
 
         if (typeof renderTemplateDropdown === 'function') renderTemplateDropdown();
         renderTermsCheckboxes();

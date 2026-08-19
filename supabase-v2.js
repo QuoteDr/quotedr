@@ -1704,6 +1704,32 @@ function qdCanonicalInvoiceNumber(value) {
     return base + '-INV';
 }
 
+async function qdEnsureInvoiceDocumentNumber(invoiceData) {
+    invoiceData = invoiceData || {};
+    if (invoiceData.invoiceNumber || invoiceData.invoice_number) {
+        invoiceData.invoiceNumber = invoiceData.invoiceNumber || invoiceData.invoice_number;
+        invoiceData.quoteNumber = invoiceData.invoiceNumber;
+        return invoiceData;
+    }
+    if (!window.QuoteDrDocumentNumbers) throw new Error('Document numbering is unavailable. Reload QuoteDr and try again.');
+    var sourceQuoteNumber = invoiceData.sourceQuoteNumber || invoiceData.source_quote_number || invoiceData.quoteNumber || invoiceData.quote_number || '';
+    var invoiceReservation = await QuoteDrDocumentNumbers.reserve('invoice', {
+        id: invoiceData.clientId || invoiceData.client_id || '',
+        clientNumber: invoiceData.clientNumber || invoiceData.client_number || null,
+        name: invoiceData.clientName || invoiceData.client_name || '',
+        phone: invoiceData.clientPhone || invoiceData.phone || '',
+        email: invoiceData.clientEmail || invoiceData.email || '',
+        address: invoiceData.projectAddress || invoiceData.client_address || ''
+    });
+    invoiceData.sourceQuoteNumber = sourceQuoteNumber;
+    invoiceData.invoiceNumber = invoiceReservation.documentNumber;
+    invoiceData.quoteNumber = invoiceReservation.documentNumber;
+    invoiceData.clientId = invoiceReservation.client && invoiceReservation.client.id || invoiceData.clientId || '';
+    invoiceData.clientNumber = invoiceReservation.clientNumber || invoiceReservation.client && invoiceReservation.client.clientNumber || invoiceData.clientNumber || null;
+    return invoiceData;
+}
+window.qdEnsureInvoiceDocumentNumber = qdEnsureInvoiceDocumentNumber;
+
 async function saveInvoiceForSharing(invoiceData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
@@ -1714,7 +1740,21 @@ async function saveInvoiceForSharing(invoiceData) {
         return { error: error };
     }
     const now = new Date().toISOString();
-    const invoiceQuoteNumber = qdCanonicalInvoiceNumber(invoiceData.quoteNumber || invoiceData.quote_number || '');
+    var isUpdate = !!invoiceData.supabaseId;
+    var sourceQuoteNumber = invoiceData.sourceQuoteNumber || invoiceData.source_quote_number || invoiceData.quoteNumber || invoiceData.quote_number || '';
+    var invoiceQuoteNumber = invoiceData.invoiceNumber || invoiceData.invoice_number || '';
+    if (!isUpdate) {
+        try {
+            await qdEnsureInvoiceDocumentNumber(invoiceData);
+            invoiceQuoteNumber = invoiceData.invoiceNumber;
+            sourceQuoteNumber = invoiceData.sourceQuoteNumber || sourceQuoteNumber;
+        } catch (numberingError) {
+            console.error('Invoice number reservation error:', numberingError);
+            return { error: numberingError };
+        }
+    } else {
+        invoiceQuoteNumber = invoiceQuoteNumber || invoiceData.quoteNumber || invoiceData.quote_number || qdCanonicalInvoiceNumber('');
+    }
     const invoiceHasExplicitPortalAssignment = Object.prototype.hasOwnProperty.call(invoiceData, 'portal_visible') ||
         Object.prototype.hasOwnProperty.call(invoiceData, 'portal_id');
     const payload = {
@@ -1722,6 +1762,8 @@ async function saveInvoiceForSharing(invoiceData) {
         data: {
             ...invoiceData,
             quoteNumber: invoiceQuoteNumber,
+            invoiceNumber: invoiceQuoteNumber,
+            sourceQuoteNumber: sourceQuoteNumber,
             _type: 'invoice',
             type: invoiceData.type || 'invoice',
             documentType: 'invoice',
@@ -1736,7 +1778,6 @@ async function saveInvoiceForSharing(invoiceData) {
         status: 'invoiced',
         updated_at: now
     };
-    var isUpdate = !!invoiceData.supabaseId;
     if (!isUpdate) payload.created_at = now;
     var result = await qdDurableSupabaseOperation({
         entityType: 'invoice',

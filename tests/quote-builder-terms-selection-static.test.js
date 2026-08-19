@@ -29,10 +29,8 @@ assert(
 
 assert(
   storage.includes('renderTermsCheckboxes(getQuoteTermsForRender(data));') &&
-  storage.includes('renderTermsCheckboxes(getQuoteTermsForRender(session));') &&
-  storage.includes('renderTermsCheckboxes(getQuoteTermsForRender(draft));') &&
-  storage.includes('renderTermsCheckboxes(getQuoteTermsForRender(qData));'),
-  'Every quote load/restore path should normalize saved terms before rendering checkboxes'
+  (storage.match(/renderTermsCheckboxes\(getQuoteTermsForRender\(qData\)\);/g) || []).length >= 2,
+  'The unified direct-load and last-opened restore paths should normalize saved terms before rendering checkboxes'
 );
 
 assert(

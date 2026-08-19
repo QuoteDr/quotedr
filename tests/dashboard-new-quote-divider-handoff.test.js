@@ -136,6 +136,12 @@ const context = {
   },
   findNewQuoteClientByName() { return null; },
   findDashboardClientByEmail() { return null; },
+  QuoteDrDocumentNumbers: {
+    async reserve() {
+      return { documentNumber: 'Q-2026-C0001-001', client: { id: 'client-1', clientNumber: 1 }, clientNumber: 1 };
+    }
+  },
+  async saveNewQuoteClientDraft() { return true; },
   async maybePromptSaveNewQuoteClient() {},
   getDashboardQuoteDividerPrefs() {
     return { dividerPromptMode, singular: 'Room', plural: 'Rooms' };

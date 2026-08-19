@@ -62,6 +62,7 @@ export const publicArtifactConfig = Object.freeze({
     'chatbot-feedback-topics.js',
     'client-document-decisions.js',
     'community-starter-templates.js',
+    'document-numbering.js',
     'error-reporter.js',
     'floor-plan-scanner.js',
     'help-content.js',

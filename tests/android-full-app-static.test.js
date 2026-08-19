@@ -70,9 +70,9 @@ assert(quoteBuilder.includes('syncMobileActionBarVisibility'), 'quote builder sh
 assert(quoteBuilder.includes('mobile-action-bar-hidden'), 'quote builder should hide the mobile action bar only near the page bottom');
 assert(quoteBuilder.includes('env(safe-area-inset-bottom'), 'mobile action bar should respect device safe-area bottom insets');
 assert(quoteBuilder.includes('quote-identity-grid'), 'quote builder should group quote number, title, and status in a clear identity grid');
-assert(quoteBuilder.includes('quote-number-heading'), 'quote number actions should live in the quote number heading row');
-assert(quoteBuilder.includes('quote-number-actions'), 'randomize and next buttons should be visually attached to quote number');
-assert(quoteBuilder.indexOf('quote-number-actions') < quoteBuilder.indexOf('quoteTitle'), 'quote number actions should appear before the file name field');
+assert(quoteBuilder.includes('quote-number-heading'), 'the account-assigned quote number should live in the quote number heading row');
+assert(quoteBuilder.includes('Account assigned'), 'the builder should identify centrally assigned document numbers');
+assert(!quoteBuilder.includes('onclick="randomizeQuoteNumber()"') && !quoteBuilder.includes('onclick="nextQuoteNumber()"'), 'mobile must not expose conflicting browser-only number controls');
 assert(quoteBuilder.includes('settings.html?tab=quotes&section=terms'), 'manage terms link should open the Quotes settings terms section');
 assert(quoteBuilder.includes('savedTerms.length'), 'quote builder should ignore empty custom terms and fall back to built-ins');
 assert(settings.includes('id="quoteTermsSettings"'), 'settings terms card should have a direct anchor target');

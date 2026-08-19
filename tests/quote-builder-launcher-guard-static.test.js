@@ -29,8 +29,10 @@ assert(
 
 assert(
   builder.includes('quote-storage.js?v=2026081901') &&
-    builder.includes("typeof quoteStorageHasOpenDocument === 'function' && quoteStorageHasOpenDocument()"),
-  'The builder must load the guarded storage bundle and avoid generating an ID while closed'
+    !builder.includes('generateQuoteNumber()') &&
+    !builder.includes('randomizeQuoteNumber()') &&
+    !builder.includes('nextQuoteNumber()'),
+  'The builder must load the guarded storage bundle without manufacturing browser-only document numbers'
 );
 
 assert(

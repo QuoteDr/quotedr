@@ -474,6 +474,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js?v=2026081901"></script>
     <script src="account-access.js?v=2026080701"></script>
+    <script src="document-numbering.js?v=2026081901"></script>
     <script src="admin-access.js?v=2026080201"></script>
     <script src="save-coordinator.js?v=2026081801"></script>
     <script src="app-broadcasts.js?v=1779131000"></script>
@@ -1298,6 +1299,9 @@
                 var clientName = q.client_name || 'Unnamed Client';
                 var displayTitle = quoteTitle || clientName;
                 var quoteNumber = q.quote_number || '';
+                var matchedClient = typeof findNewQuoteClientByName === 'function' ? findNewQuoteClientByName(clientName) : null;
+                var clientNumber = q.data && (q.data.clientNumber || q.data.client_number) || matchedClient && (matchedClient.clientNumber || matchedClient.client_number) || null;
+                var clientNumberLabel = window.QuoteDrDocumentNumbers ? QuoteDrDocumentNumbers.clientLabel(clientNumber) : '';
                 var clientEmail = q.data && q.data.clientEmail ? q.data.clientEmail : '';
                 var status = q.status || 'draft';
                 var isChangeOrder = window.QuoteDrChangeOrders && QuoteDrChangeOrders.isChangeOrder(q);
@@ -1350,7 +1354,7 @@
                               <button class="btn btn-success btn-sm" onclick="event.stopPropagation();saveTitle(${jsAttr(q.id)})"><i class="fas fa-check"></i></button>
                               <button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation();cancelEditTitle(${jsAttr(q.id)})"><i class="fas fa-times"></i></button>
                             </div>
-                            <div class="text-muted small">${quoteTitle ? escapeHtml(clientName) + ' - ' : ''}${quoteNumber ? '#' + escapeHtml(quoteNumber) + ' - ' : ''}${escapeHtml(formatDate((q.data && q.data.savedAt) || q.created_at))}</div>
+                            <div class="text-muted small">${clientNumberLabel ? escapeHtml(clientNumberLabel) + ' · ' : ''}${quoteTitle ? escapeHtml(clientName) + ' - ' : ''}${quoteNumber ? '#' + escapeHtml(quoteNumber) + ' - ' : ''}${escapeHtml(formatDate((q.data && q.data.savedAt) || q.created_at))}</div>
                             ${portalVisible ? `<div class="portal-added-meta mt-1"><i class="fas fa-lock me-1"></i>Added to portal: ${escapeHtml(portalAddedLabel)}</div>` : ''}
                         </div>
                         <div class="text-end d-flex flex-column align-items-end gap-1">
@@ -1479,6 +1483,7 @@
                         key: key,
                         name: clientName,
                         emails: [],
+                        clientNumbers: [],
                         quoteNumbers: [],
                         titles: [],
                         count: 0,
@@ -1489,6 +1494,10 @@
                 groups[key].count += 1;
                 groups[key].total += parseFloat(quote.total || 0) || 0;
                 if (email && groups[key].emails.indexOf(email) === -1) groups[key].emails.push(email);
+                var matchedClient = typeof findNewQuoteClientByName === 'function' ? findNewQuoteClientByName(clientName) : null;
+                var clientNumber = quoteData(quote).clientNumber || quoteData(quote).client_number || matchedClient && (matchedClient.clientNumber || matchedClient.client_number);
+                var clientNumberLabel = window.QuoteDrDocumentNumbers ? QuoteDrDocumentNumbers.clientLabel(clientNumber) : String(clientNumber || '');
+                if (clientNumberLabel && groups[key].clientNumbers.indexOf(clientNumberLabel) === -1) groups[key].clientNumbers.push(clientNumberLabel);
                 if (quote.quote_number && groups[key].quoteNumbers.indexOf(quote.quote_number) === -1) groups[key].quoteNumbers.push(quote.quote_number);
                 var title = getQuoteTitle(quote);
                 if (title && groups[key].titles.indexOf(title) === -1) groups[key].titles.push(title);
@@ -1522,6 +1531,7 @@
                 if (!term) return true;
                 return group.name.toLowerCase().includes(term) ||
                     group.emails.join(' ').toLowerCase().includes(term) ||
+                    group.clientNumbers.join(' ').toLowerCase().includes(term) ||
                     group.quoteNumbers.join(' ').toLowerCase().includes(term) ||
                     group.titles.join(' ').toLowerCase().includes(term);
             });
@@ -1798,8 +1808,19 @@
                 data.supabaseId = null;
                 data.revisionOf = quote.id;
                 data.revisionCreatedAt = now;
-                var quoteNumber = (quote.quote_number || data.quoteNumber || 'REV') + '-REV';
+                if (!window.QuoteDrDocumentNumbers) throw new Error('Document numbering is unavailable. Reload QuoteDr and try again.');
+                var revisionReservation = await QuoteDrDocumentNumbers.reserve('revision', {
+                    id: data.clientId || data.client_id || '',
+                    clientNumber: data.clientNumber || data.client_number || null,
+                    name: quote.client_name || data.clientName || data.client_name || '',
+                    phone: data.clientPhone || data.phone || '',
+                    email: data.clientEmail || data.email || '',
+                    address: data.projectAddress || data.project_address || ''
+                });
+                var quoteNumber = revisionReservation.documentNumber;
                 data.quoteNumber = quoteNumber;
+                data.clientId = revisionReservation.client && revisionReservation.client.id || data.clientId || '';
+                data.clientNumber = revisionReservation.clientNumber || data.clientNumber || null;
                 var session = await _supabase.auth.getSession();
                 var userId = session.data?.session?.user?.id || quote.user_id;
                 if (!userId) throw new Error('Not logged in');
@@ -4953,6 +4974,8 @@ function renderBusinessInsights(quotes) {
                 result.data.forEach(function(client) {
                     if (!client || !client.name) return;
                     existing[client.name] = Object.assign({}, existing[client.name] || {}, {
+                        id: client.id || (existing[client.name] && existing[client.name].id) || '',
+                        clientNumber: client.client_number || client.clientNumber || (existing[client.name] && existing[client.name].clientNumber) || null,
                         name: client.name,
                         phone: client.phone || (existing[client.name] && existing[client.name].phone) || '',
                         email: client.email || (existing[client.name] && existing[client.name].email) || '',
@@ -4965,6 +4988,7 @@ function renderBusinessInsights(quotes) {
                 localStorage.setItem('ald_clients', JSON.stringify(existing));
                 populateNewQuoteClientSuggestions();
                 populatePortalAssignClientSuggestions();
+                if (Array.isArray(allQuotes) && allQuotes.length && typeof filterQuotes === 'function') filterQuotes();
             } catch(e) {
                 console.warn('Dashboard client refresh error:', e);
             }
@@ -4996,7 +5020,10 @@ function renderBusinessInsights(quotes) {
         }
 
         function getNewQuoteClientDraft() {
+            var selected = window._newQuoteSelectedClient || {};
             return {
+                id: selected.id || selected.clientId || '',
+                clientNumber: selected.clientNumber || selected.client_number || null,
                 name: document.getElementById('newQuoteClientName').value.trim(),
                 address: document.getElementById('newQuoteAddress').value.trim(),
                 email: document.getElementById('newQuoteClientEmail').value.trim(),
@@ -5016,6 +5043,8 @@ function renderBusinessInsights(quotes) {
         async function saveNewQuoteClientDraft(clientDraft) {
             if (!isNewQuoteClientDraftSaveable(clientDraft)) return false;
             var client = {
+                id: clientDraft.id || '',
+                clientNumber: clientDraft.clientNumber || clientDraft.client_number || null,
                 name: clientDraft.name,
                 phone: clientDraft.phone || '',
                 email: clientDraft.email || '',
@@ -5152,7 +5181,10 @@ function renderBusinessInsights(quotes) {
                 item.type = 'button';
                 item.className = 'portal-client-suggestion text-start w-100 border-0';
                 var title = document.createElement('strong');
-                title.textContent = client.name || client.email || 'Saved client';
+                var clientNumberLabel = window.QuoteDrDocumentNumbers
+                    ? QuoteDrDocumentNumbers.clientLabel(client.clientNumber || client.client_number)
+                    : '';
+                title.textContent = (clientNumberLabel ? clientNumberLabel + ' · ' : '') + (client.name || client.email || 'Saved client');
                 var details = document.createElement('small');
                 details.textContent = [client.address, client.phone, client.email].filter(Boolean).join(' - ');
                 item.appendChild(title);
@@ -5238,11 +5270,15 @@ function renderBusinessInsights(quotes) {
             if (!nameInput || !addressInput || !emailInput || !phoneInput) return;
             var client = selectedClient || findNewQuoteClientByName(nameInput.value) || findDashboardClientByEmail(emailInput.value);
             window._newQuoteSelectedClient = client || null;
-            if (!client) return;
+            if (!client) {
+                updateNewQuoteNumberPreview();
+                return;
+            }
             nameInput.value = client.name || nameInput.value;
             if (client.address) addressInput.value = client.address;
             if (client.email) emailInput.value = client.email;
             if (client.phone) phoneInput.value = client.phone;
+            updateNewQuoteNumberPreview();
         }
 
         function applyPortalAssignClientSelection(source, selectedClient) {
@@ -5434,6 +5470,30 @@ function renderBusinessInsights(quotes) {
             settleQuoteDividerPrompt(null);
         }
 
+        function updateNewQuoteNumberPreview() {
+            var preview = document.getElementById('newQuoteGeneratedPreview');
+            if (!preview || !window.QuoteDrDocumentNumbers) return;
+            var selected = window._newQuoteSelectedClient || {};
+            var clientNumber = selected.clientNumber || selected.client_number || 1;
+            var customNumber = document.getElementById('newQuoteNumber')?.value.trim() || '';
+            var example = QuoteDrDocumentNumbers.format(QuoteDrDocumentNumbers.current(), {
+                documentType: 'quote',
+                year: new Date().getFullYear(),
+                clientNumber: clientNumber,
+                sequence: 1
+            });
+            var clientLabel = QuoteDrDocumentNumbers.clientLabel(clientNumber);
+            preview.innerHTML = customNumber
+                ? '<i class="fas fa-pen me-1"></i>Custom number: <strong>' + escapeHtml(customNumber) + '</strong>. The client still receives a permanent ' + escapeHtml(clientLabel || 'client number') + '.'
+                : '<i class="fas fa-wand-magic-sparkles me-1"></i>Next number will follow <strong>' + escapeHtml(example) + '</strong>. The exact sequence is reserved when you create the quote.';
+        }
+
+        async function loadNewQuoteNumberingSettings() {
+            if (!window.QuoteDrDocumentNumbers) return;
+            await QuoteDrDocumentNumbers.load({ force: true });
+            updateNewQuoteNumberPreview();
+        }
+
         function openNewQuoteModal() {
             document.getElementById('newQuoteClientName').value = '';
             document.getElementById('newQuoteAddress').value = '';
@@ -5444,6 +5504,7 @@ function renderBusinessInsights(quotes) {
             document.getElementById('newQuoteError').textContent = '';
             document.getElementById('newQuoteClientSaveStatus').textContent = '';
             window._newQuoteSelectedClient = null;
+            loadNewQuoteNumberingSettings();
             populateNewQuoteClientSuggestions();
             refreshDashboardSavedClientsFromCloud();
             var btn = document.getElementById('newQuoteCreateBtn');
@@ -5474,18 +5535,33 @@ function renderBusinessInsights(quotes) {
                 return;
             }
             errEl.textContent = '';
-            await maybePromptSaveNewQuoteClient(clientDraft);
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Preparing...';
 
-            // Auto-generate quote number if blank
-            if (!quoteNum) {
-                var maxNum = 0;
-                (allQuotes || []).forEach(function(q) {
-                    var m = String(q.quote_number || '').match(/(\d+)$/);
-                    if (m) maxNum = Math.max(maxNum, parseInt(m[1]));
+            var numberingReservation = null;
+            try {
+                if (!window.QuoteDrDocumentNumbers) throw new Error('Document numbering is unavailable. Reload QuoteDr and try again.');
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Assigning client number...';
+                if (quoteNum) {
+                    numberingReservation = await QuoteDrDocumentNumbers.ensureClient(Object.assign({}, savedClient || {}, clientDraft));
+                } else {
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Reserving quote number...';
+                    numberingReservation = await QuoteDrDocumentNumbers.reserve('quote', Object.assign({}, savedClient || {}, clientDraft));
+                    quoteNum = numberingReservation.documentNumber;
+                }
+                var numberedClient = numberingReservation.client || {};
+                clientDraft.id = numberedClient.id || clientDraft.id || '';
+                clientDraft.clientNumber = numberedClient.clientNumber || numberingReservation.clientNumber || clientDraft.clientNumber || null;
+                savedClient = Object.assign({}, savedClient || {}, clientDraft, numberedClient, {
+                    clientNumber: clientDraft.clientNumber
                 });
-                quoteNum = 'Q-' + (maxNum + 1).toString().padStart(3, '0');
+                window._newQuoteSelectedClient = savedClient;
+                await saveNewQuoteClientDraft(savedClient);
+            } catch(numberingError) {
+                errEl.textContent = 'Could not assign the client and document number: ' + (numberingError && numberingError.message || 'Try again.');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-arrow-right me-1"></i>Create & Open Builder';
+                return;
             }
 
             // Check for duplicate quote number
@@ -5519,6 +5595,8 @@ function renderBusinessInsights(quotes) {
                     clientName: clientName,
                     clientEmail: clientEmail,
                     clientPhone: clientPhone,
+                    clientId: clientDraft.id || '',
+                    clientNumber: clientDraft.clientNumber || null,
                     projectAddress: address,
                     quoteNumber: quoteNum,
                     quoteTitle: quoteTitle,
@@ -5528,7 +5606,7 @@ function renderBusinessInsights(quotes) {
                     rooms: [],
                     grandTotal: 0,
                     status: 'draft',
-                    data: { clientName: clientName, clientEmail: clientEmail, clientPhone: clientPhone, projectAddress: address, quoteNumber: quoteNum, quoteTitle: quoteTitle, title: quoteTitle, dividerSingular: dividerLabels.singular, dividerPlural: dividerLabels.plural, quoteDividerLabels: { singular: dividerLabels.singular, plural: dividerLabels.plural }, rooms: [] }
+                    data: { clientName: clientName, clientEmail: clientEmail, clientPhone: clientPhone, clientId: clientDraft.id || '', clientNumber: clientDraft.clientNumber || null, projectAddress: address, quoteNumber: quoteNum, quoteTitle: quoteTitle, title: quoteTitle, dividerSingular: dividerLabels.singular, dividerPlural: dividerLabels.plural, quoteDividerLabels: { singular: dividerLabels.singular, plural: dividerLabels.plural }, rooms: [] }
                 });
 
                 if (result.error) throw new Error(result.error.message || 'Save failed');
@@ -5558,10 +5636,12 @@ function renderBusinessInsights(quotes) {
             });
             var newQuoteClientName = document.getElementById('newQuoteClientName');
             if (newQuoteClientName) {
-                newQuoteClientName.addEventListener('input', showNewQuoteClientSuggestions);
+                newQuoteClientName.addEventListener('input', function() { showNewQuoteClientSuggestions(); updateNewQuoteNumberPreview(); });
                 newQuoteClientName.addEventListener('change', applyNewQuoteClientSelection);
                 newQuoteClientName.addEventListener('blur', hideNewQuoteClientSuggestions);
             }
+            var newQuoteNumber = document.getElementById('newQuoteNumber');
+            if (newQuoteNumber) newQuoteNumber.addEventListener('input', updateNewQuoteNumberPreview);
             var newQuoteClientEmail = document.getElementById('newQuoteClientEmail');
             if (newQuoteClientEmail) {
                 newQuoteClientEmail.addEventListener('change', function() {
@@ -5914,8 +5994,10 @@ function renderBusinessInsights(quotes) {
           </div>
         </div>
         <div class="mb-3">
-          <label class="form-label fw-semibold">Quote Number <span class="text-muted fw-normal">(optional - auto-assigned if blank)</span></label>
+          <label class="form-label fw-semibold">Quote Number <span class="text-muted fw-normal">(automatically assigned)</span></label>
           <input type="text" id="newQuoteNumber" class="form-control" placeholder="e.g. Q-2026-042">
+          <div id="newQuoteGeneratedPreview" class="form-text mt-2" aria-live="polite">Choose a client to preview the new number.</div>
+          <div class="form-text">Leave blank for the account format, or enter a custom number for this quote only.</div>
         </div>
         <div id="newQuoteError" class="text-danger small" style="min-height:1.2rem;"></div>
         <div id="newQuoteClientSaveStatus" class="text-success small" role="status" aria-live="polite"></div>

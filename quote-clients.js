@@ -38,9 +38,11 @@
             const all = getAllClients();
             const results = [];
             for (const [clientName, data] of Object.entries(all)) {
-                const match = fuzzyMatch(query, clientName);
+                const normalized = normalizeClientRecord(data, clientName);
+                const numberLabel = window.QuoteDrDocumentNumbers ? QuoteDrDocumentNumbers.clientLabel(normalized.clientNumber) : (normalized.clientNumber ? 'C' + normalized.clientNumber : '');
+                const match = fuzzyMatch(query, [clientName, numberLabel, normalized.email, normalized.phone].filter(Boolean).join(' '));
                 if (match.score > 50) {
-                    results.push({ ...data, score: match.score });
+                    results.push({ ...normalized, score: match.score });
                 }
             }
             return results.sort((a, b) => b.score - a.score);
@@ -68,7 +70,8 @@
                         }
                     }
 
-                    const subtitle = client.address ? client.address : (client.filename ? 'From: ' + client.filename : '');
+                    const numberLabel = window.QuoteDrDocumentNumbers ? QuoteDrDocumentNumbers.clientLabel(client.clientNumber) : (client.clientNumber ? 'C' + client.clientNumber : '');
+                    const subtitle = [numberLabel, client.address || (client.filename ? 'From: ' + client.filename : '')].filter(Boolean).join(' · ');
                     item.innerHTML = `<span>${displayName}</span><small class="text-muted">${subtitle}</small>`;
                     item.onclick = function() {
                         fillClientInfo(client.name, client);
@@ -173,6 +176,7 @@
             const primaryProperty = properties[0] || {};
             return {
                 id: source.id || source.clientId || '',
+                clientNumber: source.clientNumber || source.client_number || null,
                 name,
                 phone: source.phone || '',
                 email: source.email || '',
@@ -236,6 +240,7 @@
             const crm = c.crm || {};
             return [
                 c.name,
+                window.QuoteDrDocumentNumbers ? QuoteDrDocumentNumbers.clientLabel(c.clientNumber) : (c.clientNumber ? 'C' + String(c.clientNumber) : ''),
                 c.phone,
                 c.email,
                 c.address,
@@ -323,6 +328,12 @@
             });
             window._selectedQuoteClient = client;
             window._selectedQuoteProperty = property;
+            const clientNumberBadge = document.getElementById('clientNumberBadge');
+            const clientNumberLabel = window.QuoteDrDocumentNumbers ? QuoteDrDocumentNumbers.clientLabel(client.clientNumber) : '';
+            if (clientNumberBadge) {
+                clientNumberBadge.textContent = clientNumberLabel;
+                clientNumberBadge.style.display = clientNumberLabel ? '' : 'none';
+            }
             if (window.QuoteDrPropertyMemory) window.QuoteDrPropertyMemory.refreshForCurrentAddress();
             if (typeof markUnsaved === 'function') markUnsaved();
         }
@@ -407,7 +418,7 @@
             const filtered = Object.values(all).filter(c => getClientSearchText(c).includes(filter)).sort((a,b) => a.name.localeCompare(b.name));
             const container = document.getElementById('clientsList');
             if (!filtered.length) { container.innerHTML = '<p class="text-muted text-center py-3">No clients found.</p>'; return; }
-            let html = '<table class="table table-sm table-hover"><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th></th></tr></thead><tbody>';
+            let html = '<table class="table table-sm table-hover"><thead><tr><th>Client #</th><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th></th></tr></thead><tbody>';
             filtered.forEach(c => {
                 const crm = c.crm || {};
                 const crmBadges = [crm.tags, crm.followUpDate ? 'Follow up: ' + crm.followUpDate : '', crm.notes ? 'Notes' : '']
@@ -419,7 +430,9 @@
                 const propertyCount = getClientProperties(c).length;
                 const propertyBadge = propertyCount > 1 ? '<span class="badge text-bg-light border ms-1">' + propertyCount + ' properties</span>' : '';
                 const addressCell = c.address ? escapeHtml(c.address) + propertyBadge : '<span class="text-muted">-</span>';
+                const clientNumberLabel = window.QuoteDrDocumentNumbers ? QuoteDrDocumentNumbers.clientLabel(c.clientNumber) : (c.clientNumber ? 'C' + c.clientNumber : '');
                 html += `<tr>
+                    <td><span class="badge text-bg-light border">${clientNumberLabel ? escapeHtml(clientNumberLabel) : 'Pending'}</span></td>
                     <td><strong>${escapeHtml(c.name)}</strong>${crmBadges ? '<div class="mt-1">' + crmBadges + '</div>' : ''}</td>
                     <td>${c.phone ? escapeHtml(c.phone) : '<span class="text-muted">-</span>'}</td>
                     <td>${c.email ? escapeHtml(c.email) : '<span class="text-muted">-</span>'}</td>

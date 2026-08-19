@@ -527,6 +527,7 @@ if (location.search.includes('debug')) {
     <script src="quickbooks-import.js?v=2026080801"></script>
     <script src="quickbooks-import-controller.js?v=2026080801"></script>
     <script src="account-access.js?v=2026080701"></script>
+    <script src="document-numbering.js?v=2026081901"></script>
     <script src="save-coordinator.js?v=2026081801"></script>
     <script src="analytics.js?v=1778059000"></script>
 </head>
@@ -737,14 +738,74 @@ if (location.search.includes('debug')) {
 					<label class="form-label mb-0">Quote Heading</label>
 					<input type="text" class="form-control" id="quoteHeading" placeholder="Your Quote">
 				</div>
-				<div class="col-12">
-					<label class="form-label mb-0">Quote Prefix</label>
-					<input type="text" class="form-control" id="quotePrefix" placeholder="ALD">
-				</div>
-				<div class="col-12">
-					<div class="form-check">
-						<input class="form-check-input" type="checkbox" id="showPrefix" checked>
-						<label class="form-check-label" for="showPrefix">Show prefix in quotes</label>
+				<div class="col-12" data-account-permission="settings.manage">
+					<div class="border rounded-3 p-3 bg-light">
+						<div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
+							<div>
+								<div class="fw-bold"><i class="fas fa-hashtag me-1 text-primary"></i>Client &amp; Document Numbers</div>
+								<div class="text-muted small">Every new client receives a permanent client number. New quotes, invoices, change orders, and revisions receive their own searchable identifier.</div>
+							</div>
+							<span class="badge text-bg-primary align-self-start">Q · I · CO · R</span>
+						</div>
+						<div class="row g-3">
+							<div class="col-md-4">
+								<label class="form-label fw-semibold" for="quotePrefix">Company code <span class="text-muted fw-normal">(optional)</span></label>
+								<input type="text" class="form-control text-uppercase" id="quotePrefix" placeholder="ALD" maxlength="12" oninput="updateDocumentNumberingPreview()">
+								<div class="form-text">Letters and numbers only.</div>
+							</div>
+							<div class="col-md-4">
+								<label class="form-label fw-semibold" for="companyCodePosition">Company code position</label>
+								<select class="form-select" id="companyCodePosition" onchange="updateDocumentNumberingPreview()">
+									<option value="suffix">At the end (suffix)</option>
+									<option value="prefix">At the beginning (prefix)</option>
+									<option value="none">Do not include it</option>
+								</select>
+							</div>
+							<div class="col-md-4 d-flex align-items-end">
+								<div class="form-check form-switch mb-2">
+									<input class="form-check-input" type="checkbox" id="showPrefix" checked onchange="updateDocumentNumberingPreview()">
+									<label class="form-check-label fw-semibold" for="showPrefix">Include company code</label>
+								</div>
+							</div>
+							<div class="col-md-6">
+								<label class="form-label fw-semibold" for="documentNumberFormatStyle">Number order</label>
+								<select class="form-select" id="documentNumberFormatStyle" onchange="updateDocumentNumberingPreview()">
+									<option value="document_first">Document first — Q-2026-C0427-003</option>
+									<option value="client_first">Client first — C0427-Q-2026-003</option>
+								</select>
+							</div>
+							<div class="col-md-6">
+								<label class="form-label fw-semibold" for="documentNumberYearStyle">Year</label>
+								<select class="form-select" id="documentNumberYearStyle" onchange="updateDocumentNumberingPreview()">
+									<option value="four_digit">Four digits — 2026</option>
+									<option value="two_digit">Two digits — 26</option>
+									<option value="none">Do not include year</option>
+								</select>
+							</div>
+							<div class="col-sm-6">
+								<label class="form-label fw-semibold" for="clientNumberPadding">Client number digits</label>
+								<select class="form-select" id="clientNumberPadding" onchange="updateDocumentNumberingPreview()">
+									<option value="3">3 — C427</option>
+									<option value="4" selected>4 — C0427</option>
+									<option value="5">5 — C00427</option>
+									<option value="6">6 — C000427</option>
+								</select>
+							</div>
+							<div class="col-sm-6">
+								<label class="form-label fw-semibold" for="documentSequencePadding">Document sequence digits</label>
+								<select class="form-select" id="documentSequencePadding" onchange="updateDocumentNumberingPreview()">
+									<option value="2">2 — 03</option>
+									<option value="3" selected>3 — 003</option>
+									<option value="4">4 — 0003</option>
+									<option value="5">5 — 00003</option>
+								</select>
+							</div>
+						</div>
+						<div class="mt-3 p-3 bg-white border rounded-3">
+							<div class="small text-uppercase text-muted fw-bold mb-2">Live preview</div>
+							<div class="d-flex flex-wrap gap-2" id="documentNumberingPreview" aria-live="polite"></div>
+							<div class="form-text mt-2">Existing document numbers never change. Sequences are reserved centrally so two devices cannot receive the same number.</div>
+						</div>
 					</div>
 				</div>
 				<div class="col-12">
@@ -4486,6 +4547,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (document.getElementById('quoteHeading')) document.getElementById('quoteHeading').value = savedPrefs.heading || 'Your Quote';
 			if (document.getElementById('quotePrefix')) document.getElementById('quotePrefix').value = savedPrefs.prefix || 'ALD';
 			if (document.getElementById('showPrefix') && savedPrefs.showPrefix === false) document.getElementById('showPrefix').checked = false;
+			loadDocumentNumberingSettingsUI(savedPrefs);
 			if (document.getElementById('taxRate') && savedPrefs.taxRate !== undefined) document.getElementById('taxRate').value = savedPrefs.taxRate;
 			if (document.getElementById('taxLabel') && savedPrefs.taxLabel) document.getElementById('taxLabel').value = savedPrefs.taxLabel;
 			if (document.getElementById('taxEnabledDefault')) document.getElementById('taxEnabledDefault').checked = savedPrefs.taxEnabledDefault !== false;
@@ -4931,11 +4993,74 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (document.getElementById('quoteDividerPreset')) document.getElementById('quoteDividerPreset').value = (savedPrefs && savedPrefs.dividerPromptMode === 'ask') ? 'ask' : getQuoteDividerPresetValue(singular, plural);
 		}
 
-		function saveQuotePrefs() {
+		function documentNumberingSettingsFromForm() {
+			var code = window.QuoteDrDocumentNumbers
+				? QuoteDrDocumentNumbers.cleanCompanyCode(document.getElementById('quotePrefix')?.value || '')
+				: String(document.getElementById('quotePrefix')?.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+			var includeCode = document.getElementById('showPrefix')?.checked !== false && !!code;
+			return {
+				version: 1,
+				companyCode: code,
+				companyCodePosition: includeCode ? (document.getElementById('companyCodePosition')?.value || 'suffix') : 'none',
+				formatStyle: document.getElementById('documentNumberFormatStyle')?.value || 'document_first',
+				yearStyle: document.getElementById('documentNumberYearStyle')?.value || 'four_digit',
+				clientPadding: parseInt(document.getElementById('clientNumberPadding')?.value || '4', 10),
+				sequencePadding: parseInt(document.getElementById('documentSequencePadding')?.value || '3', 10)
+			};
+		}
+
+		function applyDocumentNumberingSettingsToForm(settings) {
+			if (!window.QuoteDrDocumentNumbers) return;
+			settings = QuoteDrDocumentNumbers.normalize(settings);
+			if (document.getElementById('quotePrefix')) document.getElementById('quotePrefix').value = settings.companyCode || '';
+			if (document.getElementById('showPrefix')) document.getElementById('showPrefix').checked = settings.companyCodePosition !== 'none' && !!settings.companyCode;
+			if (document.getElementById('companyCodePosition')) document.getElementById('companyCodePosition').value = settings.companyCodePosition === 'prefix' ? 'prefix' : 'suffix';
+			if (document.getElementById('documentNumberFormatStyle')) document.getElementById('documentNumberFormatStyle').value = settings.formatStyle;
+			if (document.getElementById('documentNumberYearStyle')) document.getElementById('documentNumberYearStyle').value = settings.yearStyle;
+			if (document.getElementById('clientNumberPadding')) document.getElementById('clientNumberPadding').value = String(settings.clientPadding);
+			if (document.getElementById('documentSequencePadding')) document.getElementById('documentSequencePadding').value = String(settings.sequencePadding);
+			updateDocumentNumberingPreview();
+		}
+
+		function updateDocumentNumberingPreview() {
+			var preview = document.getElementById('documentNumberingPreview');
+			if (!preview || !window.QuoteDrDocumentNumbers) return;
+			var settings = documentNumberingSettingsFromForm();
+			var labels = [
+				['quote', 'Quote'],
+				['invoice', 'Invoice'],
+				['change_order', 'Change order'],
+				['revision', 'Revision']
+			];
+			preview.innerHTML = labels.map(function(entry) {
+				var number = QuoteDrDocumentNumbers.format(settings, {
+					documentType: entry[0],
+					year: new Date().getFullYear(),
+					clientNumber: 427,
+					sequence: 3
+				});
+				return '<span class="badge text-bg-light border text-dark px-3 py-2"><span class="text-muted me-1">' + entry[1] + '</span>' + number + '</span>';
+			}).join('');
+		}
+
+		async function loadDocumentNumberingSettingsUI(savedPrefs) {
+			if (!window.QuoteDrDocumentNumbers) return;
+			var legacy = {
+				companyCode: savedPrefs && savedPrefs.showPrefix === false ? '' : savedPrefs && savedPrefs.prefix || '',
+				companyCodePosition: savedPrefs && savedPrefs.showPrefix === false ? 'none' : 'prefix'
+			};
+			applyDocumentNumberingSettingsToForm(QuoteDrDocumentNumbers.normalize(legacy));
+			var result = await QuoteDrDocumentNumbers.load({ force: true });
+			if (result && result.settings) applyDocumentNumberingSettingsToForm(result.settings);
+		}
+
+		async function saveQuotePrefs() {
+			var numberingSettings = documentNumberingSettingsFromForm();
 			var prefs = {
 				heading: document.getElementById('quoteHeading').value.trim() || 'Your Quote',
-				prefix: document.getElementById('quotePrefix').value.trim() || 'ALD',
-				showPrefix: document.getElementById('showPrefix').checked,
+				prefix: numberingSettings.companyCode,
+				showPrefix: numberingSettings.companyCodePosition !== 'none',
+				documentNumbering: numberingSettings,
 				taxRate: document.getElementById('taxRate') ? document.getElementById('taxRate').value : '13',
 				taxLabel: document.getElementById('taxLabel') ? document.getElementById('taxLabel').value.trim() || 'HST' : 'HST',
 				taxEnabledDefault: document.getElementById('taxEnabledDefault') ? document.getElementById('taxEnabledDefault').checked : true,
@@ -4946,11 +5071,21 @@ Sarah Jones, 905-555-5678"></textarea>
 				dividerPlural: normalizeQuoteDividerLabel(document.getElementById('quoteDividerPlural') ? document.getElementById('quoteDividerPlural').value : '', 'Rooms')
 			};
 			localStorage.setItem('ald_quote_prefs', JSON.stringify(prefs));
-			
+			var numberingError = null;
+			try {
+				if (!window.QuoteDrDocumentNumbers) throw new Error('Numbering controls are unavailable.');
+				await QuoteDrDocumentNumbers.save(numberingSettings);
+			} catch(e) {
+				numberingError = e;
+				console.warn('Document numbering settings save failed:', e);
+			}
 			var badge = document.getElementById('prefsSaved');
-			badge.innerHTML = '<i class="fas fa-check-circle me-1"></i>Saved!';
+			badge.innerHTML = numberingError
+				? '<i class="fas fa-exclamation-triangle me-1"></i>Saved on this device; numbering cloud sync failed.'
+				: '<i class="fas fa-check-circle me-1"></i>Saved!';
+			badge.classList.toggle('text-warning', !!numberingError);
 			badge.style.display = 'inline';
-			setTimeout(function() { badge.style.display = 'none'; }, 3000);
+			setTimeout(function() { badge.style.display = 'none'; badge.classList.remove('text-warning'); }, numberingError ? 6000 : 3000);
 		}
 
 		async function submitFeedback(type) {

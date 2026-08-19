@@ -104,6 +104,52 @@ const accountingExportSourceLimit = 2001;
 const qboInvoiceProfileKey = 'accounting_qbo_invoice_csv_profile_v1';
 const qboInvoiceSourceLimit = 1001;
 
+const defaultDocumentNumberingSettings = Object.freeze({
+  version: 1,
+  companyCode: '',
+  companyCodePosition: 'suffix',
+  formatStyle: 'document_first',
+  yearStyle: 'four_digit',
+  clientPadding: 4,
+  sequencePadding: 3,
+  documentCodes: Object.freeze({ quote: 'Q', invoice: 'I', change_order: 'CO', revision: 'R' })
+});
+
+function numberingRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && Array.isArray(value) === false
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function boundedInteger(value: unknown, fallback: number, minimum: number, maximum: number) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  return Number.isFinite(parsed) ? Math.max(minimum, Math.min(maximum, parsed)) : fallback;
+}
+
+function normalizeDocumentNumberingSettings(value: unknown) {
+  const source = numberingRecord(value);
+  const companyCode = cleanText(source.companyCode, 40).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+  const companyCodePosition = ['prefix', 'suffix', 'none'].includes(String(source.companyCodePosition || '').toLowerCase())
+    ? String(source.companyCodePosition).toLowerCase()
+    : defaultDocumentNumberingSettings.companyCodePosition;
+  const formatStyle = String(source.formatStyle || '').toLowerCase() === 'client_first'
+    ? 'client_first'
+    : defaultDocumentNumberingSettings.formatStyle;
+  const yearStyle = ['four_digit', 'two_digit', 'none'].includes(String(source.yearStyle || '').toLowerCase())
+    ? String(source.yearStyle).toLowerCase()
+    : defaultDocumentNumberingSettings.yearStyle;
+  return {
+    version: 1,
+    companyCode,
+    companyCodePosition: companyCode ? companyCodePosition : 'none',
+    formatStyle,
+    yearStyle,
+    clientPadding: boundedInteger(source.clientPadding, 4, 2, 8),
+    sequencePadding: boundedInteger(source.sequencePadding, 3, 2, 8),
+    documentCodes: { ...defaultDocumentNumberingSettings.documentCodes }
+  };
+}
+
 const accountPlanFeatures: Record<string, string[]> = {
   basic: [
     'quotes', 'invoices', 'clients', 'templates', 'custom_branding',
@@ -431,6 +477,154 @@ async function getBusiness(req: Request, accountId: unknown) {
     .maybeSingle();
   if (result.error) throw result.error;
   return json({ data: result.data ? sanitizeBusinessProfile(result.data, { fieldAccess }) : null });
+}
+
+async function getDocumentNumberingSettings(req: Request, accountId: unknown) {
+  const auth = await requireAccountPermission(req, accountId, ACCOUNT_PERMISSION.ACCOUNT_READ);
+  const result = await serviceClient()
+    .from('accounts')
+    .select('document_numbering_settings')
+    .eq('id', auth.accountId)
+    .single();
+  if (result.error) throw result.error;
+  const stored = numberingRecord(result.data && result.data.document_numbering_settings);
+  return json({
+    data: {
+      settings: normalizeDocumentNumberingSettings(stored),
+      configured: Object.keys(stored).length > 0
+    }
+  });
+}
+
+async function saveDocumentNumberingSettings(req: Request, accountId: unknown, body: Record<string, unknown>) {
+  const auth = await requireAccountPermission(req, accountId, ACCOUNT_PERMISSION.SETTINGS_MANAGE);
+  const settings = normalizeDocumentNumberingSettings(body.settings);
+  const admin = serviceClient();
+  const result = await admin
+    .from('accounts')
+    .update({ document_numbering_settings: settings, updated_at: new Date().toISOString() })
+    .eq('id', auth.accountId)
+    .select('document_numbering_settings')
+    .single();
+  if (result.error) throw result.error;
+  const audit = await admin.from('account_audit_events').insert({
+    account_id: auth.accountId,
+    actor_user_id: auth.user.id,
+    event_type: 'settings.document_numbering.updated',
+    target_type: 'account',
+    target_id: auth.accountId,
+    details: { settings }
+  });
+  if (audit.error) console.warn('Document numbering settings audit failed:', audit.error.message);
+  return json({ data: { settings, configured: true } });
+}
+
+async function resolveNumberingClient(
+  req: Request,
+  auth: AccountAuthorization,
+  body: Record<string, unknown>
+) {
+  const source = numberingRecord(body.client);
+  const clientId = cleanText(source.id || source.clientId, 80);
+  const clientName = cleanText(source.name || body.clientName, 300);
+  const admin = serviceClient();
+  let existing = null;
+  if (clientId) {
+    const lookup = await admin
+      .from('clients')
+      .select('id,name,client_number,phone,email,address,city')
+      .eq('id', clientId)
+      .eq('user_id', auth.ownerUserId)
+      .maybeSingle();
+    if (lookup.error) throw lookup.error;
+    existing = lookup.data;
+  }
+  if (!existing && clientName) {
+    const lookup = await admin
+      .from('clients')
+      .select('id,name,client_number,phone,email,address,city')
+      .eq('user_id', auth.ownerUserId)
+      .eq('name', clientName)
+      .maybeSingle();
+    if (lookup.error) throw lookup.error;
+    existing = lookup.data;
+  }
+  if (existing) return existing;
+  if (!clientName) throw new AccountAccessError('Choose or create a client first', 400, 'client_required');
+
+  await requireAccountPermission(req, auth.accountId, ACCOUNT_PERMISSION.CLIENTS_MANAGE);
+  const created = await admin
+    .from('clients')
+    .upsert({
+      user_id: auth.ownerUserId,
+      name: clientName,
+      phone: cleanText(source.phone, 80),
+      email: cleanText(source.email, 320),
+      address: cleanText(source.address, 500),
+      city: cleanText(source.city, 200),
+      notes: '',
+      crm: {},
+      created_by_user_id: auth.user.id,
+      updated_by_user_id: auth.user.id,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id,name' })
+    .select('id,name,client_number,phone,email,address,city')
+    .single();
+  if (created.error) throw created.error;
+  return created.data;
+}
+
+async function reserveDocumentNumber(req: Request, accountId: unknown, body: Record<string, unknown>) {
+  const auth = await requireAccountPermission(req, accountId, ACCOUNT_PERMISSION.QUOTES_CREATE);
+  const documentType = cleanText(body.documentType, 40).toLowerCase();
+  if (!['quote', 'invoice', 'change_order', 'revision'].includes(documentType)) {
+    throw new AccountAccessError('Choose a supported document type', 400, 'document_type_invalid');
+  }
+  const client = await resolveNumberingClient(req, auth, body);
+  const requestedYear = Number.parseInt(String(body.documentYear || ''), 10);
+  const documentYear = Number.isFinite(requestedYear) && requestedYear >= 2000 && requestedYear <= 9999
+    ? requestedYear
+    : new Date().getUTCFullYear();
+  const result = await serviceClient().rpc('quotedr_reserve_document_number', {
+    p_account_id: auth.accountId,
+    p_document_type: documentType,
+    p_client_id: client.id,
+    p_actor_user_id: auth.user.id,
+    p_document_year: documentYear
+  });
+  if (result.error) throw result.error;
+  const reservation = Array.isArray(result.data) ? result.data[0] : result.data;
+  if (!reservation || !reservation.document_number) {
+    throw new AccountAccessError('Document number could not be reserved', 500, 'number_reservation_failed');
+  }
+  return json({
+    data: {
+      documentNumber: reservation.document_number,
+      client: {
+        id: client.id,
+        name: client.name,
+        clientNumber: reservation.client_number
+      },
+      clientNumber: reservation.client_number,
+      sequence: reservation.sequence_value,
+      settings: reservation.numbering_settings
+    }
+  });
+}
+
+async function ensureNumberingClient(req: Request, accountId: unknown, body: Record<string, unknown>) {
+  const auth = await requireAccountPermission(req, accountId, ACCOUNT_PERMISSION.CLIENTS_MANAGE);
+  const client = await resolveNumberingClient(req, auth, body);
+  return json({
+    data: {
+      client: {
+        id: client.id,
+        name: client.name,
+        clientNumber: client.client_number
+      },
+      clientNumber: client.client_number
+    }
+  });
 }
 
 async function getLogo(req: Request, accountId: unknown) {
@@ -1244,6 +1438,10 @@ Deno.serve(async (req) => {
     if (action === 'team.member.remove') return await removeMember(req, accountId, body);
     if (action === 'business.get') return await getBusiness(req, accountId);
     if (action === 'business.logo') return await getLogo(req, accountId);
+    if (action === 'numbering.get') return await getDocumentNumberingSettings(req, accountId);
+    if (action === 'numbering.save') return await saveDocumentNumberingSettings(req, accountId, body);
+    if (action === 'numbering.client') return await ensureNumberingClient(req, accountId, body);
+    if (action === 'numbering.reserve') return await reserveDocumentNumber(req, accountId, body);
     if (action === 'payments.get') return await getPaymentSettings(req, accountId);
     if (action === 'entitlements.get') return await getEntitlements(req, accountId);
     if (action === 'accounting.export') return await accountingExport(req, accountId, body);

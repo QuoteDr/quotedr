@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 106,
-  "totalBytes": 22687045,
-  "treeSha256": "4a85c8e808750ade8fa93a0a2c37e6b7e4b1855b808cdcc56cc2e3350f510b41",
+  "fileCount": 107,
+  "totalBytes": 22715575,
+  "treeSha256": "8b50e23b293f647311d1c8e3ae0a1f53c188f251f0c1a873983ee9a1002d38c6",
   "files": [
     {
       "path": "404.html",
@@ -157,13 +157,18 @@
     },
     {
       "path": "dashboard.html",
-      "bytes": 372315,
-      "sha256": "56e3ad5cc285e6b35b90fa0b8787eefa730cdeec4e9478153b8521e732838817"
+      "bytes": 379105,
+      "sha256": "bc056c27025bbe5fe8e3b371c4748404f6567f8745edece22912b7c2905ba628"
     },
     {
       "path": "data/whats-new.json",
       "bytes": 6569,
       "sha256": "56fcbab199ad63e887926e9cf07239e6068ebe5d150415844cfe62527f99df56"
+    },
+    {
+      "path": "document-numbering.js",
+      "bytes": 8707,
+      "sha256": "a7fcf2df6728245025787c55f331739aa27f4644824e6c84c4b53e2f85b4a82d"
     },
     {
       "path": "enhanced-material-calculator.html",
@@ -317,8 +322,8 @@
     },
     {
       "path": "quote-builder.html",
-      "bytes": 1399294,
-      "sha256": "5f2255368cdb269e011e3a9e35e6334b3cc1cb978c9ead9851ab86ec08875eab"
+      "bytes": 1397475,
+      "sha256": "87bc49352a7008cd7779d75b6adbc144f388afc7719d79d9e0bdcae2a2d6a45a"
     },
     {
       "path": "quote-calculators.js",
@@ -327,8 +332,8 @@
     },
     {
       "path": "quote-clients.js",
-      "bytes": 23648,
-      "sha256": "756c96f544713db93a474330bc9d0ef91df631e2995fd31de62f89c9d6000404"
+      "bytes": 25202,
+      "sha256": "741c1132fd892411392e71c72a0f69c57a5904731647eb8c6986fd44adbcdec0"
     },
     {
       "path": "quote-completeness-review.js",
@@ -387,8 +392,8 @@
     },
     {
       "path": "quote-storage.js",
-      "bytes": 133738,
-      "sha256": "334b7f97b3a71878696e02c1d229b77569097357ee4f5b71c34db503d106a2c0"
+      "bytes": 136492,
+      "sha256": "54680c850d4f7ba05c0523d5b6fc67dd907a69c65c81644f2f4785dd664c14c3"
     },
     {
       "path": "quote-style.js",
@@ -427,8 +432,8 @@
     },
     {
       "path": "settings.html",
-      "bytes": 350088,
-      "sha256": "bda6a0671d95c656c93918b36ba833b09087116028ffd5fa5b9d6a9af3098304"
+      "bytes": 358112,
+      "sha256": "8c9ad28f0b128b92196011f2a9c725ae3d29256ce13600cff9c659dae4b4b4e5"
     },
     {
       "path": "signup-gate.css",
@@ -442,8 +447,8 @@
     },
     {
       "path": "supabase-v2.js",
-      "bytes": 184464,
-      "sha256": "b8d34273a98fee7ebfe30e642028a4f4f9402c72cd03eaf1035a50497669cf91"
+      "bytes": 186984,
+      "sha256": "41d87c6e64eb19c684042e2e3fcacc711f3961248d9ec0cb5aa1d182b524b9d0"
     },
     {
       "path": "sw.js",
