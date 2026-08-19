@@ -57,7 +57,7 @@ function sourceBetween(source, startMarker, endMarker) {
   assert.strictEqual(policy.safeVoiceAudioRecording({ ...baseRecord, support_hold_state: 'active' }).canDelete, false, 'active authorized holds must prevent immediate deletion until closed');
   assert.strictEqual(policy.voiceAudioQuotaSummary(95 * 1024 * 1024).nearLimit, true, 'users must be warned before a maximum-size capture could be blocked');
 
-  const migration = read('supabase/migrations/20260809005241_ai_voice_audio_evidence.sql');
+  const migration = read('supabase/migrations/20260809031711_ai_voice_audio_evidence.sql');
   assert(migration.includes("'ai-voice-audio-evidence'"));
   assert(migration.includes('public = false'), 'the Storage bucket must stay private');
   assert(migration.includes('file_size_limit'));

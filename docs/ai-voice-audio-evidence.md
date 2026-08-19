@@ -57,7 +57,7 @@ Reference: <https://supabase.com/docs/guides/platform/manage-your-usage/storage-
 1. Fetch and integrate the then-current `origin/main`; review that the final diff contains only Voice To Quote audio evidence and direct conflict resolutions.
 2. Rerun all focused Voice To Quote tests and the local browser fixture. Perform a real signed-in live-microphone check with an isolated test account only if separately authorized.
 3. Deploy the backward-compatible `voice-transcripts` Edge Function update. It accepts the prior text-only notice during cache rollout, but optional audio still requires the new notice exactly.
-4. Apply `20260809005241_ai_voice_audio_evidence.sql`. Verify the bucket is private, allowed MIME types and 6 MiB limit are present, browser roles have no audio table/Storage access, and direct transcript deletion is revoked.
+4. Apply `20260809031711_ai_voice_audio_evidence.sql`. Verify the bucket is private, allowed MIME types and 6 MiB limit are present, browser roles have no audio table/Storage access, and direct transcript deletion is revoked.
 5. Set a dedicated high-entropy `VOICE_AUDIO_CLEANUP_TOKEN` Edge secret. Do not reuse an API key or expose it to the browser.
 6. Deploy the new `voice-audio` Edge Function. Verify unauthenticated owner/support calls fail, wrong cleanup tokens fail, and responses use `Cache-Control: no-store`.
 7. With isolated non-customer identities, verify owner/cross-account RLS behavior, signed upload/finalization, 60-second playback, delete, preserve, exact-case support access, case close, and cleanup. Do not query customer records.

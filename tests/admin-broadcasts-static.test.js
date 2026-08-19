@@ -10,7 +10,7 @@ const dashboard = read('dashboard.html');
 const builder = read('quote-builder.html');
 const loader = read('app-broadcasts.js');
 const migration = read('supabase/migrations/20260621120000_admin_broadcast_messages.sql');
-const adminEmailMigration = read('supabase/migrations/20260802005740_add_admin_email_routing.sql');
+const adminEmailMigration = read('supabase/migrations/20260802031656_add_admin_email_routing.sql');
 
 assert(settings.includes('id="userMessagesTabLink"'), 'settings should expose an admin-only User Messages tab link');
 assert(settings.includes('id="tab-user-messages"'), 'settings should include the User Messages admin panel');

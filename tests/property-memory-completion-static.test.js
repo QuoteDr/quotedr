@@ -8,7 +8,7 @@ const memory = fs.readFileSync(path.join(root, 'property-memory.js'), 'utf8');
 const storage = fs.readFileSync(path.join(root, 'quote-storage.js'), 'utf8');
 const supabase = fs.readFileSync(path.join(root, 'supabase-v2.js'), 'utf8');
 const grants = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20260521020743_tighten_private_table_anon_access.sql'), 'utf8');
-const rls = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20260807022336_team_accounts_rbac.sql'), 'utf8');
+const rls = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20260808000732_team_accounts_rbac.sql'), 'utf8');
 
 assert(builder.includes('id="managePropertyMemoryBtn"') && builder.includes('Manage Property Memory'), 'the address area needs an obvious manager entry point');
 assert(builder.includes('id="propertyMemoryReminderArea"') && builder.includes('aria-live="polite"'), 'matching reminders need a non-destructive live region');

@@ -10,9 +10,9 @@ const ui = read('ai-operations.js');
 const core = read('ai-operations-core.js');
 const settings = read('settings.html');
 const edgeFunction = read('supabase/functions/ai-operations/index.ts');
-const migration = read('supabase/migrations/20260808152738_ai_operations_dashboard.sql');
-const handoffMigration = read('supabase/migrations/20260808161014_ai_operations_coordinator_handoff.sql');
-const inboxMigration = read('supabase/migrations/20260808165116_ai_operations_coordinator_inbox.sql');
+const migration = read('supabase/migrations/20260808182320_ai_operations_dashboard.sql');
+const handoffMigration = read('supabase/migrations/20260808182344_ai_operations_coordinator_handoff.sql');
+const inboxMigration = read('supabase/migrations/20260808182403_ai_operations_coordinator_inbox.sql');
 const config = read('supabase/config.toml');
 
 ['incomingQueue', 'engineeringQueue', 'deployQueue', 'followupQueue', 'coordinatorInbox', 'improvementFeed', 'commonTopics'].forEach(id => {

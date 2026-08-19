@@ -203,7 +203,7 @@ Forbidden samples (expected true 404/403, never 200/redirect-to-app/fallback HTM
 /OVERNIGHT_TASKS.md
 /tests/ai-operations-core.test.js
 /supabase/functions/ai-assistant/index.ts
-/supabase/migrations/20260808152738_ai_operations_dashboard.sql
+/supabase/migrations/20260808182320_ai_operations_dashboard.sql
 /android-app/package.json
 /mobile-companion/package.json
 /package.json

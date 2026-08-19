@@ -27,7 +27,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
   assert.strictEqual(policy.normalizeVoiceTranscriptSupportOffset('-3'), 0);
   assert.strictEqual(policy.normalizeVoiceTranscriptSupportOffset('50'), 50);
 
-  const migration = read('supabase/migrations/20260807111159_ai_voice_transcript_history.sql');
+  const migration = read('supabase/migrations/20260808230520_ai_voice_transcript_history.sql');
   assert(migration.includes('create table if not exists public.ai_voice_transcripts'));
   assert(migration.includes('create table if not exists public.ai_voice_transcript_preferences'));
   assert(migration.includes('create table if not exists public.ai_voice_transcript_support_access'));

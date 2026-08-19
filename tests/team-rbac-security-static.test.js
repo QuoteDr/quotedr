@@ -5,11 +5,11 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
-const migration = read('supabase/migrations/20260807022336_team_accounts_rbac.sql');
-const fieldMigration = read('supabase/migrations/20260807110226_custom_role_field_permissions.sql');
-const roleRepairMigration = read('supabase/migrations/20260809024931_repair_account_role_save.sql');
-const invitationRepairMigration = read('supabase/migrations/20260810230104_repair_team_invitation_acceptance.sql');
-const indexMigration = read('supabase/migrations/20260808000920_team_rbac_foreign_key_indexes.sql');
+const migration = read('supabase/migrations/20260808000732_team_accounts_rbac.sql');
+const fieldMigration = read('supabase/migrations/20260808000808_custom_role_field_permissions.sql');
+const roleRepairMigration = read('supabase/migrations/20260809041332_repair_account_role_save.sql');
+const invitationRepairMigration = read('supabase/migrations/20260811020241_repair_team_invitation_acceptance.sql');
+const indexMigration = read('supabase/migrations/20260808001022_team_rbac_foreign_key_indexes.sql');
 const invitationFixture = read('supabase/tests/team_invitation_acceptance.sql');
 const invitationConcurrencyFixture = read('supabase/tests/team_invitation_acceptance_concurrency.sql');
 const invitationApiFixture = read('tests/team-invitation-disposable-api.integration.mjs');

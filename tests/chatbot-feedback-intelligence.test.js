@@ -38,7 +38,8 @@ assert(edge.includes('await verifyAdmin(req)'), 'administrator reads and mutatio
 assert(edge.includes('fingerprintsReturned: false'), 'admin response must document fingerprint minimization');
 assert(!/user_fingerprint\s*:/m.test(edge), 'fingerprints must not be serialized in the admin response');
 
-const migration = read('supabase/migrations/20260805004527_chatbot_feedback_intelligence.sql');
+const migration = read('supabase/migrations/20260808173300_chatbot_feedback_intelligence.sql');
+const cooldownRepairMigration = read('supabase/migrations/20260808173611_fix_chatbot_feedback_review_cooldown.sql');
 assert(migration.includes('enable row level security'), 'feedback tables must enable RLS');
 assert(migration.includes('revoke all on table public.chatbot_feedback_observations from public, anon, authenticated'), 'contractors must have no direct observation access');
 assert(migration.includes('revoke all on function public.record_chatbot_feedback_observation') && migration.includes('to service_role'), 'only the server may execute the recorder RPC');
@@ -46,7 +47,8 @@ assert(migration.includes("p_user_id::text || ':' || p_topic_key"), 'fingerprint
 assert(migration.includes('count(distinct observation.user_fingerprint)'), 'alerts must count distinct users');
 assert(migration.includes('v_settings.window_days') && migration.includes('v_settings.cooldown_days'), 'window and debounce must be enforced in the database');
 assert(migration.includes('v_theme.reviewed_at') && migration.includes('v_theme.snoozed_until'), 'review and snooze state must affect alerts');
-assert(migration.includes('greatest(v_count_from, v_theme.reviewed_at)') && !migration.includes('pg_catalog.greatest'), 'review cooldown must use valid PostgreSQL GREATEST syntax');
+assert(migration.includes('pg_catalog.greatest(v_count_from, v_theme.reviewed_at)'), 'the historical migration must match the production ledger');
+assert(cooldownRepairMigration.includes("replace(function_definition, 'pg_catalog.greatest', 'greatest')"), 'the follow-up migration must repair the invalid qualified GREATEST expression');
 assert(migration.includes('retention_days integer not null default 90'), 'minimized observations must have a bounded default retention');
 assert(!/chatbot_feedback_observations[\s\S]{0,1200}\b(question|answer|message|email|client_name)\s+(text|varchar)/i.test(migration), 'observation schema must not contain raw chat or direct identity columns');
 

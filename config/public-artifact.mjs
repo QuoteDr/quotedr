@@ -190,7 +190,7 @@ export const publicArtifactConfig = Object.freeze({
     '/sw.js.map',
     '/supabase.js.backup',
     '/supabase/functions/ai-assistant/index.ts',
-    '/supabase/migrations/20260808152738_ai_operations_dashboard.sql',
+    '/supabase/migrations/20260808182320_ai_operations_dashboard.sql',
     '/supabase-schema.sql',
     '/temp_settings_end.html',
     '/templates/index.html',

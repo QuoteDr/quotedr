@@ -6,7 +6,7 @@ const read = (name) => fs.readFileSync(path.join(root, name), 'utf8');
 
 const intake = read('supabase/functions/support-intake/index.ts');
 const adapter = read('supabase/functions/_shared/support-agent-adapter.ts');
-const migration = read('supabase/migrations/20260809022026_support_email_intake.sql');
+const migration = read('supabase/migrations/20260811031843_support_email_intake.sql');
 const dashboard = read('ai-operations.js');
 const settings = read('settings.html');
 const config = read('supabase/config.toml');

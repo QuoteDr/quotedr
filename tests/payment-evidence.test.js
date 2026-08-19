@@ -33,7 +33,8 @@ test('payment proof filenames cannot carry paths or control characters', async (
 });
 
 test('payment evidence storage is private and browser roles have no direct data access', () => {
-  const migration = read('supabase/migrations/20260818180914_payment_evidence.sql');
+  const migration = read('supabase/migrations/20260819015013_payment_evidence.sql');
+  const foreignKeyIndexesMigration = read('supabase/migrations/20260819015108_payment_evidence_fk_indexes.sql');
   assert(migration.includes("'document-payment-evidence'"));
   assert(/'document-payment-evidence',[\s\S]*?false,[\s\S]*?8388608/.test(migration));
   assert(migration.includes("array['image/jpeg', 'image/png', 'application/pdf']"));
@@ -43,8 +44,8 @@ test('payment evidence storage is private and browser roles have no direct data 
   assert(migration.includes('payment_evidence_one_active_per_payment_idx'));
   assert(migration.includes('on public.payment_evidence(payment_record_id, uploaded_by_role)'));
   assert(migration.includes('where deleted_at is null'));
-  assert(migration.includes('payment_evidence_quote_id_fkey_idx'));
-  assert(migration.includes('payment_evidence_invoice_id_fkey_idx'));
+  assert(foreignKeyIndexesMigration.includes('payment_evidence_quote_id_fkey_idx'));
+  assert(foreignKeyIndexesMigration.includes('payment_evidence_invoice_id_fkey_idx'));
 });
 
 test('the payment function authorizes, verifies, and signs evidence without changing accounting amounts', () => {

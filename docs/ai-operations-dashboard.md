@@ -19,9 +19,9 @@ Sensitive billing, payment, data-loss, privacy, access, legal/signature, cross-d
 
 ## Backend
 
-- Base migration: `supabase/migrations/20260808152738_ai_operations_dashboard.sql`
-- Coordinator handoff migration: `supabase/migrations/20260808161014_ai_operations_coordinator_handoff.sql`
-- Coordinator inbox migration: `supabase/migrations/20260808165116_ai_operations_coordinator_inbox.sql`
+- Base migration: `supabase/migrations/20260808182320_ai_operations_dashboard.sql`
+- Coordinator handoff migration: `supabase/migrations/20260808182344_ai_operations_coordinator_handoff.sql`
+- Coordinator inbox migration: `supabase/migrations/20260808182403_ai_operations_coordinator_inbox.sql`
 - Edge Function: `supabase/functions/ai-operations/index.ts`
 - Function configuration: `[functions.ai-operations]` with `verify_jwt = true`
 
@@ -55,7 +55,7 @@ The three dashboard/inbox migrations and JWT-protected dashboard function are de
 
 The receiving side is intentionally separate from the browser-facing `ai-operations` function:
 
-- Migration: `supabase/migrations/20260808200503_ai_operations_coordinator_receiver.sql`
+- Migration: `supabase/migrations/20260808210345_ai_operations_coordinator_receiver.sql`
 - Narrow Edge Function: `supabase/functions/ai-operations-coordinator/index.ts`
 - Single-run local bridge: `scripts/ai-operations-coordinator.mjs`
 - Synthetic no-data fixture: `tests/fixtures/ai-operations-coordinator-synthetic.json`

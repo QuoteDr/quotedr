@@ -224,7 +224,7 @@ begin
   v_count_from := v_now - pg_catalog.make_interval(days => v_settings.window_days);
   if v_theme.reviewed_at is not null
      and (v_theme.alerted_at is null or v_theme.reviewed_at >= v_theme.alerted_at) then
-    v_count_from := greatest(v_count_from, v_theme.reviewed_at);
+    v_count_from := pg_catalog.greatest(v_count_from, v_theme.reviewed_at);
   end if;
 
   select count(distinct observation.user_fingerprint)::integer

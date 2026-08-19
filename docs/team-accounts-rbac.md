@@ -226,7 +226,7 @@ This produces these invariants:
 
 ## Rollout plan
 
-1. Apply `20260807022336_team_accounts_rbac.sql`, then `20260807110226_custom_role_field_permissions.sql`, then `20260808000920_team_rbac_foreign_key_indexes.sql`. Verify backfill counts, policies, grants, role RPCs, default field mappings, and foreign-key index coverage in a staging project.
+1. Apply `20260808000732_team_accounts_rbac.sql`, then `20260808000808_custom_role_field_permissions.sql`, then `20260808001022_team_rbac_foreign_key_indexes.sql`. Verify backfill counts, policies, grants, role RPCs, default field mappings, and foreign-key index coverage in a staging project.
 2. Deploy `team-account` and the updated protected Edge Functions together. Configure `TEAM_DATA_REFERENCE_SECRET` or deliberately use the existing service-role secret fallback.
 3. Add the production and local `team-invite.html` URLs to the Supabase Auth redirect allowlist.
 4. Publish the static client files after the database and functions are available. Legacy owner fallback preserves current local behavior during the transition, but invitations should remain hidden until the backend is live.

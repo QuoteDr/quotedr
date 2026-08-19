@@ -144,7 +144,7 @@ this release, use this sequence only after QBO has terminal verification:
    `QUOTEDR_SUPPORT_INTAKE_ACTOR_ID` directly in the Edge Function secret
    store without displaying values. The actor ID must be a dedicated existing
    service identity, never a customer or browser account.
-4. Apply only `20260809022026_support_email_intake.sql`, then deploy only
+4. Apply only `20260811031843_support_email_intake.sql`, then deploy only
    `support-intake`. Re-run the reviewed HMAC, unauthorized-user, raw-message,
    redacted-handoff, and no-autosend checks before releasing the static assets.
    Do not deploy the Google bridge, create a Gmail watch, set a Pub/Sub

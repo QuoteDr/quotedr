@@ -12,7 +12,7 @@ const privacy = read('recording-privacy.js');
 const theme = read('brand-theme.css');
 const analyticsBrief = read('supabase/functions/analytics-brief/index.ts');
 const adminMigration = read('supabase/migrations/20260713150000_expand_quotedr_admin_access.sql');
-const adminEmailMigration = read('supabase/migrations/20260802005740_add_admin_email_routing.sql');
+const adminEmailMigration = read('supabase/migrations/20260802031656_add_admin_email_routing.sql');
 const browserFixture = read('tests/recording-privacy-browser-fixture.html');
 
 const inlineScripts = Array.from(settings.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi));

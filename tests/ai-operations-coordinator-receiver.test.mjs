@@ -12,7 +12,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 const edge = read('supabase/functions/ai-operations-coordinator/index.ts');
 const sensitivity = read('supabase/functions/_shared/coordinator-review-sensitivity.mjs');
-const migration = read('supabase/migrations/20260808200503_ai_operations_coordinator_receiver.sql');
+const migration = read('supabase/migrations/20260808210345_ai_operations_coordinator_receiver.sql');
 const config = read('supabase/config.toml');
 const envExample = read('scripts/ai-operations-coordinator.env.example');
 const fixture = JSON.parse(read('tests/fixtures/ai-operations-coordinator-synthetic.json'));

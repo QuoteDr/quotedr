@@ -27,7 +27,7 @@ identifiers.
 Apply:
 
 ```text
-supabase/migrations/20260801004920_visitor_traffic_alerts.sql
+supabase/migrations/20260802031650_visitor_traffic_alerts.sql
 ```
 
 Deploy:

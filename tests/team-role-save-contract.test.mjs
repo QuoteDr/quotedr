@@ -12,8 +12,8 @@ import {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
-const originalMigration = read('supabase/migrations/20260807110226_custom_role_field_permissions.sql');
-const repairMigration = read('supabase/migrations/20260809024931_repair_account_role_save.sql');
+const originalMigration = read('supabase/migrations/20260808000808_custom_role_field_permissions.sql');
+const repairMigration = read('supabase/migrations/20260809041332_repair_account_role_save.sql');
 const accountApi = read('supabase/functions/team-account/index.ts');
 
 function estimatorDuplicate(overrides = {}) {

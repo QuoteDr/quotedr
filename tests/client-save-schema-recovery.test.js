@@ -4,7 +4,7 @@ const vm = require('vm');
 
 const coordinator = fs.readFileSync('save-coordinator.js', 'utf8');
 const dashboard = fs.readFileSync('dashboard.html', 'utf8');
-const migration = fs.readFileSync('supabase/migrations/20260804015921_repair_client_sync_schema.sql', 'utf8');
+const migration = fs.readFileSync('supabase/migrations/20260804022657_repair_client_sync_schema.sql', 'utf8');
 
 function extractFunction(source, name) {
   const marker = `function ${name}(`;

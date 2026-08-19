@@ -120,7 +120,7 @@ assert(newsletter.includes("capture('newsletter_signup_completed'"), 'newsletter
 const settings = read('settings.html');
 const trafficFunction = read('supabase/functions/analytics-traffic/index.ts');
 const alertFunction = read('supabase/functions/visitor-alert/index.ts');
-const migration = read('supabase/migrations/20260801004920_visitor_traffic_alerts.sql');
+const migration = read('supabase/migrations/20260802031650_visitor_traffic_alerts.sql');
 const config = read('supabase/config.toml');
 
 assert(settings.includes('id="siteTrafficTabLink"') && settings.includes('id="tab-site-traffic"'), 'settings should expose the admin traffic panel');
