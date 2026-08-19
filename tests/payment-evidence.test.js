@@ -80,10 +80,22 @@ test('client and contractor interfaces keep evidence optional and warn before up
   assert(viewer.includes('I checked this file for sensitive information.'));
   assert(viewer.includes("if (evidenceFile)"), 'the client may report a payment without a proof');
   assert(browser.includes('uploadToSignedUrl'));
+  assert(browser.includes('window.validatePaymentEvidenceFile = validatePaymentEvidenceFile;'));
+  assert(browser.includes('window.uploadPaymentEvidence = uploadPaymentEvidence;'));
   assert(!browser.includes('readAsDataURL'), 'proof bytes must upload directly rather than entering JSON or local storage');
   assert(fixture.includes('<meta name="viewport" content="width=device-width, initial-scale=1">'));
   assert(fixture.includes('id="portal-visibility"'));
   assert(!/id="portal-visibility"[^>]*checked/.test(fixture), 'the browser fixture must preserve default-off sharing');
+});
+
+test('payment-proof callers request the same current shared-client bundle', () => {
+  const dashboard = read('dashboard.html');
+  const viewer = read('interactive-quote-viewer.html');
+  const dashboardVersion = dashboard.match(/supabase-v2\.js\?v=(\d+)/)?.[1];
+  const viewerVersion = viewer.match(/supabase-v2\.js\?v=(\d+)/)?.[1];
+  assert.equal(dashboardVersion, '2026081901');
+  assert.equal(viewerVersion, dashboardVersion);
+  assert.notEqual(dashboardVersion, '2026081801', 'a stale client bundle leaves payment-proof helpers undefined');
 });
 
 test('proof visibility and deletion are explicit on both surfaces', () => {
