@@ -211,12 +211,12 @@ begin
   end if;
 
   if v_client_number is null then
-    update public.clients
+    update public.clients as target_client
     set client_number = 0,
         updated_at = now()
-    where id = p_client_id
-      and user_id = v_owner_user_id
-      and client_number is null;
+    where target_client.id = p_client_id
+      and target_client.user_id = v_owner_user_id
+      and target_client.client_number is null;
 
     select c.client_number
     into v_client_number

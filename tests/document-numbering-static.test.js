@@ -13,6 +13,7 @@ const allowlist = read('config/public-artifact.mjs');
 
 assert(migration.includes('add column if not exists client_number bigint'), 'clients need permanent account-scoped numbers');
 assert(migration.includes('clients_user_client_number_uidx'), 'client numbers must be unique per owner');
+assert(migration.includes('target_client.client_number is null'), 'the fallback client-number update must disambiguate the table column from the RPC output column');
 assert(migration.includes('account_document_sequences') && migration.includes('on conflict (account_id, document_type, period_key) do update'), 'document sequences must be reserved atomically');
 assert(migration.includes('account_document_numbers') && migration.includes('unique (account_id, normalized_number)'), 'reserved human numbers need an immutable collision registry');
 assert(migration.includes('security invoker') && migration.includes('Account membership required'), 'the reservation RPC must retain an explicit membership boundary');
