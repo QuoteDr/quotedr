@@ -2384,6 +2384,75 @@
         z-index: 99999 !important;
     }
 
+    body.quote-builder-document-closed {
+        overflow: hidden;
+    }
+    .quote-builder-launcher {
+        position: fixed;
+        inset: 0;
+        z-index: 1035;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background:
+            radial-gradient(circle at top, rgba(26, 86, 160, 0.18), transparent 42%),
+            linear-gradient(145deg, #eef5fc 0%, #f8fbff 52%, #edf3f8 100%);
+    }
+    body.quote-builder-document-closed .quote-builder-launcher {
+        display: flex;
+    }
+    .quote-builder-launcher-card {
+        width: min(680px, 100%);
+        border: 1px solid rgba(26, 86, 160, 0.16);
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.98);
+        box-shadow: 0 24px 70px rgba(15, 52, 96, 0.18);
+        padding: clamp(24px, 5vw, 44px);
+        text-align: center;
+    }
+    .quote-builder-launcher-icon {
+        width: 72px;
+        height: 72px;
+        margin: 0 auto 18px;
+        display: grid;
+        place-items: center;
+        border-radius: 22px;
+        color: #fff;
+        background: linear-gradient(135deg, #1a56a0, #0f3460);
+        font-size: 1.8rem;
+        box-shadow: 0 12px 28px rgba(26, 86, 160, 0.24);
+    }
+    .quote-builder-launcher-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 26px;
+    }
+    .quote-builder-launcher-actions .btn {
+        min-height: 58px;
+        font-weight: 700;
+        border-radius: 14px;
+    }
+    .quote-builder-launcher-status {
+        min-height: 1.5rem;
+        margin-top: 18px;
+        color: #5f6f82;
+        font-size: 0.9rem;
+    }
+    @media (max-width: 576px) {
+        .quote-builder-launcher {
+            padding: 14px;
+        }
+        .quote-builder-launcher-card {
+            border-radius: 18px;
+            padding: 28px 20px;
+        }
+        .quote-builder-launcher-actions {
+            grid-template-columns: 1fr;
+        }
+    }
+
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="card-payment-rules.js?v=2026080301"></script>
@@ -2405,8 +2474,25 @@ if (location.search.includes('debug')) {
 <script src="error-reporter.js"></script>
     <script src="analytics.js?v=1778059000"></script>
 </head>
-<body>
-    <div class="container-fluid py-4">
+<body class="quote-builder-document-closed">
+    <section id="quoteBuilderLauncher" class="quote-builder-launcher" role="dialog" aria-modal="true" aria-labelledby="quoteBuilderLauncherTitle" aria-describedby="quoteBuilderLauncherDescription">
+        <div class="quote-builder-launcher-card">
+            <div class="quote-builder-launcher-icon" aria-hidden="true"><i class="fas fa-file-circle-plus"></i></div>
+            <h1 id="quoteBuilderLauncherTitle" class="h3 fw-bold mb-2">Choose a quote to begin</h1>
+            <p id="quoteBuilderLauncherDescription" class="text-muted mb-0">The builder only opens after a quote has been created or selected. This keeps every saved change attached to the correct client and quote.</p>
+            <div class="quote-builder-launcher-actions">
+                <button type="button" class="btn btn-primary" id="quoteBuilderStartNewBtn" onclick="quoteStorageStartNewQuoteFlow()">
+                    <i class="fas fa-plus me-2"></i>Start New Quote
+                </button>
+                <button type="button" class="btn btn-outline-primary" id="quoteBuilderOpenExistingBtn" onclick="quoteStorageOpenExistingFlow()">
+                    <i class="fas fa-folder-open me-2"></i>Open Existing Quote
+                </button>
+            </div>
+            <div id="quoteBuilderLauncherStatus" class="quote-builder-launcher-status" role="status" aria-live="polite"></div>
+            <a href="dashboard.html" class="btn btn-link btn-sm mt-1"><i class="fas fa-arrow-left me-1"></i>Back to Dashboard</a>
+        </div>
+    </section>
+    <div id="quoteBuilderWorkspace" class="container-fluid py-4" inert aria-hidden="true">
         <!-- Professional Header -->
         <div class="d-flex flex-column align-items-center mb-2" style="overflow: visible; padding-top: 8px; padding-bottom: 8px;">
             <!-- QuoteDr app header -->
@@ -17673,7 +17759,7 @@ Example:
         // Save/load/session core moved to quote-storage.js
     </script>
     <script src="change-orders.js?v=1778152100"></script>
-    <script src="quote-storage.js?v=2026080201"></script>
+    <script src="quote-storage.js?v=2026081901"></script>
     <script src="property-memory.js?v=2026081001"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
@@ -17799,8 +17885,9 @@ Example:
         updateQuoteDividerLabels();
         renderRooms();
 
-        // Auto-generate quote number on load if not already set
-        if (!document.getElementById('quoteNumber').value) {
+        // Generate numbers only for an intentionally opened document. The
+        // closed launcher state must never manufacture a saveable blank quote.
+        if (typeof quoteStorageHasOpenDocument === 'function' && quoteStorageHasOpenDocument() && !document.getElementById('quoteNumber').value) {
             document.getElementById('quoteNumber').value = generateQuoteNumber();
         }
 

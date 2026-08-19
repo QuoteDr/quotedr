@@ -43,9 +43,9 @@ assert(
 );
 
 assert(
-  storage.includes('Choose Another Quote/Draft') &&
+    storage.includes('Choose Another Quote/Draft') &&
     storage.includes("secondaryText: 'Start New Quote'") &&
-    storage.includes("quote-builder.html?new=1"),
+    storage.includes("dashboard.html?new=1"),
   'Quote builder portal lock should let users choose another draft or start a new quote'
 );
 

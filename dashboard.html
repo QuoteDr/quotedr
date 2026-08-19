@@ -4020,6 +4020,14 @@
                     updateStats(allQuotes);
                     applyDashboardDefaultView();
                     schedulePhotoStorageOptimization();
+                    var dashboardParams = new URLSearchParams(window.location.search);
+                    if (dashboardParams.get('new') === '1' && !window._dashboardNewQuoteAutoOpened) {
+                        window._dashboardNewQuoteAutoOpened = true;
+                        dashboardParams.delete('new');
+                        var cleanQuery = dashboardParams.toString();
+                        history.replaceState(null, '', window.location.pathname + (cleanQuery ? '?' + cleanQuery : '') + window.location.hash);
+                        openNewQuoteModal();
+                    }
                 } else {
                     document.getElementById('quotesList').innerHTML = '<div class="alert alert-warning">Please <a href="login.html">log in</a> to see your quotes.</div>';
                 }

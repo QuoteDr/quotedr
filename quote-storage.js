@@ -20,6 +20,66 @@
         var quoteStorageRemoteUpdate = null;
         var quoteStorageRemotePromptOpen = false;
         var quoteStorageRemoteConflictPromise = null;
+        var quoteStorageDocumentState = 'closed';
+
+        function quoteStorageSetDocumentState(state, detail) {
+            quoteStorageDocumentState = state === 'open' ? 'open' : (state === 'loading' ? 'loading' : 'closed');
+            window._quoteDocumentState = quoteStorageDocumentState;
+            var isOpen = quoteStorageDocumentState === 'open';
+            var isLoading = quoteStorageDocumentState === 'loading';
+            document.body.classList.toggle('quote-builder-document-closed', !isOpen);
+            var launcher = document.getElementById('quoteBuilderLauncher');
+            if (launcher) launcher.setAttribute('aria-hidden', isOpen ? 'true' : 'false');
+            var workspace = document.getElementById('quoteBuilderWorkspace');
+            if (workspace) {
+                workspace.toggleAttribute('inert', !isOpen);
+                workspace.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+            }
+            var status = document.getElementById('quoteBuilderLauncherStatus');
+            if (status) {
+                status.innerHTML = isLoading
+                    ? '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>' + quoteStorageEscapeHtml(detail || 'Opening quote...')
+                    : quoteStorageEscapeHtml(detail || '');
+            }
+            ['quoteBuilderStartNewBtn', 'quoteBuilderOpenExistingBtn'].forEach(function(id) {
+                var button = document.getElementById(id);
+                if (button) button.disabled = isLoading;
+            });
+            if (!isOpen) {
+                clearTimeout(_autoSaveTimer);
+                clearTimeout(autoSaveTimer);
+                unsavedChanges = false;
+            }
+        }
+
+        function quoteStorageHasOpenDocument() {
+            return quoteStorageDocumentState === 'open';
+        }
+
+        function quoteStorageRequireOpenDocument(actionLabel) {
+            if (quoteStorageHasOpenDocument()) return true;
+            quoteStorageSetDocumentState('closed', 'Start a new quote or open an existing quote before ' + (actionLabel || 'continuing') + '.');
+            return false;
+        }
+
+        async function quoteStorageStartNewQuoteFlow() {
+            if (quoteStorageHasOpenDocument() && typeof qdLeavePage === 'function') {
+                await qdLeavePage('dashboard.html?new=1');
+                return;
+            }
+            quoteStorageSetDocumentState('loading', 'Opening the new quote setup...');
+            window.location.href = 'dashboard.html?new=1';
+        }
+
+        async function quoteStorageOpenExistingFlow() {
+            quoteStorageSetDocumentState('closed');
+            await showLoadModal();
+        }
+
+        window.quoteStorageHasOpenDocument = quoteStorageHasOpenDocument;
+        window.quoteStorageSetDocumentState = quoteStorageSetDocumentState;
+        window.quoteStorageStartNewQuoteFlow = quoteStorageStartNewQuoteFlow;
+        window.quoteStorageOpenExistingFlow = quoteStorageOpenExistingFlow;
 
         function parseQuoteMoney(value) {
             var raw = String(value || '');
@@ -221,6 +281,7 @@
             clearTimeout(_autoSaveTimer);
             clearTimeout(autoSaveTimer);
             clearPortalLockedBuilderRestoreState();
+            quoteStorageSetDocumentState('closed');
             if (typeof qdAlert === 'function') {
                 var choice = true;
                 if (typeof qdConfirm === 'function') {
@@ -238,7 +299,7 @@
                     await qdAlert(message, { title: 'Portal Document Locked', type: 'warning' });
                 }
                 if (choice === 'new') {
-                    window.location.href = 'quote-builder.html?new=1';
+                    window.location.href = 'dashboard.html?new=1';
                 } else {
                     window.location.href = 'dashboard.html';
                 }
@@ -527,6 +588,7 @@
         }
 
         function quoteStorageFinishResolvedLoad(resolved, cloudDetail) {
+            quoteStorageSetDocumentState('open');
             clearTimeout(_autoSaveTimer);
             if (!resolved || resolved.source === 'cloud') {
                 quoteStorageRemoteUpdate = null;
@@ -1195,6 +1257,7 @@
 
         function markUnsaved() {
             if (quoteStoragePortalExitActive()) return;
+            if (!quoteStorageHasOpenDocument()) return;
             unsavedChanges = true;
             window._quoteLocalEditAt = new Date().toISOString();
             if (quoteStorageRemoteUpdate) {
@@ -1221,49 +1284,7 @@
         }
 
         async function newQuote() {
-            if (!await qdConfirm('Start a new quote? Any unsaved changes will be lost.', {
-                title: 'Start New Quote',
-                okText: 'Start New',
-                okClass: 'btn-warning',
-                type: 'warning'
-            })) return;
-            window._quoteFullyLoaded = true; // new quote - intentionally empty, allow save
-            // Clear all fields
-            ['quoteTitle','clientName','clientEmail','projectAddress','quoteNotes'].forEach(function(id) {
-                var el = document.getElementById(id);
-                if (el) el.value = '';
-            });
-            rooms = [];
-            window._quoteReviewProfile = null;
-            window._propertyMemoryReminderAcknowledgements = [];
-            if (window.QuoteDrPropertyMemory && typeof window.QuoteDrPropertyMemory.setQuoteReminderAcknowledgements === 'function') {
-                window.QuoteDrPropertyMemory.setQuoteReminderAcknowledgements([]);
-            }
-            renderRooms();
-            document.getElementById('quoteNumber').value = nextQuoteNumberValue();
-            checkQuoteNumberDuplicate();
-            currentQuoteId = null;
-            window._supabaseQuoteId = null;
-            window._loadedQuoteData = {};
-            window._currentQuoteData = {};
-            window._quoteServerUpdatedAt = null;
-            window._quoteLocalEditAt = null;
-            window._quotePayableTotalCents = 0;
-            window._quoteBalanceDueCents = 0;
-            window._quotePaymentFallbackBalanceDue = null;
-            setQuoteClientAdjustment(null);
-            setQuotePaymentsReceived(null);
-            try { localStorage.removeItem('ald_active_quote_id'); } catch (e) {}
-            renderRooms();
-            window._quoteDocumentType = 'quote';
-            window._parentQuoteId = '';
-            window._parentQuoteNumber = '';
-            window._parentQuoteTotal = 0;
-            window._changeOrderNumber = 0;
-            if (typeof updateChangeOrderModeUI === 'function') updateChangeOrderModeUI();
-            saveFileHandle = null; // force "Save As" on next save
-            unsavedChanges = false;
-            document.title = 'Quote Builder - QuoteDr';
+            await quoteStorageStartNewQuoteFlow();
         }
 
         function qdAfterManualQuoteSave() {
@@ -1273,6 +1294,7 @@
         }
 
 async function saveQuote() {
+            if (!quoteStorageRequireOpenDocument('saving')) return;
             // Always show save dialog first
             var qData = collectQuoteData();
             if (!qData.clientName && !qData.rooms.length) {
@@ -1671,6 +1693,7 @@ async function saveQuote() {
             }
             saveFileHandle = resolved.fromRecovery ? null : selectedFile.handle;
             applyQuoteData(data);
+            quoteStorageSetDocumentState('open');
             startAutoSave();
             updateSaveStatus('loaded', selectedFile.file.name);
             if (resolved.fromRecovery) {
@@ -1732,6 +1755,7 @@ async function saveQuote() {
                         <div class="modal-footer flex-wrap gap-2">
                             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                             <button type="button" class="btn btn-outline-secondary" onclick="loadQuoteFromLocalFile()" id="openLocalFileBtn"><i class="fas fa-folder me-1"></i>Open Local File</button>
+                            <button type="button" class="btn btn-primary" onclick="quoteStorageStartNewQuoteFlow()"><i class="fas fa-plus me-1"></i>Start New Quote</button>
                         </div>
                     </div>
                 </div>`;
@@ -1748,7 +1772,7 @@ async function saveQuote() {
                 var result = await listCloudQuotes();
                 var quotes = quoteStorageActiveRows((result && result.data) ? result.data : []);
                 if (!quotes.length) {
-                    listEl.innerHTML = '<div class="text-muted small text-center py-3">No saved cloud quotes yet.<br>Save a quote first using the Save button.</div>';
+                    listEl.innerHTML = '<div class="text-muted small text-center py-3">No saved cloud quotes yet.<br>Start a new quote to create the first client-linked document.</div>';
                     return;
                 }
                 listEl.innerHTML = quotes.map(function(q) {
@@ -1808,6 +1832,7 @@ async function saveQuote() {
 
         function saveSessionQuote() {
             if (quoteStoragePortalExitActive()) return;
+            if (!quoteStorageHasOpenDocument()) return;
             try {
                 localStorage.setItem('ald_session_quote', JSON.stringify(collectQuoteData()));
             } catch(e) {}
@@ -1820,6 +1845,10 @@ async function saveQuote() {
         function updateDraftWarning() {
             var banner = document.getElementById('draftWarningBanner');
             if (!banner) return;
+            if (!quoteStorageHasOpenDocument()) {
+                banner.style.display = 'none';
+                return;
+            }
             // Hide if we have a local file handle OR a cloud save ID
             banner.style.display = (saveFileHandle || window._supabaseQuoteId) ? 'none' : 'block';
         }
@@ -1827,6 +1856,7 @@ async function saveQuote() {
         async function doAutoSave(options) {
             options = options || {};
             if (quoteStoragePortalExitActive()) return { state: 'skipped', reason: 'portal_locked' };
+            if (!quoteStorageHasOpenDocument()) return { state: 'skipped', reason: 'no_open_quote' };
             if (!unsavedChanges && options.force !== true) return { state: 'unchanged' };
             var t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             var el = document.getElementById('saveStatus');
@@ -1924,6 +1954,7 @@ async function saveQuote() {
         window.qdSaveBeforeNavigation = async function() {
             clearTimeout(_autoSaveTimer);
             if (quoteStoragePortalExitActive()) return true;
+            if (!quoteStorageHasOpenDocument()) return true;
             saveSessionQuote();
             if (quoteStorageRemoteUpdate && quoteStorageRemoteUpdate.hasLocalEdits) {
                 await quoteStoragePersistRemoteConflict(collectQuoteData());
@@ -1943,6 +1974,7 @@ async function saveQuote() {
         };
 
         function downloadQuoteFallback() {
+            if (!quoteStorageRequireOpenDocument('exporting')) return;
             const blob = new Blob([JSON.stringify(collectQuoteData(), null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -2011,10 +2043,12 @@ async function saveQuote() {
             const loadId = quoteStorageNormalizeCloudId(requestedLoadId);
             if (requestedLoadId && !loadId) console.warn('Ignored an invalid quote id in the page URL.');
             if (loadId && typeof loadQuoteFromSupabase === 'function') {
+                quoteStorageSetDocumentState('loading', 'Opening the selected quote...');
                 try {
                     const { data, error } = await loadQuoteFromSupabase(loadId);
                     if (error) {
                         console.warn('Could not load quote from cloud:', error.message);
+                        quoteStorageSetDocumentState('closed', 'That quote could not be opened. Choose another quote or start a new one.');
                     } else if (data) {
                         const q = data;
                         if (quoteIsPortalLockedForBuilder(q) && !quoteBuilderIsStartingChangeOrder()) {
@@ -2042,114 +2076,21 @@ async function saveQuote() {
                             window._loadedQuoteData = qData;
                             showClientNotesBanner(qData);
                         }
+                    } else {
+                        quoteStorageSetDocumentState('closed', 'That quote could not be found. Choose another quote or start a new one.');
                     }
                 } catch(e) {
                     console.warn('Error loading quote from cloud:', e);
+                    quoteStorageSetDocumentState('closed', 'That quote could not be opened. Choose another quote or start a new one.');
                 }
+            } else if (requestedLoadId) {
+                quoteStorageSetDocumentState('closed', 'That quote link is invalid. Choose another quote or start a new one.');
             }
         });
         // -- End Save / Load ------------------------------------------------------
 
-        function startupContinueSession() {
-            var session = null;
-            try { session = JSON.parse(localStorage.getItem('ald_session_quote')); } catch(e) {}
-            if (!session) {
-                // No saved session - just start fresh, no alert needed
-                updateDraftWarning();
-                return;
-            }
-            if (quoteDataIsPortalLockedForBuilder(session)) {
-                localStorage.removeItem('ald_session_quote');
-                updateDraftWarning();
-                if (typeof qdAlert === 'function') {
-                    qdAlert('The last opened document is already in a client portal, so it was not restored for editing. Remove it from the portal in the dashboard before editing.', {
-                        title: 'Portal Document Locked',
-                        type: 'warning'
-                    });
-                }
-                return;
-            }
-            // Hide startup modal if it's open
-            var sm = document.getElementById('startupModal');
-            if (sm) { var mi = bootstrap.Modal.getInstance(sm); if (mi) mi.hide(); }
-            cleanupModalBackdrop();
-            applyQuoteData(session);
-            if (session.quoteNumber) document.getElementById('quoteNumber').value = session.quoteNumber;
-            renderTermsCheckboxes(getQuoteTermsForRender(session));
-            // Cancel any autosave triggered during restore - we just loaded, nothing is actually unsaved
-            unsavedChanges = false;
-            clearTimeout(_autoSaveTimer);
-            var el = document.getElementById('saveStatus');
-            if (window._supabaseQuoteId) {
-                if (el) el.innerHTML = '<span style="color:#28a745;"><i class="fas fa-cloud"></i> Restored - ' + (session.clientName || 'quote') + '</span>';
-            } else {
-                if (el) el.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-history"></i> Session restored</span>';
-            }
-            updateDraftWarning();
-        }
-
-        function startupNewQuote() {
-            localStorage.removeItem("ald_active_quote_id");
-            window._supabaseQuoteId = null;
-            window._quoteReviewProfile = null;
-            localStorage.removeItem('ald_session_quote');
-            var modal = bootstrap.Modal.getInstance(document.getElementById('startupModal'));
-            if (modal) modal.hide();
-            cleanupModalBackdrop();
-            // Ensure quote number is set
-            if (!document.getElementById('quoteNumber').value) {
-                document.getElementById('quoteNumber').value = nextQuoteNumberValue();
-            }
-            // On mobile (no File System API), skip the file picker - just start fresh
-            if (window.showSaveFilePicker) {
-                setTimeout(async function() {
-                    try {
-                        saveFileHandle = await window.showSaveFilePicker({
-                            suggestedName: 'New Quote - ' + new Date().toISOString().slice(0,10) + '.qdr',
-                            types: [{ description: 'QuoteDr File', accept: { 'application/json': ['.qdr'] } }]
-                        });
-                        await writeToHandle(saveFileHandle);
-                        startAutoSave();
-                    } catch(err) {
-                        if (err.name !== 'AbortError') console.warn('Save skipped:', err);
-                    }
-                }, 400);
-            }
-            updateDraftWarning();
-        }
-
-        function startupRecoverDraft() {
-            try {
-                var draft = JSON.parse(localStorage.getItem('ald_autosave_draft'));
-                if (!draft) { qdAlert('No draft found.'); return; }
-                bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide(); cleanupModalBackdrop();
-                applyQuoteData(draft);
-                if (draft.quoteNumber) document.getElementById('quoteNumber').value = draft.quoteNumber;
-                renderTermsCheckboxes(getQuoteTermsForRender(draft));
-                var el = document.getElementById('saveStatus');
-                if (el) el.innerHTML = '<span style="color:#fd7e14;"><i class="fas fa-history"></i> Draft recovered - save to file to keep it safe</span>';
-                updateDraftWarning();
-            } catch(e) { qdAlert('Could not recover draft.'); }
-        }
-
-        async function startupOpenQuote() {
-            // Hide modal and clean up backdrop FIRST before any async work
-            var modal = bootstrap.Modal.getInstance(document.getElementById('startupModal'));
-            if (modal) modal.hide();
-            cleanupModalBackdrop();
-            try {
-                await quoteStorageOpenLocalSelection();
-            } catch (err) {
-                if (err.name !== 'AbortError') {
-                    console.warn('File open error:', err);
-                    if (typeof qdAlert === 'function') qdAlert(err.message || 'Could not open file.', { title: 'Could Not Open Backup', type: 'error' });
-                }
-                // Always ensure backdrop is cleaned up
-                cleanupModalBackdrop();
-            }
-        }
-
-        // Runs on load - independent of auth. Handles session restore + startup modal.
+        // Runs on load - independent of auth. The builder remains closed until
+        // an explicit cloud/local quote load succeeds.
         // Global safety net: always clean up backdrop when any modal hides
         document.addEventListener('hidden.bs.modal', function() {
             cleanupModalBackdrop();
@@ -2246,6 +2187,7 @@ async function saveQuote() {
                 if (cloudQuoteId) {
                     localStorage.removeItem('ald_open_cloud_quote');
                     if (typeof loadQuoteFromSupabase === 'function') {
+                        quoteStorageSetDocumentState('loading', 'Opening the selected quote...');
                         loadQuoteFromSupabase(cloudQuoteId).then(async function(result) {
                             if (result && result.data && result.data.data) {
                                 if (quoteIsPortalLockedForBuilder(result.data)) {
@@ -2263,32 +2205,25 @@ async function saveQuote() {
                                 var el = document.getElementById('saveStatus');
                                 if (el && resolved.source === 'cloud') el.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-cloud"></i> Loaded from cloud</span>';
                                 updateDraftWarning();
+                            } else {
+                                quoteStorageSetDocumentState('closed', 'That quote could not be opened. Choose another quote or start a new one.');
                             }
-                        }).catch(function(e) { console.warn('Failed to load cloud quote:', e); });
+                        }).catch(function(e) {
+                            console.warn('Failed to load cloud quote:', e);
+                            quoteStorageSetDocumentState('closed', 'That quote could not be opened. Choose another quote or start a new one.');
+                        });
                         return; // Don't show modal while loading
                     }
                 }
 
-                // Show Continue button if session exists
-                var session = null;
-                try { session = JSON.parse(localStorage.getItem('ald_session_quote')); } catch(e) {}
-                var hasSession = !!(session && (session.clientName || (session.rooms && session.rooms.length > 0)));
-                var continueBtn = document.getElementById('continueSessionBtn');
-                if (continueBtn) continueBtn.style.display = hasSession ? 'inline-block' : 'none';
-                // Show Recover Draft button if draft exists
-                var recoverBtn = document.getElementById('recoverDraftBtn');
-                if (recoverBtn) recoverBtn.style.display = localStorage.getItem('ald_autosave_draft') ? 'inline-block' : 'none';
-                // Startup modal disabled - using draft warning banner instead
-                // Skip session restore if loading a specific quote from URL
+                // Skip last-quote restoration if a specific quote is loading.
                 var _urlp = new URLSearchParams(window.location.search);
                 if (_urlp.get('new') === '1') {
                     clearPortalLockedBuilderRestoreState();
                     localStorage.removeItem('ald_session_quote');
-                    window._quoteFullyLoaded = true;
-                    if (!document.getElementById('quoteNumber').value) {
-                        document.getElementById('quoteNumber').value = nextQuoteNumberValue();
-                    }
-                    updateDraftWarning();
+                    quoteStorageSetDocumentState('loading', 'Opening the new quote setup...');
+                    window.location.replace('dashboard.html?new=1');
+                    return;
                 } else if (!_urlp.get('load') && !_urlp.get('shownotes')) {
                     var _savedActiveIdRaw = localStorage.getItem("ald_active_quote_id");
                     var _savedActiveId = quoteStorageNormalizeCloudId(_savedActiveIdRaw);
@@ -2296,6 +2231,7 @@ async function saveQuote() {
                     if (_savedActiveId && typeof loadQuoteFromSupabase === "function") {
                         // Reload the last opened quote from Supabase directly
                         window._supabaseQuoteId = _savedActiveId;
+                        quoteStorageSetDocumentState('loading', 'Restoring the last opened quote...');
                         loadQuoteFromSupabase(_savedActiveId).then(async function(result) {
                             if (result && result.data && result.data.data) {
                                 if (quoteIsPortalLockedForBuilder(result.data)) {
@@ -2314,15 +2250,18 @@ async function saveQuote() {
                                 if (el && resolved.source === 'cloud') el.innerHTML = "<span style=\"color:#28a745;\"><i class=\"fas fa-cloud\"></i> Restored - " + (qData.clientName || "quote") + "</span>";
                                 updateDraftWarning();
                             } else {
-                                // Quote not found - fall back to session restore
+                                // Quote not found: never turn a loose session snapshot
+                                // into an editable quote without an explicit user choice.
                                 localStorage.removeItem("ald_active_quote_id");
-                                startupContinueSession();
+                                window._supabaseQuoteId = null;
+                                quoteStorageSetDocumentState('closed', 'The last quote is no longer available. Choose another quote or start a new one.');
                             }
                         }).catch(function() {
-                            startupContinueSession();
+                            window._supabaseQuoteId = null;
+                            quoteStorageSetDocumentState('closed', 'The last quote could not be restored. Choose another quote or start a new one.');
                         });
                     } else {
-                        startupContinueSession();
+                        quoteStorageSetDocumentState('closed');
                     }
                 }
             }
@@ -2330,6 +2269,7 @@ async function saveQuote() {
             // Auto-open builder modals when navigated from settings.
             function openBuilderHashTarget(attempt) {
                 attempt = attempt || 0;
+                if (typeof quoteStorageHasOpenDocument === 'function' && !quoteStorageHasOpenDocument()) return;
                 if (window.location.hash === "#manage-items" && typeof openManageItemsModal === "function") {
                     openManageItemsModal();
                     history.replaceState(null, "", window.location.pathname + window.location.search);
