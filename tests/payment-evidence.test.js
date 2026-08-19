@@ -43,6 +43,8 @@ test('payment evidence storage is private and browser roles have no direct data 
   assert(migration.includes('payment_evidence_one_active_per_payment_idx'));
   assert(migration.includes('on public.payment_evidence(payment_record_id, uploaded_by_role)'));
   assert(migration.includes('where deleted_at is null'));
+  assert(migration.includes('payment_evidence_quote_id_fkey_idx'));
+  assert(migration.includes('payment_evidence_invoice_id_fkey_idx'));
 });
 
 test('the payment function authorizes, verifies, and signs evidence without changing accounting amounts', () => {

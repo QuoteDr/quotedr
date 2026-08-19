@@ -59,6 +59,10 @@ create index if not exists payment_evidence_document_quote_idx
 create index if not exists payment_evidence_document_invoice_idx
   on public.payment_evidence(user_id, invoice_id, created_at desc)
   where invoice_id is not null and deleted_at is null;
+create index if not exists payment_evidence_quote_id_fkey_idx
+  on public.payment_evidence(quote_id);
+create index if not exists payment_evidence_invoice_id_fkey_idx
+  on public.payment_evidence(invoice_id);
 create index if not exists payment_evidence_upload_deadline_idx
   on public.payment_evidence(upload_deadline)
   where upload_status = 'upload_pending' and deleted_at is null;
