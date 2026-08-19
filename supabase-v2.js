@@ -19,9 +19,9 @@ window._supabase = _supabase;
 window._supabaseClient = _supabase;
 
 // Client portal links have their own additive hostname contract. Keep the
-// legacy QuoteDr origins valid permanently; change only the primary origin
-// after the new client-facing domain is attached and verified in Pages.
-const QUOTEDR_PRIMARY_CLIENT_PORTAL_ORIGIN = 'https://quotedr.io';
+// legacy QuoteDr origins valid permanently. Do not deploy a changed primary
+// origin until that client-facing domain is attached and verified in Pages.
+const QUOTEDR_PRIMARY_CLIENT_PORTAL_ORIGIN = 'https://myprojectview.ca';
 const QUOTEDR_LEGACY_CLIENT_PORTAL_ORIGINS = Object.freeze([
     'https://quotedr.io',
     'https://www.quotedr.io'

@@ -1,6 +1,7 @@
 // Keep every legacy production hostname here permanently. Adding a new
 // primary client-facing domain must be additive; never replace this list.
 export const CLIENT_PORTAL_PRODUCTION_HOSTS = Object.freeze([
+  "myprojectview.ca",
   "quotedr.io",
   "www.quotedr.io",
 ]);

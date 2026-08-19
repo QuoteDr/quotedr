@@ -41,6 +41,7 @@ assert(clientDocument.includes('code: "portal_assignment_required"'), 'Edge Func
 assert(clientDocument.includes('code: "portal_url_required"'), 'Edge Function should reject non-portal destinations');
 assert(clientDocument.includes('isProductionClientPortalUrl(url)'), 'Edge Function should use the shared production portal-origin allowlist');
 assert(clientPortalUrl.includes('"quotedr.io"') && clientPortalUrl.includes('"www.quotedr.io"'), 'legacy QuoteDr portal hosts must remain permanently allowlisted');
+assert(clientPortalUrl.includes('"myprojectview.ca"'), 'the purchased client portal apex domain must be explicitly allowlisted');
 assert(clientDocument.includes('portal_share_token: token'), 'new portal anchors should persist their stable portal token');
 assert(clientDocument.includes('sanitizeClientDocumentRow(row, options)'), 'secure document responses should use the dedicated allowlist projection');
 for (const forbidden of ["'portal_share_token'", "'portal_pin'", "'shareToken'", "'portalToken'", "'_saveMeta'"]) {
