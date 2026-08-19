@@ -19,6 +19,7 @@ const voiceRuleMatcher = read('ai-voice-rule-matcher.js');
 const parseQuote = read('supabase/functions/parse-quote/index.ts');
 const tradeRulesSchema = read('supabase/ai_trade_rules.sql');
 const tradeRuleQuestionMigration = read('supabase/migrations/20260518110000_ai_trade_rule_questions.sql');
+const tradeRuleLearningMigration = read('supabase/migrations/20260819145201_remember_ai_trade_rule_phrases.sql');
 
 assert(builder.includes('createChoiceGroupFromRoomItems'), 'builder should create quote-level choice groups from room items');
 assert(builder.includes('applyChoiceGroupSelectionToItem'), 'builder should apply choice group selections to totals');
@@ -49,6 +50,10 @@ assert(!builder.includes('Choose Cancel to replace everything'), 'AI Voice shoul
 assert(builder.includes('ai-voice-review-quantity'), 'AI Voice review should let users correct parsed quantities before adding items');
 assert(builder.includes('aiVoiceReviewUnit'), 'AI Voice review should let users correct parsed units before adding items');
 assert(builder.includes('_applyAiVoiceReviewQuantityEdit'), 'AI Voice review should apply corrected quantity and unit values before quote creation');
+assert(builder.includes('ai-voice-review-rule-count'), 'AI Voice trade-rule review should expose an editable count/multiplier');
+assert(builder.includes('_applyAiVoiceTradeRuleCountEdit'), 'AI Voice should recalculate trade-rule quantity from the corrected multiplier');
+assert(builder.includes('Remember this phrase for this trade rule'), 'AI Voice review should explain that a confirmed rule phrase will be learned');
+assert(builder.includes('rememberAiTradeRulePhrase'), 'AI Voice should persist an explicitly confirmed phrase-to-rule choice');
 assert(builder.includes('ai-voice-rule-matcher.js?v='), 'AI Voice should load the deterministic trade-rule matcher');
 assert(builder.includes('aiVoiceOriginalTranscriptReview'), 'AI Voice review should show the original browser transcript');
 assert(builder.includes('ai-voice-review-phrase'), 'AI Voice review should let users correct the phrase used for a match');
@@ -61,6 +66,7 @@ assert(!builder.includes('await Promise.all(usageTasks)'), 'keeping AI suggestio
 assert(builder.includes('_voiceRuleSelectionHasLearnedMapping'), 'remembered saved-item corrections should override the same wrong trade-rule match');
 assert(!builder.includes("console.log('[QuoteDr AI Voice] Opening review for parse result:'"), 'AI Voice should not log parsed customer scope');
 assert(voiceRuleMatcher.includes('selectRuleMatches'), 'AI Voice matcher should rank and group overlapping trade rules');
+assert(voiceRuleMatcher.includes('learned_phrases'), 'AI Voice matcher should include owner-confirmed phrases when matching trade rules');
 assert(parseQuote.includes('exact, contiguous excerpt'), 'parse-quote should require verbatim spoken phrases');
 assert(parseQuote.includes('trim up a five-foot exterior door'), 'parse-quote should preserve distinguishing door measurements and qualifiers');
 assert(builder.includes('_repairAiTradeRuleReviewItem'), 'AI Voice review should repair stale trade-rule unit/rate from the matched saved item');
@@ -182,3 +188,6 @@ assert(tradeRulesSchema.includes("clarification_options jsonb not null default '
 assert(tradeRuleQuestionMigration.includes('add column if not exists rule_type'), 'migration should add rule_type');
 assert(tradeRuleQuestionMigration.includes('add column if not exists clarification_question'), 'migration should add clarification_question');
 assert(tradeRuleQuestionMigration.includes('add column if not exists clarification_options'), 'migration should add clarification_options');
+assert(tradeRuleLearningMigration.includes('add column if not exists learned_phrases'), 'migration should add durable learned trade-rule phrases');
+assert(supabase.includes(".eq('user_id', user.id)"), 'trade-rule phrase learning should remain owner scoped');
+assert(supabase.includes('normalizeAiTradeRuleLearnedPhrases'), 'trade-rule phrase learning should normalize, deduplicate, and cap saved phrases');

@@ -37,7 +37,7 @@
     function tokenize(value) {
         var source = String(value || '');
         var tokens = [];
-        var matcher = /[a-z0-9]+/gi;
+        var matcher = /\d+(?:\.\d+)?|[a-z]+/gi;
         var match;
         while ((match = matcher.exec(source))) {
             var canonical = canonicalToken(match[0]);
@@ -56,8 +56,18 @@
         return tokenize(value).map(function(token) { return token.value; }).join(' ');
     }
 
-    function matchRule(rule, transcript) {
-        var triggerTokens = tokenize(rule && rule.trigger_phrase);
+    function learnedPhrases(rule) {
+        var values = rule && rule.learned_phrases;
+        if (typeof values === 'string') {
+            try { values = JSON.parse(values); } catch (error) { values = []; }
+        }
+        return Array.isArray(values) ? values.map(function(value) {
+            return String(value || '').trim();
+        }).filter(Boolean) : [];
+    }
+
+    function matchRulePhrase(rule, triggerPhrase, transcript, learnedPhrase) {
+        var triggerTokens = tokenize(triggerPhrase);
         var transcriptTokens = tokenize(transcript);
         if (!triggerTokens.length || !transcriptTokens.length) return null;
 
@@ -116,13 +126,36 @@
                 requiresConfirmation: requiresConfirmation,
                 confirmationReason: confirmationReason
             };
+            candidate.matchedTriggerPhrase = triggerPhrase;
+            candidate.learnedPhrase = learnedPhrase === true;
             if (!best
                 || candidate.extraTokens < best.extraTokens
-                || (candidate.extraTokens === best.extraTokens && candidate.startIndex < best.startIndex)) {
+                || (candidate.extraTokens === best.extraTokens && candidate.tokenCount > best.tokenCount)
+                || (candidate.extraTokens === best.extraTokens && candidate.tokenCount === best.tokenCount && candidate.startIndex < best.startIndex)) {
                 best = candidate;
             }
         }
         return best;
+    }
+
+    function matchRule(rule, transcript) {
+        if (!rule) return null;
+        var phrases = [{ value: rule.trigger_phrase, learned: false }];
+        learnedPhrases(rule).forEach(function(value) {
+            if (canonicalText(value) === canonicalText(rule.trigger_phrase)) return;
+            phrases.push({ value: value, learned: true });
+        });
+        var matches = phrases.map(function(phrase) {
+            return matchRulePhrase(rule, phrase.value, transcript, phrase.learned);
+        }).filter(Boolean);
+        matches.sort(function(left, right) {
+            return Number(right.exactSequence) - Number(left.exactSequence)
+                || left.extraTokens - right.extraTokens
+                || right.tokenCount - left.tokenCount
+                || Number(right.learnedPhrase) - Number(left.learnedPhrase)
+                || left.startIndex - right.startIndex;
+        });
+        return matches[0] || null;
     }
 
     function usageCount(match) {
@@ -177,6 +210,15 @@
                 return tokens[labelStart + offset].value === labelToken.value;
             });
             if (!labelMatches) continue;
+            var dimensionStart = labelStart - 3;
+            var countBeforeDimension = numericValue(tokens[dimensionStart - 1]);
+            if (dimensionStart >= 1
+                && numericValue(tokens[dimensionStart]) !== null
+                && DIMENSION_MARKERS[tokens[dimensionStart + 1] && tokens[dimensionStart + 1].value]
+                && numericValue(tokens[dimensionStart + 2]) !== null
+                && countBeforeDimension !== null) {
+                return countBeforeDimension;
+            }
             for (var numberIndex = labelStart - 1; numberIndex >= Math.max(0, labelStart - 4); numberIndex--) {
                 var count = numericValue(tokens[numberIndex]);
                 if (count === null) continue;
@@ -222,6 +264,7 @@
         matchRule: matchRule,
         selectRuleMatches: selectRuleMatches,
         areCloseMatches: areCloseMatches,
-        extractCount: extractCount
+        extractCount: extractCount,
+        learnedPhrases: learnedPhrases
     };
 });

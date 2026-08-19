@@ -98,6 +98,54 @@ const fiveFootItem = countHelpers._buildAiTradeRuleVoiceItem(
 );
 assert.strictEqual(fiveFootItem.quantity, 35, 'five-foot must use the one-door default rather than five doors');
 
+const twoWindowRule = Object.assign({}, pricedRule, {
+  id: 'window-rule',
+  quantity_value: 18,
+  count_unit_label: 'window',
+  default_count: 4,
+});
+const twoWindowItem = countHelpers._buildAiTradeRuleVoiceItem(
+  twoWindowRule,
+  'Trim up two 4x5 windows.',
+  '',
+  { spokenPhrase: 'trim up two 4x5 windows' },
+);
+assert.strictEqual(twoWindowItem.aiTradeRuleCount, 2, 'the rule item should retain the editable item multiplier');
+assert.strictEqual(twoWindowItem.aiTradeRuleQuantityValue, 18, 'the rule item should retain the per-window quantity');
+assert.strictEqual(twoWindowItem.quantity, 36, '18 LF per window should multiply by the spoken two windows, not the saved default of four');
+assert(twoWindowItem.calculation.includes('18 LF x 2 window = 36 LF'), 'review math should visibly prove the corrected two-window multiplier');
+
+const reviewElements = {
+  aiVoiceReviewRuleCount0: { value: '2' },
+  aiVoiceReviewQuantity0: { value: '' },
+  aiVoiceReviewUnit0: { value: '' },
+  aiVoiceParsedPreview0: { textContent: '' },
+};
+const multiplierSource = sourceBetween(
+  builder,
+  'function _aiVoiceTradeRuleCalculationLabel',
+  'function _syncAiVoiceReviewMatchSource',
+);
+const multiplierHelpers = new Function(
+  'document',
+  '_voiceRoundQuantity',
+  'formatQuoteQuantityDisplay',
+  'qdFormatMoney',
+  multiplierSource + '\nreturn { _applyAiVoiceTradeRuleCountEdit };',
+)(
+  { getElementById: (id) => reviewElements[id] || null },
+  (value) => Math.round(Number(value) * 100) / 100,
+  (quantity, unit) => `${quantity} ${unit}`,
+  (value) => `$${Number(value).toFixed(2)}`,
+);
+const editedWindowRow = { item: Object.assign({}, twoWindowItem, { aiTradeRuleCount: 4, quantity: 72 }) };
+multiplierHelpers._applyAiVoiceTradeRuleCountEdit(editedWindowRow, 0);
+assert.strictEqual(editedWindowRow.item.aiTradeRuleCount, 2, 'the editable multiplier should update the trade-rule count');
+assert.strictEqual(editedWindowRow.item.quantity, 36, 'editing the multiplier should recalculate the priced LF quantity');
+assert.strictEqual(editedWindowRow.item.total, 360, 'editing the multiplier should recalculate the line total deterministically');
+assert(editedWindowRow.item.calculation.includes('x 2 window = 36 LF'), 'editing the multiplier should rewrite the visible proof formula');
+assert.strictEqual(reviewElements.aiVoiceReviewQuantity0.value, 36, 'the quantity field should stay synchronized with multiplier math');
+
 const postAuditSource = sourceBetween(
   builder,
   'function _voiceAuditClaimItems',
@@ -108,6 +156,29 @@ const postAudit = new Function(
   '_voiceRuleTextKey',
   postAuditSource + '\nreturn { _applyAiVoicePostProcessingAudit };',
 )({ QdAiVoiceRuleMatcher: matcher }, matcher.canonicalText);
+
+const windowAuditResult = {
+  _voiceAudit: {
+    claims: {
+      counts: [{ count: 2, object: 'window' }],
+      qualifiers: [],
+      work: [{ actions: ['trim'], object: 'window' }],
+    },
+  },
+  rooms: [{ name: 'Windows', items: [Object.assign({}, twoWindowItem)] }],
+};
+assert.deepStrictEqual(
+  postAudit._applyAiVoicePostProcessingAudit(windowAuditResult),
+  [],
+  'the screenshot case should pass once the formula proves 18 LF x 2 windows = 36 LF',
+);
+windowAuditResult.rooms[0].items[0].quantity = 72;
+windowAuditResult.rooms[0].items[0].calculation = 'AI trade rule: 18 LF x 4 window = 72 LF';
+assert.deepStrictEqual(
+  postAudit._applyAiVoicePostProcessingAudit(windowAuditResult).map((issue) => issue.type),
+  ['count'],
+  'the safety check must continue blocking the stale four-window multiplier',
+);
 
 const processed = {
   _voiceAudit: {

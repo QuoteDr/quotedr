@@ -3126,6 +3126,58 @@ async function getUserAiTradeRules() {
     return data || [];
 }
 
+function normalizeAiTradeRuleLearnedPhrases(values) {
+    if (typeof values === 'string') {
+        try { values = JSON.parse(values); } catch (error) { values = []; }
+    }
+    const seen = new Set();
+    return (Array.isArray(values) ? values : [])
+        .map(function(value) { return String(value || '').trim(); })
+        .filter(function(value) {
+            const key = normalizeAiPhraseKey(value);
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        })
+        .slice(-50);
+}
+
+async function rememberAiTradeRulePhrase(ruleId, phrase) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'Not authenticated' };
+    if (!ruleId) return { data: null, error: 'Missing rule id' };
+    const cleanPhrase = String(phrase || '').trim();
+    const phraseKey = normalizeAiPhraseKey(cleanPhrase);
+    if (!phraseKey) return { data: null, error: 'Missing phrase' };
+    const { data: existing, error: loadError } = await _supabase
+        .from('ai_trade_rules')
+        .select('id, learned_phrases')
+        .eq('id', ruleId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+    if (loadError || !existing) return { data: null, error: loadError || 'Rule not found' };
+    const phrases = normalizeAiTradeRuleLearnedPhrases(existing.learned_phrases);
+    if (phrases.some(function(value) { return normalizeAiPhraseKey(value) === phraseKey; })) {
+        return { data: existing, error: null };
+    }
+    const learnedPhrases = normalizeAiTradeRuleLearnedPhrases(phrases.concat(cleanPhrase));
+    const payload = { learned_phrases: learnedPhrases, updated_at: new Date().toISOString() };
+    return qdDurableSupabaseOperation({
+        entityType: 'ai_trade_rule_phrase',
+        entityId: ruleId + ':' + phraseKey,
+        entityLabel: 'AI trade rule phrase: ' + cleanPhrase,
+        action: 'update',
+        payload: payload,
+        target: {
+            table: 'ai_trade_rules',
+            action: 'update',
+            values: payload,
+            filters: [{ column: 'id', value: ruleId }, { column: 'user_id', value: user.id }],
+            single: 'single'
+        }
+    });
+}
+
 function sanitizeAiTradeRuleClarificationOptions(options) {
     if (!Array.isArray(options)) return [];
     return options

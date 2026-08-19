@@ -2387,9 +2387,9 @@
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="card-payment-rules.js?v=2026080301"></script>
-    <script src="supabase-v2.js?v=2026081801"></script>
+    <script src="supabase-v2.js?v=2026081902"></script>
     <script src="account-access.js?v=2026080701"></script>
-    <script src="ai-voice-rule-matcher.js?v=2026080601"></script>
+    <script src="ai-voice-rule-matcher.js?v=2026081902"></script>
     <script src="ai-voice-audio-recorder.js?v=2026081901"></script>
     <script src="save-coordinator.js?v=2026081801"></script>
     <script src="quote-media.js?v=2026071202"></script>
@@ -19351,7 +19351,11 @@ Example:
                 notes: rule.user_note || '',
                 aiTradeRuleId: rule.id,
                 aiTradeRuleTrigger: rule.trigger_phrase || '',
-                aiTradeRuleAnswer: answerLabel || ''
+                aiTradeRuleAnswer: answerLabel || '',
+                aiTradeRuleQuantityMode: rule.quantity_mode === 'fixed' ? 'fixed' : 'per_count',
+                aiTradeRuleQuantityValue: eachQty,
+                aiTradeRuleCount: count,
+                aiTradeRuleCountUnitLabel: rule.count_unit_label || 'count'
             };
         }
 
@@ -19860,11 +19864,74 @@ Example:
             delete item.aiTradeRuleCandidates;
             delete item.aiTradeRuleAmbiguous;
             delete item.aiTradeRuleAmbiguityReason;
+            delete item.aiTradeRuleQuantityMode;
+            delete item.aiTradeRuleQuantityValue;
+            delete item.aiTradeRuleCount;
+            delete item.aiTradeRuleCountUnitLabel;
             if (hadTradeRule) delete item.calculation;
             return item;
         }
 
+        function _aiVoiceTradeRuleCalculationLabel(item) {
+            return item && item.aiTradeRuleAnswer
+                ? 'AI trade rule answer "' + item.aiTradeRuleAnswer + '": '
+                : 'AI trade rule: ';
+        }
+
+        function _refreshAiVoiceReviewPreview(row, index) {
+            if (!row || !row.item) return;
+            var item = row.item;
+            var quantityInput = document.getElementById('aiVoiceReviewQuantity' + index);
+            var unitInput = document.getElementById('aiVoiceReviewUnit' + index);
+            var previewText = document.getElementById('aiVoiceParsedPreview' + index);
+            if (quantityInput) quantityInput.value = _voiceRoundQuantity(item.quantity || 0);
+            if (unitInput) unitInput.value = item.unit || item.unitType || 'ls';
+            if (previewText) {
+                var displayRate = parseFloat(item.rate !== undefined ? item.rate : item.price) || 0;
+                previewText.textContent = (item.description || 'Item')
+                    + ' - ' + formatQuoteQuantityDisplay(item.quantity || 0, item.unit || item.unitType || 'ls')
+                    + ' @ ' + qdFormatMoney(displayRate)
+                    + (item.calculation ? ' - ' + item.calculation : '');
+            }
+        }
+
+        function _syncAiVoiceTradeRuleCountControls(index) {
+            var row = _voiceReviewRows[index];
+            var item = row && row.item;
+            var wrap = document.getElementById('aiVoiceTradeRuleCountWrap' + index);
+            var input = document.getElementById('aiVoiceReviewRuleCount' + index);
+            var label = document.getElementById('aiVoiceReviewRuleCountLabel' + index);
+            var help = document.getElementById('aiVoiceReviewRuleCountHelp' + index);
+            var perCount = !!(item && item.aiTradeRuleId && item.aiTradeRuleQuantityMode === 'per_count');
+            if (wrap) wrap.classList.toggle('d-none', !perCount);
+            if (!perCount) return;
+            var countLabel = String(item.aiTradeRuleCountUnitLabel || 'item').trim();
+            var pluralLabel = /s$/i.test(countLabel) ? countLabel : countLabel + 's';
+            if (label) label.textContent = 'Count / multiplier (' + pluralLabel + ')';
+            if (input) input.value = _voiceRoundQuantity(item.aiTradeRuleCount || 1);
+            if (help) help.textContent = 'Adjust the number of ' + pluralLabel + '; QuoteDr recalculates the ' + (item.unit || item.unitType || 'quantity') + ' total.';
+        }
+
+        function _applyAiVoiceTradeRuleCountEdit(row, index) {
+            if (!row || !row.item || row.item.aiTradeRuleQuantityMode !== 'per_count') return;
+            var input = document.getElementById('aiVoiceReviewRuleCount' + index);
+            var count = input ? parseFloat(input.value) : NaN;
+            if (!isFinite(count) || count <= 0) return;
+            var item = row.item;
+            var eachQty = parseFloat(item.aiTradeRuleQuantityValue || 1) || 1;
+            var quantity = _voiceRoundQuantity(eachQty * count);
+            item.aiTradeRuleCount = _voiceRoundQuantity(count);
+            item.quantity = quantity;
+            item.total = _voiceRoundQuantity(quantity * (parseFloat(item.rate || item.price || 0) || 0));
+            item.calculation = _aiVoiceTradeRuleCalculationLabel(item)
+                + eachQty + ' ' + (item.unit || item.unitType || 'ls')
+                + ' x ' + item.aiTradeRuleCount + ' ' + (item.aiTradeRuleCountUnitLabel || 'count')
+                + ' = ' + quantity + ' ' + (item.unit || item.unitType || 'ls');
+            _refreshAiVoiceReviewPreview(row, index);
+        }
+
         function _syncAiVoiceReviewMatchSource(index) {
+            var row = _voiceReviewRows[index];
             var source = document.getElementById('aiVoiceReviewMatchSource' + index);
             var savedWrap = document.getElementById('aiVoiceSavedItemMatchWrap' + index);
             var tradeWrap = document.getElementById('aiVoiceTradeRuleMatchWrap' + index);
@@ -19874,9 +19941,16 @@ Example:
             var useTradeRule = source && source.value === 'trade_rule';
             if (savedWrap) savedWrap.classList.toggle('d-none', useTradeRule);
             if (tradeWrap) tradeWrap.classList.toggle('d-none', !useTradeRule);
-            if (rememberWrap) rememberWrap.classList.toggle('d-none', useTradeRule);
             if (savedInput) savedInput.disabled = useTradeRule;
             if (tradeSelect) tradeSelect.disabled = !useTradeRule;
+            var rememberLabel = document.querySelector('label[for="aiVoiceReviewRemember' + index + '"]');
+            if (rememberWrap) rememberWrap.classList.remove('d-none');
+            if (rememberLabel) {
+                rememberLabel.textContent = useTradeRule
+                    ? 'Remember this phrase for this trade rule'
+                    : (row && row.requiresChoice ? 'Remember this choice / do not ask again' : 'Remember this phrase');
+            }
+            _syncAiVoiceTradeRuleCountControls(index);
         }
 
         function _syncAiVoiceTradeRuleSelection(index) {
@@ -19887,18 +19961,8 @@ Example:
             var preview = _buildVoiceTradeRuleChoiceItem(choice, row);
             if (!preview) return;
             _replaceVoiceReviewItem(row.item, preview);
-            var quantityInput = document.getElementById('aiVoiceReviewQuantity' + index);
-            var unitInput = document.getElementById('aiVoiceReviewUnit' + index);
-            var previewText = document.getElementById('aiVoiceParsedPreview' + index);
-            if (quantityInput) quantityInput.value = _voiceRoundQuantity(preview.quantity || 1);
-            if (unitInput) unitInput.value = preview.unit || preview.unitType || 'ls';
-            if (previewText) {
-                var displayRate = parseFloat(preview.rate !== undefined ? preview.rate : preview.price) || 0;
-                previewText.textContent = (preview.description || 'Item')
-                    + ' - ' + formatQuoteQuantityDisplay(preview.quantity || 1, preview.unit || preview.unitType || 'ls')
-                    + ' @ ' + qdFormatMoney(displayRate)
-                    + (preview.calculation ? ' - ' + preview.calculation : '');
-            }
+            _syncAiVoiceTradeRuleCountControls(index);
+            _refreshAiVoiceReviewPreview(row, index);
         }
 
         function _voiceMappingAsItem(mapping) {
@@ -20707,12 +20771,17 @@ Example:
                     + '<select class="form-select ai-voice-review-trade-rule" id="aiVoiceReviewTradeRule' + index + '" data-row-index="' + index + '"' + (usesTradeRule ? '' : ' disabled') + '>'
                     + _voiceTradeRuleOptionsHtml(row)
                     + '</select>'
+                    + '<div class="mt-2' + (item.aiTradeRuleQuantityMode === 'per_count' ? '' : ' d-none') + '" id="aiVoiceTradeRuleCountWrap' + index + '">'
+                    + '<label class="form-label small fw-semibold mb-1" id="aiVoiceReviewRuleCountLabel' + index + '" for="aiVoiceReviewRuleCount' + index + '">Count / multiplier</label>'
+                    + '<input type="number" min="0.01" step="0.01" class="form-control form-control-sm ai-voice-review-rule-count" id="aiVoiceReviewRuleCount' + index + '" data-row-index="' + index + '" value="' + _escapeHtml(_voiceRoundQuantity(item.aiTradeRuleCount || 1)) + '">'
+                    + '<div class="small text-muted mt-1" id="aiVoiceReviewRuleCountHelp' + index + '">Change the item count and QuoteDr will recalculate the trade-rule quantity.</div>'
+                    + '</div>'
                     + '</div>'
                     + helper
-                    + '<div class="d-flex flex-wrap gap-3 align-items-center mt-2' + (usesTradeRule ? ' d-none' : '') + '" id="aiVoiceRememberWrap' + index + '">'
+                    + '<div class="d-flex flex-wrap gap-3 align-items-center mt-2" id="aiVoiceRememberWrap' + index + '">'
                     + '<div class="form-check">'
-                    + '<input class="form-check-input ai-voice-review-remember" type="checkbox" id="aiVoiceReviewRemember' + index + '" data-row-index="' + index + '" ' + (selectedText ? 'checked' : '') + '>'
-                    + '<label class="form-check-label small" for="aiVoiceReviewRemember' + index + '">' + (row.requiresChoice ? 'Remember this choice / do not ask again' : 'Remember this phrase') + '</label>'
+                    + '<input class="form-check-input ai-voice-review-remember" type="checkbox" id="aiVoiceReviewRemember' + index + '" data-row-index="' + index + '" ' + ((usesTradeRule || selectedText) ? 'checked' : '') + '>'
+                    + '<label class="form-check-label small" for="aiVoiceReviewRemember' + index + '">' + (usesTradeRule ? 'Remember this phrase for this trade rule' : (row.requiresChoice ? 'Remember this choice / do not ask again' : 'Remember this phrase')) + '</label>'
                     + '</div>'
                     + '<input class="form-control form-control-sm ai-voice-review-note" data-row-index="' + index + '" placeholder="Optional note" style="max-width:320px;">'
                     + '</div>'
@@ -20733,6 +20802,12 @@ Example:
             list.querySelectorAll('.ai-voice-review-trade-rule').forEach(function(select) {
                 select.addEventListener('change', function() {
                     _syncAiVoiceTradeRuleSelection(parseInt(this.getAttribute('data-row-index'), 10));
+                });
+            });
+            list.querySelectorAll('.ai-voice-review-rule-count').forEach(function(input) {
+                input.addEventListener('input', function() {
+                    var index = parseInt(this.getAttribute('data-row-index'), 10);
+                    _applyAiVoiceTradeRuleCountEdit(_voiceReviewRows[index], index);
                 });
             });
             _voiceReviewRows.forEach(function(row, index) { _syncAiVoiceReviewMatchSource(index); });
@@ -20919,8 +20994,18 @@ Example:
                 if (decision.source === 'trade_rule') {
                     var rebuiltRuleItem = _buildVoiceTradeRuleChoiceItem(decision.tradeChoice, row);
                     _replaceVoiceReviewItem(row.item, rebuiltRuleItem);
-                    _applyAiVoiceReviewQuantityEdit(row, index);
+                    _applyAiVoiceTradeRuleCountEdit(row, index);
+                    if (row.item.aiTradeRuleQuantityMode !== 'per_count') {
+                        _applyAiVoiceReviewQuantityEdit(row, index);
+                    }
                     confirmedRuleIds.push(decision.tradeChoice.rule.id);
+                    if (remember && remember.checked && typeof rememberAiTradeRulePhrase === 'function') {
+                        saveTasks.push(function() {
+                            return rememberAiTradeRulePhrase(decision.tradeChoice.rule.id, row.phrase || row.item.spokenPhrase || '').catch(function(error) {
+                                console.warn('Could not remember AI trade rule phrase:', error);
+                            });
+                        });
+                    }
                 } else if (confirmedExistingMapping) {
                     _clearAiTradeRuleReviewMetadata(row.item);
                     _applyVoiceMappedItem(row.item, row.mapping);

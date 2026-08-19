@@ -22,6 +22,7 @@ create table if not exists ai_trade_rules (
     default_count numeric(12,2) default 1,
 
     user_note text default '',
+    learned_phrases jsonb not null default '[]'::jsonb,
     active boolean default true,
     usage_count integer default 0,
 

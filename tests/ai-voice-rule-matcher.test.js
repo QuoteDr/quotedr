@@ -13,6 +13,23 @@ function rule(id, phrase, usageCount = 0) {
 }
 
 {
+  assert.strictEqual(matcher.extractCount('trim up two 4x5 windows', 'window'), 2, 'a leading count before dimensions should count windows, not dimension values');
+  assert.strictEqual(matcher.extractCount('trim up 2 4 by 5 windows', 'window'), 2, 'spoken by-dimensions should preserve the leading item count');
+  assert.strictEqual(matcher.extractCount('trim up 4x5 windows', 'window'), null, 'dimensions without an explicit leading count must not become four windows');
+}
+
+{
+  const learnedRule = Object.assign(rule('window-trim', 'trim up a window'), {
+    learned_phrases: ['trim up two 4x5 windows'],
+  });
+  const selection = matcher.selectRuleMatches([learnedRule], 'Trim up two 4x5 windows.')[0];
+  assert(selection, 'a confirmed learned trade-rule phrase should match in a later recording');
+  assert.strictEqual(selection.rule.id, 'window-trim');
+  assert.strictEqual(selection.match.learnedPhrase, true, 'the matcher should identify the owner-confirmed phrase path');
+  assert.strictEqual(selection.ambiguous, false, 'an exact learned phrase should not ask the same trade-rule question again');
+}
+
+{
   const selections = matcher.selectRuleMatches([
     rule('familiar', 'trim up a door', 250),
     rule('specific', 'trim up a five-foot exterior door', 0),
