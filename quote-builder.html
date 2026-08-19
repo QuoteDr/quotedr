@@ -17825,7 +17825,7 @@ Example:
     </script>
     <script src="quote-review-construction-knowledge.js?v=2026080201"></script>
     <script src="quote-starter-item-library.js?v=2026080201"></script>
-    <script src="quote-items.js?v=2026081604"></script>
+    <script src="quote-items.js?v=2026081902"></script>
     <script src="quote-import.js?v=2026071202"></script>
     <script>
         // Load templates from localStorage on startup
@@ -18891,6 +18891,7 @@ Example:
             if (row && row.item && row.item.aiTradeRuleId) return { score: 98, label: '98% Trade rule', rank: 4, reason: 'Your trade rule created this item.' };
             if (row && row.duplicateOf !== undefined) return { score: 20, label: '20% Possible duplicate', rank: -1, reason: 'Looks covered by another parsed item, so it is unchecked by default.' };
             if (row && row.requiresChoice) return { score: 35, label: '35% Choose item', rank: 0, reason: 'You have multiple saved items that could match this phrase.' };
+            if (row && row.suggestCreateNew) return { score: 25, label: 'New item', rank: 0, reason: 'No saved item is close enough. Create a reusable pricing item or choose another correction below.' };
             if (row && row.mapping && usage >= 3) return { score: 95, label: '95% Learned', rank: 3, reason: 'This phrase has been confirmed several times.' };
             if (row && row.mapping) return { score: 75, label: '75% Learned', rank: 1, reason: 'QuoteDr remembers this phrase but still wants confirmation.' };
             if (row && row.exact) return { score: 90, label: '90% Exact match', rank: 2, reason: 'The phrase matches a saved item name.' };
@@ -19976,20 +19977,25 @@ Example:
             var source = document.getElementById('aiVoiceReviewMatchSource' + index);
             var savedWrap = document.getElementById('aiVoiceSavedItemMatchWrap' + index);
             var tradeWrap = document.getElementById('aiVoiceTradeRuleMatchWrap' + index);
+            var newItemWrap = document.getElementById('aiVoiceNewItemMatchWrap' + index);
             var rememberWrap = document.getElementById('aiVoiceRememberWrap' + index);
             var savedInput = document.getElementById('aiVoiceReviewMatch' + index);
             var tradeSelect = document.getElementById('aiVoiceReviewTradeRule' + index);
             var useTradeRule = source && source.value === 'trade_rule';
-            if (savedWrap) savedWrap.classList.toggle('d-none', useTradeRule);
+            var useNewItem = source && source.value === 'new_item';
+            if (savedWrap) savedWrap.classList.toggle('d-none', useTradeRule || useNewItem);
             if (tradeWrap) tradeWrap.classList.toggle('d-none', !useTradeRule);
-            if (savedInput) savedInput.disabled = useTradeRule;
+            if (newItemWrap) newItemWrap.classList.toggle('d-none', !useNewItem);
+            if (savedInput) savedInput.disabled = useTradeRule || useNewItem;
             if (tradeSelect) tradeSelect.disabled = !useTradeRule;
             var rememberLabel = document.querySelector('label[for="aiVoiceReviewRemember' + index + '"]');
             if (rememberWrap) rememberWrap.classList.remove('d-none');
             if (rememberLabel) {
                 rememberLabel.textContent = useTradeRule
                     ? 'Remember this phrase for this trade rule'
-                    : (row && row.requiresChoice ? 'Remember this choice / do not ask again' : 'Remember this phrase');
+                    : useNewItem
+                        ? 'Remember this phrase for the new saved item'
+                        : (row && row.requiresChoice ? 'Remember this choice / do not ask again' : 'Remember this phrase');
             }
             _syncAiVoiceTradeRuleCountControls(index);
         }
@@ -20655,7 +20661,9 @@ Example:
                     var familyItems = mapping || exact ? [] : _findAmbiguousVoiceFamilyItems(phrase || item.description || '');
                     var requiresChoice = familyItems.length > 1;
                     var similar = mapping ? [] : (requiresChoice ? familyItems : _findSimilarVoiceItems(phrase || item.description || ''));
-                    var selected = mapping || exact || (requiresChoice ? null : similar[0]) || null;
+                    var bestSimilarScore = similar[0] ? (parseInt(similar[0]._score, 10) || 0) : 0;
+                    var suggestCreateNew = !mapping && !exact && !requiresChoice && bestSimilarScore < 35;
+                    var selected = mapping || exact || (requiresChoice || suggestCreateNew ? null : similar[0]) || null;
                     if (item && item.aiTradeRuleId) _repairAiTradeRuleReviewItem(item, selected);
                     var row = {
                         roomIndex: roomIndex,
@@ -20669,6 +20677,7 @@ Example:
                         selected: selected,
                         similar: similar,
                         requiresChoice: requiresChoice,
+                        suggestCreateNew: suggestCreateNew,
                         originalIndex: rows.length
                     };
                     var conf = _voiceReviewConfidence(row);
@@ -20767,6 +20776,7 @@ Example:
                 }
                 var card = document.createElement('div');
                 var usesTradeRule = !!item.aiTradeRuleId;
+                var usesNewItem = !usesTradeRule && row.suggestCreateNew;
                 var hasTradeRuleChoices = _voiceTradeRuleChoices().length > 0;
                 card.className = 'border rounded p-3 mb-3 ai-voice-review-card' + (row.duplicateOf !== undefined ? ' bg-light' : '');
                 card.innerHTML = ''
@@ -20798,11 +20808,12 @@ Example:
                     + '<div class="border rounded p-3 bg-light-subtle">'
                     + '<label class="form-label small fw-semibold" for="aiVoiceReviewMatchSource' + index + '">Correct this match</label>'
                     + '<select class="form-select form-select-sm ai-voice-review-match-source" id="aiVoiceReviewMatchSource' + index + '" data-row-index="' + index + '">'
-                    + '<option value="saved_item"' + (usesTradeRule ? '' : ' selected') + '>Saved line item</option>'
+                    + '<option value="saved_item"' + (!usesTradeRule && !usesNewItem ? ' selected' : '') + '>Saved line item</option>'
                     + '<option value="trade_rule"' + (usesTradeRule ? ' selected' : '') + ((!hasTradeRuleChoices && !usesTradeRule) ? ' disabled' : '') + '>Trade rule</option>'
+                    + '<option value="new_item"' + (usesNewItem ? ' selected' : '') + '>Create new item</option>'
                     + '</select>'
-                    + '<div class="small text-muted mt-1 mb-2">Wrong match? Choose whether you meant one of your saved pricing items or one of your trade rules.</div>'
-                    + '<div id="aiVoiceSavedItemMatchWrap' + index + '"' + (usesTradeRule ? ' class="d-none"' : '') + '>'
+                    + '<div class="small text-muted mt-1 mb-2">Wrong match? Choose a saved item, a trade rule, or create a reusable pricing item from what you said.</div>'
+                    + '<div id="aiVoiceSavedItemMatchWrap' + index + '"' + (usesTradeRule || usesNewItem ? ' class="d-none"' : '') + '>'
                     + '<label class="form-label small fw-semibold" for="aiVoiceReviewMatch' + index + '">Match to saved item</label>'
                     + '<input class="form-control ai-voice-review-match" id="aiVoiceReviewMatch' + index + '" list="aiVoiceItemOptions" data-row-index="' + index + '" value="' + _escapeHtml(selectedText || '') + '" placeholder="' + (row.requiresChoice ? 'Choose which saved item this means...' : 'Start typing a saved item name...') + '"' + (usesTradeRule ? ' disabled' : '') + '>'
                     + suggestions
@@ -20818,11 +20829,14 @@ Example:
                     + '<div class="small text-muted mt-1" id="aiVoiceReviewRuleCountHelp' + index + '">Change the item count and QuoteDr will recalculate the trade-rule quantity.</div>'
                     + '</div>'
                     + '</div>'
+                    + '<div id="aiVoiceNewItemMatchWrap' + index + '"' + (usesNewItem ? '' : ' class="d-none"') + '>'
+                    + '<div class="alert alert-primary py-2 px-3 small mb-0"><strong>Create new item after review.</strong> QuoteDr will open a guided batch wizard for every row marked Create new item. You can speak the job details, answer follow-up questions, set your own price, and approve the saved description.</div>'
+                    + '</div>'
                     + helper
                     + '<div class="d-flex flex-wrap gap-3 align-items-center mt-2" id="aiVoiceRememberWrap' + index + '">'
                     + '<div class="form-check">'
-                    + '<input class="form-check-input ai-voice-review-remember" type="checkbox" id="aiVoiceReviewRemember' + index + '" data-row-index="' + index + '" ' + ((usesTradeRule || selectedText) ? 'checked' : '') + '>'
-                    + '<label class="form-check-label small" for="aiVoiceReviewRemember' + index + '">' + (usesTradeRule ? 'Remember this phrase for this trade rule' : (row.requiresChoice ? 'Remember this choice / do not ask again' : 'Remember this phrase')) + '</label>'
+                    + '<input class="form-check-input ai-voice-review-remember" type="checkbox" id="aiVoiceReviewRemember' + index + '" data-row-index="' + index + '" ' + ((usesTradeRule || usesNewItem || selectedText) ? 'checked' : '') + '>'
+                    + '<label class="form-check-label small" for="aiVoiceReviewRemember' + index + '">' + (usesTradeRule ? 'Remember this phrase for this trade rule' : (usesNewItem ? 'Remember this phrase for the new saved item' : (row.requiresChoice ? 'Remember this choice / do not ask again' : 'Remember this phrase'))) + '</label>'
                     + '</div>'
                     + '<input class="form-control form-control-sm ai-voice-review-note" data-row-index="' + index + '" placeholder="Optional note" style="max-width:320px;">'
                     + '</div>'
@@ -20990,7 +21004,7 @@ Example:
                 var sourceInput = document.getElementById('aiVoiceReviewMatchSource' + validationIndex);
                 var savedInput = document.getElementById('aiVoiceReviewMatch' + validationIndex);
                 var tradeInput = document.getElementById('aiVoiceReviewTradeRule' + validationIndex);
-                var source = sourceInput ? sourceInput.value : (validationRow.item.aiTradeRuleId ? 'trade_rule' : 'saved_item');
+                var source = sourceInput ? sourceInput.value : (validationRow.item.aiTradeRuleId ? 'trade_rule' : (validationRow.suggestCreateNew ? 'new_item' : 'saved_item'));
                 var phrase = phraseInput && phraseInput.value.trim()
                     ? phraseInput.value.trim()
                     : (validationRow.phrase || validationRow.item.description || '');
@@ -21013,6 +21027,60 @@ Example:
                     savedSelection: savedSelection
                 };
             }
+            var newItemIndexes = Object.keys(decisions).map(function(value) { return parseInt(value, 10); }).filter(function(index) {
+                return decisions[index] && decisions[index].source === 'new_item';
+            });
+            if (newItemIndexes.length) {
+                if (!window.QdAiVoiceNewItemWizard || typeof window.QdAiVoiceNewItemWizard.run !== 'function' || typeof createCustomItemsFromVoice !== 'function' || typeof getSupabaseFunctionAuthHeaders !== 'function') {
+                    qdAlert('The guided new-item tool did not load. Refresh Quote Builder and try again. No new items were saved.');
+                    return;
+                }
+                await _hideBootstrapModalAndWait('aiVoiceReviewModal');
+                _forceCloseAiVoiceReviewModal();
+                var wizardResult;
+                try {
+                    wizardResult = await window.QdAiVoiceNewItemWizard.run(newItemIndexes.map(function(rowIndex) {
+                        var row = _voiceReviewRows[rowIndex];
+                        return {
+                            rowIndex: rowIndex,
+                            phrase: decisions[rowIndex].phrase,
+                            parsedName: row.item.description || '',
+                            category: row.item.category || 'Miscellaneous',
+                            roomName: row.roomName || '',
+                            quantity: row.item.quantity || 1,
+                            unitType: row.item.unit || row.item.unitType || 'ls'
+                        };
+                    }), {
+                        categories: Object.keys(pricingDatabase || {}).filter(function(category) { return category.indexOf('__') !== 0; }),
+                        endpoint: 'https://axmoffknvblluibuitrq.supabase.co/functions/v1/ai-assistant',
+                        getAuthHeaders: getSupabaseFunctionAuthHeaders,
+                        requireProFeature: typeof requireProFeature === 'function' ? requireProFeature : null,
+                        completeProTrialFeature: typeof completeProTrialFeature === 'function' ? completeProTrialFeature : null,
+                        autoAsk: true
+                    });
+                    if (!wizardResult || wizardResult.cancelled) {
+                        _renderAiVoiceReviewModal();
+                        _forceOpenAiVoiceReviewModal();
+                        return;
+                    }
+                    var createdResult = await createCustomItemsFromVoice(wizardResult.drafts);
+                    if (!createdResult || !Array.isArray(createdResult.items) || createdResult.items.length !== newItemIndexes.length) {
+                        throw new Error('QuoteDr could not save every new pricing item.');
+                    }
+                    newItemIndexes.forEach(function(rowIndex, draftIndex) {
+                        decisions[rowIndex].newItem = createdResult.items[draftIndex];
+                    });
+                    if (createdResult.error) {
+                        qdAlert('The new items were saved on this device, but cloud backup did not finish. Use Save & Recovery before leaving this device, then retry the cloud save.');
+                    }
+                } catch (error) {
+                    console.error('[QuoteDr AI Voice] New item wizard failed:', error);
+                    qdAlert((error && error.message ? error.message : 'The new items could not be saved.') + ' Your quote has not been updated.');
+                    _renderAiVoiceReviewModal();
+                    _forceOpenAiVoiceReviewModal();
+                    return;
+                }
+            }
             _voiceReviewRows.forEach(function(row, index) {
                 var include = document.getElementById('aiVoiceReviewInclude' + index);
                 if (include && !include.checked) {
@@ -21020,7 +21088,7 @@ Example:
                     return;
                 }
                 var decision = decisions[index] || {
-                    source: row.item.aiTradeRuleId ? 'trade_rule' : 'saved_item',
+                    source: row.item.aiTradeRuleId ? 'trade_rule' : (row.suggestCreateNew ? 'new_item' : 'saved_item'),
                     phrase: row.phrase || row.item.description || ''
                 };
                 row.phrase = decision.phrase;
@@ -21046,6 +21114,22 @@ Example:
                                 console.warn('Could not remember AI trade rule phrase:', error);
                             });
                         });
+                    }
+                } else if (decision.source === 'new_item' && decision.newItem) {
+                    _clearAiTradeRuleReviewMetadata(row.item);
+                    _applyVoiceMappedItem(row.item, decision.newItem);
+                    row.item.priceTbd = decision.newItem.priceTbd === true;
+                    row.item.pricingMode = row.item.priceTbd ? 'tbd' : 'fixed';
+                    _applyAiVoiceReviewQuantityEdit(row, index);
+                    row.suggestCreateNew = false;
+                    row.selected = decision.newItem;
+                    if (!_voiceReviewItems.some(function(item) { return _voiceItemDisplay(item) === _voiceItemDisplay(decision.newItem); })) {
+                        _voiceReviewItems.push(decision.newItem);
+                    }
+                    if (remember && remember.checked && typeof saveLearnedMapping === 'function') {
+                        saveTasks.push(function() { return saveLearnedMapping(row.phrase || row.item.description, decision.newItem, note ? note.value.trim() : '').catch(function(error) {
+                            console.warn('Could not remember new AI voice item phrase:', error);
+                        }); });
                     }
                 } else if (confirmedExistingMapping) {
                     _clearAiTradeRuleReviewMetadata(row.item);
@@ -21088,6 +21172,7 @@ Example:
                 });
                 _renderAiVoiceReviewModal();
                 qdAlert('The final transcript safety check still found a missing count, qualifier, or spoken task. Correct the highlighted item before adding it.');
+                _forceOpenAiVoiceReviewModal();
                 return;
             }
             await Promise.all(saveTasks.map(function(runSaveTask) { return runSaveTask(); }));
@@ -23372,6 +23457,7 @@ Example:
 <script src="modal-help.js?v=1778055200"></script>
 <script src="quote-tips.js?v=2026080801"></script>
 <script src="quote-spellcheck.js?v=2026071602"></script>
+<script src="ai-voice-new-item-wizard.js?v=2026081901"></script>
 <script src="quote-completeness-review.js?v=2026080201"></script>
 <script>
         function _toggleAiBtn() {

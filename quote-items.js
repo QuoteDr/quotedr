@@ -2703,7 +2703,7 @@
             localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
             _saveCategoryStylesToCloud().catch(function(){});
             // Backup using inline function (guaranteed available)
-            _doBackupItemsToCloud(customItems).then(function(result) {
+            return _doBackupItemsToCloud(customItems).then(function(result) {
                     if (showToast) {
                         var msg = result && result.error ? '❌ Cloud save failed - saved locally only' : '✅ Items saved to cloud!';
                         var color = result && result.error ? '#dc3545' : '#198754';
@@ -2713,7 +2713,62 @@
                         document.body.appendChild(toast);
                         setTimeout(function(){ toast.remove(); }, 3000);
                     }
+                    return result || { error: null };
                 });
+        }
+
+        async function createCustomItemsFromVoice(drafts) {
+            var entries = Array.isArray(drafts) ? drafts : [];
+            if (!entries.length) return { items: [], error: null };
+            var pendingKeys = {};
+            var normalized = entries.map(function normalizeVoiceDraft(draft) {
+                draft = draft && typeof draft === 'object' ? draft : {};
+                var category = String(draft.category || 'Miscellaneous').trim().slice(0, 100) || 'Miscellaneous';
+                var name = String(draft.name || '').trim().slice(0, 140);
+                var unitType = String(draft.unitType || draft.unit || 'ls').trim().slice(0, 40) || 'ls';
+                if (!name) throw new Error('Every new item needs a name.');
+                var key = (category + '|' + name).toLowerCase();
+                var existing = (Array.isArray(customItems[category]) ? customItems[category] : [])
+                    .concat(Array.isArray(pricingDatabase[category]) ? pricingDatabase[category] : [])
+                    .find(function(item) { return item && String(item.name || '').trim().toLowerCase() === name.toLowerCase(); });
+                if (existing || pendingKeys[key]) {
+                    throw new Error('An item named "' + name + '" already exists in ' + category + '. Choose that saved item or use a different name.');
+                }
+                pendingKeys[key] = true;
+                var priceTbd = draft.priceTbd === true || draft.pricingMode === 'tbd';
+                return {
+                    name: name,
+                    category: category,
+                    unitType: unitType,
+                    rate: priceTbd ? 0 : (parseFloat(draft.rate || 0) || 0),
+                    materialCost: parseFloat(draft.materialCost || 0) || 0,
+                    priceTbd: priceTbd,
+                    pricingMode: priceTbd ? 'tbd' : 'fixed',
+                    supplierUrl: String(draft.supplierUrl || '').trim().slice(0, 1000),
+                    itemDescription: String(draft.itemDescription || draft.description || '').trim().slice(0, 4000),
+                    laborTime: normalizeManageLaborTime(draft.laborTime || {})
+                };
+            });
+            normalized.forEach(function saveVoiceDraft(item) {
+                var category = item.category;
+                var savedItem = Object.assign({}, item);
+                delete savedItem.category;
+                if (!customItems[category]) customItems[category] = [];
+                customItems[category].push(savedItem);
+                if (!pricingDatabase[category]) pricingDatabase[category] = [];
+                pricingDatabase[category].push(Object.assign({}, savedItem, { _custom: true }));
+                rememberManageUnitType(savedItem.unitType);
+            });
+            var backupResult = null;
+            try {
+                backupResult = await saveCustomItems(false);
+            } catch (error) {
+                backupResult = { error: error };
+            }
+            return {
+                items: normalized.map(function publicVoiceItem(item) { return Object.assign({}, item); }),
+                error: backupResult && backupResult.error ? backupResult.error : null
+            };
         }
 
         function populateNewItemCategorySelect(selectedCat) {
@@ -6110,6 +6165,7 @@
         window._injectItemsIntoPricingDB = _injectItemsIntoPricingDB;
         window.loadCustomItems = loadCustomItems;
         window.saveCustomItems = saveCustomItems;
+        window.createCustomItemsFromVoice = createCustomItemsFromVoice;
         window.addNewCategory = addNewCategory;
         window.renameManageItemsCategory = renameManageItemsCategory;
         window.renameSelectedCategory = renameSelectedCategory;

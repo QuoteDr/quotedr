@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 107,
-  "totalBytes": 22715575,
-  "treeSha256": "8b50e23b293f647311d1c8e3ae0a1f53c188f251f0c1a873983ee9a1002d38c6",
+  "fileCount": 108,
+  "totalBytes": 22751762,
+  "treeSha256": "5cdf55b8ef198ae2c606fcef707b1ef26a2ecf21082b168e9eeaab08509ebfe1",
   "files": [
     {
       "path": "404.html",
@@ -64,6 +64,11 @@
       "path": "ai-voice-audio-recorder.js",
       "bytes": 13870,
       "sha256": "68f5ad66d088d6297b25c2927bc0aaeb2ac166c9c3c40b3ed99afc8c2dc247d2"
+    },
+    {
+      "path": "ai-voice-new-item-wizard.js",
+      "bytes": 26126,
+      "sha256": "f0cdc8744c805e7a412ee175a6d86394d309096d3fdf8b232a899d0fb261738e"
     },
     {
       "path": "ai-voice-rule-matcher.js",
@@ -322,8 +327,8 @@
     },
     {
       "path": "quote-builder.html",
-      "bytes": 1397475,
-      "sha256": "87bc49352a7008cd7779d75b6adbc144f388afc7719d79d9e0bdcae2a2d6a45a"
+      "bytes": 1404160,
+      "sha256": "22a896eaaded838233b91754fc19a276a12fbdce3d7b8687b9b7457ba326c67f"
     },
     {
       "path": "quote-calculators.js",
@@ -362,8 +367,8 @@
     },
     {
       "path": "quote-items.js",
-      "bytes": 391478,
-      "sha256": "3ce90dd9f0851f5f9ac35066ed92116afaf4fcbfbb3a4f82d3ea7d39d2ae7613"
+      "bytes": 394854,
+      "sha256": "4ae480960f97ac2f37538b7cd1fa525a7d593c043b2ef04970caf48f76f18329"
     },
     {
       "path": "quote-media.js",

@@ -54,6 +54,7 @@ export const publicArtifactConfig = Object.freeze({
     'ai-operations-core.js',
     'ai-operations.js',
     'ai-voice-audio-recorder.js',
+    'ai-voice-new-item-wizard.js',
     'ai-voice-rule-matcher.js',
     'analytics.js',
     'app-broadcasts.js',

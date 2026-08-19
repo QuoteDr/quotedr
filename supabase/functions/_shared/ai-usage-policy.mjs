@@ -49,6 +49,14 @@ export const AI_USAGE_LIMITS = Object.freeze({
     maxInputChars: 3500,
     maxOutputTokens: 500,
   }),
+  voice_item_wizard: Object.freeze({
+    feature: 'voice_item_wizard',
+    label: 'AI guided pricing item',
+    hourlyLimit: 50,
+    dailyLimit: 250,
+    maxInputChars: 5000,
+    maxOutputTokens: 800,
+  }),
   voice_quote: Object.freeze({
     feature: 'voice_quote',
     label: 'AI voice quote',
@@ -102,6 +110,7 @@ export const AI_USAGE_LIMITS = Object.freeze({
 const MODEL_PRICES_PER_MILLION_TOKENS = Object.freeze({
   'gpt-4o-mini': Object.freeze({ input: 0.15, output: 0.60 }),
   'gpt-4o': Object.freeze({ input: 5.00, output: 15.00 }),
+  'gpt-5.4-mini': Object.freeze({ input: 0.75, output: 4.50 }),
   default: Object.freeze({ input: 1.00, output: 3.00 }),
 });
 
