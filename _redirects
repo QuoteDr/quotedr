@@ -1,2 +1,3 @@
 # Keep shared portal URLs clean while resolving through the existing portal page.
+/p/:company/:token /client-portal.html?p=:token 302
 /p/* /client-portal.html?p=:splat 302

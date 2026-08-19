@@ -14612,6 +14612,9 @@ Example:
         }
 
         function getClientPortalBaseUrl() {
+            if (window.QuoteDrPortalLinks && typeof window.QuoteDrPortalLinks.portalBaseUrl === 'function') {
+                return window.QuoteDrPortalLinks.portalBaseUrl();
+            }
             return window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, 'client-portal');
         }
 
@@ -14651,6 +14654,11 @@ Example:
 
         function builderPortalUrlFromStableShare(share) {
             if (!share || !share.token || !share.anchorId) return '';
+            var isLocalPortalPreview = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+            if (!isLocalPortalPreview && window.QuoteDrPortalLinks && typeof window.QuoteDrPortalLinks.shortUrl === 'function') {
+                var profile = getLocalBusinessProfileSnapshot();
+                return window.QuoteDrPortalLinks.shortUrl(share.token, getProfileCompanyName(profile));
+            }
             var url = new URL(getClientPortalBaseUrl(), window.location.href);
             url.searchParams.set('id', share.anchorId);
             url.searchParams.set('token', share.token);
@@ -15440,7 +15448,11 @@ Example:
                 createdAt: stableShare.createdAt,
                 url: builderPortalUrlFromStableShare(stableShare)
             } : await createSecureClientShareLink(invoiceData.supabaseId, getClientPortalBaseUrl(), { mode: 'portal' });
-            if (!share || !share.url || share.url.indexOf('token=') < 0) throw new Error('Could not create the client portal link.');
+            if (share && share.token) share.url = builderPortalUrlFromStableShare({
+                token: share.token,
+                anchorId: share.portalAnchorId || share.id
+            });
+            if (!share || !share.url || !share.token) throw new Error('Could not create the client portal link.');
             applyBuilderPortalStableShare(invoiceData, {
                 token: share.token,
                 anchorId: share.portalAnchorId || share.id,
@@ -17111,7 +17123,11 @@ Example:
                     createdAt: stableShare.createdAt,
                     url: builderPortalUrlFromStableShare(stableShare)
                 } : await createSecureClientShareLink(quoteData.supabaseId, getClientPortalBaseUrl(), { mode: 'portal' });
-                if (!share || !share.url || share.url.indexOf('token=') < 0) throw new Error('Could not create the client portal link.');
+                if (share && share.token) share.url = builderPortalUrlFromStableShare({
+                    token: share.token,
+                    anchorId: share.portalAnchorId || share.id
+                });
+                if (!share || !share.url || !share.token) throw new Error('Could not create the client portal link.');
                 applyBuilderPortalStableShare(quoteData, {
                     token: share.token,
                     anchorId: share.portalAnchorId || share.id,

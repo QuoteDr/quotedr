@@ -82,7 +82,9 @@ const headers = await fs.readFile(resolveInside(outputRoot, '_headers'), 'utf8')
 assert(headers.includes('Content-Security-Policy:'), 'Cloudflare CSP must remain in the artifact');
 assert(headers.includes('/sw.js') && headers.includes('Service-Worker-Allowed: /'), 'Service-worker headers must remain in the artifact');
 const redirects = await fs.readFile(resolveInside(outputRoot, '_redirects'), 'utf8');
+assert(redirects.includes('/p/:company/:token /client-portal.html?p=:token 302'), 'Branded client portal redirect must be present in the artifact');
 assert(redirects.includes('/p/* /client-portal.html?p=:splat 302'), 'Clean client portal redirect must remain in the artifact');
+assert(redirects.indexOf('/p/:company/:token') < redirects.indexOf('/p/*'), 'Branded portal redirect must precede the permanent legacy route');
 const notFoundDocument = await fs.readFile(resolveInside(outputRoot, '404.html'), 'utf8');
 assert(notFoundDocument.includes('<meta name="robots" content="noindex">'), 'The public 404 document must remain excluded from indexing');
 assert(!notFoundDocument.includes('window.location') && !notFoundDocument.includes('http-equiv="refresh"'), 'The public 404 document must not redirect into the application');

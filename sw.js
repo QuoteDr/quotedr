@@ -29,7 +29,7 @@ self.addEventListener('fetch', event => {
   // Skip non-GET, cross-origin, Supabase, and API requests — never cache these
   if (
     event.request.method !== 'GET' ||
-    !url.origin.includes('quotedr.io') ||
+    url.origin !== self.location.origin ||
     url.hostname.includes('supabase') ||
     url.pathname.includes('/functions/') ||
     url.pathname.includes('/rest/') ||

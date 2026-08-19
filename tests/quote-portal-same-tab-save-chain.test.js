@@ -89,6 +89,7 @@ function createContext(options = {}) {
     createSecureClientShareLink: async () => options.shareFailure
       ? null
       : ({ id: 'share-1', token: 'token-1', url: 'https://example.test/client?token=token-1' }),
+    builderPortalUrlFromStableShare: share => `https://example.test/p/test-company/${share.token}`,
     getClientPortalBaseUrl: () => 'https://example.test/client-portal.html',
     setQuoteUrlFromSecureShare: () => {},
     updateQuotePortalButton: () => {},
@@ -122,7 +123,7 @@ function createContext(options = {}) {
   const portal = { id: 'portal-1', name: 'Client Portal', clientName: 'Live Client', clientEmail: 'live@example.test', pin: '1234' };
   const url = await success.context.ensureQuotePortalUrl(null, portal);
 
-  assert.strictEqual(url, 'https://example.test/client?token=token-1');
+  assert.strictEqual(url, 'https://example.test/p/test-company/token-1');
   assert.strictEqual(success.calls.saves.length, 1, 'portal publishing should perform one quote save');
   assert.strictEqual(success.calls.saves[0]._serverUpdatedAt, success.v2, 'portal publishing should use the newest same-tab cloud acknowledgement');
   assert.strictEqual(success.calls.saves[0].rooms[0].name, 'Live room', 'portal publishing should use current builder contents instead of the old share snapshot');

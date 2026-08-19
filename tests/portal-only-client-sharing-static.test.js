@@ -11,6 +11,7 @@ const dashboard = read('dashboard.html');
 const supabase = read('supabase-v2.js');
 const clientDocument = read('supabase/functions/client-document/index.ts');
 const clientDocumentPolicy = read('supabase/functions/_shared/client-document-policy.mjs');
+const clientPortalUrl = read('supabase/functions/_shared/client-portal-url.mjs');
 const sendEmail = read('supabase/functions/send-quote-email/index.ts');
 const legacyFollowup = read('supabase/functions/quote-followup/index.ts');
 const documentPayment = read('supabase/functions/document-payment/index.ts');
@@ -38,7 +39,8 @@ assert(supabase.includes("if (mode !== 'portal')"), 'browser helper should rejec
 assert(clientDocument.includes('code: "portal_required"'), 'Edge Function should reject non-portal modes');
 assert(clientDocument.includes('code: "portal_assignment_required"'), 'Edge Function should require a portal-visible document');
 assert(clientDocument.includes('code: "portal_url_required"'), 'Edge Function should reject non-portal destinations');
-assert(clientDocument.includes('host === "quotedr.io" || host === "www.quotedr.io"'), 'Edge Function should constrain production portal destinations to QuoteDr');
+assert(clientDocument.includes('isProductionClientPortalUrl(url)'), 'Edge Function should use the shared production portal-origin allowlist');
+assert(clientPortalUrl.includes('"quotedr.io"') && clientPortalUrl.includes('"www.quotedr.io"'), 'legacy QuoteDr portal hosts must remain permanently allowlisted');
 assert(clientDocument.includes('portal_share_token: token'), 'new portal anchors should persist their stable portal token');
 assert(clientDocument.includes('sanitizeClientDocumentRow(row, options)'), 'secure document responses should use the dedicated allowlist projection');
 for (const forbidden of ["'portal_share_token'", "'portal_pin'", "'shareToken'", "'portalToken'", "'_saveMeta'"]) {

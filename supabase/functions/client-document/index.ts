@@ -15,6 +15,7 @@ import {
   sanitizeClientMediaUrl,
   sanitizeClientDocumentStyle,
 } from "../_shared/client-document-policy.mjs";
+import { isProductionClientPortalUrl } from "../_shared/client-portal-url.mjs";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://axmoffknvblluibuitrq.supabase.co";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso";
@@ -409,9 +410,7 @@ function isPortalShareBaseUrl(value: unknown) {
     try {
       const url = new URL(raw);
       const host = url.hostname.toLowerCase();
-      const isProductionPortal = url.protocol === "https:" &&
-        (host === "quotedr.io" || host === "www.quotedr.io") &&
-        (!url.port || url.port === "443");
+      const isProductionPortal = isProductionClientPortalUrl(url);
       let supabaseHost = "";
       try { supabaseHost = new URL(SUPABASE_URL).hostname.toLowerCase(); } catch (_) {}
       const isLocalSupabase = supabaseHost === "localhost" || supabaseHost === "127.0.0.1";

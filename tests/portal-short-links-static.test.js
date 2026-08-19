@@ -22,6 +22,11 @@ function sourceFunction(source, name, indentation) {
 }
 
 assert(
+  redirects.indexOf('/p/:company/:token /client-portal.html?p=:token 302') < redirects.indexOf('/p/* /client-portal.html?p=:splat 302'),
+  'Branded portal paths should resolve before the permanent legacy route'
+);
+
+assert(
   redirects.includes('/p/* /client-portal.html?p=:splat 302'),
   'Cloudflare Pages should redirect clean portal paths to the portal page'
 );
@@ -132,6 +137,9 @@ vm.runInContext(
   pathContext
 );
 assert.strictEqual(pathContext.readShortToken(), 'abc_DEF-123', 'Client portal should read the token from a clean /p/ path');
+
+pathContext.window.location.pathname = '/p/northline-renovations/branded_TOKEN-456';
+assert.strictEqual(pathContext.readShortToken(), 'branded_TOKEN-456', 'Client portal should ignore a cosmetic company slug and read the final token');
 const stableShareCalls = [];
 let mintCount = 0;
 const ensureContext = {

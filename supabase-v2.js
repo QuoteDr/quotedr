@@ -18,6 +18,57 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 window._supabase = _supabase;
 window._supabaseClient = _supabase;
 
+// Client portal links have their own additive hostname contract. Keep the
+// legacy QuoteDr origins valid permanently; change only the primary origin
+// after the new client-facing domain is attached and verified in Pages.
+const QUOTEDR_PRIMARY_CLIENT_PORTAL_ORIGIN = 'https://quotedr.io';
+const QUOTEDR_LEGACY_CLIENT_PORTAL_ORIGINS = Object.freeze([
+    'https://quotedr.io',
+    'https://www.quotedr.io'
+]);
+
+function qdPortalCompanySlug(value) {
+    return String(value || '')
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 48);
+}
+
+function qdClientPortalOrigin(locationValue) {
+    var location = locationValue || window.location;
+    if (location && ['localhost', '127.0.0.1'].includes(String(location.hostname || '').toLowerCase())) {
+        return String(location.origin || '');
+    }
+    return QUOTEDR_PRIMARY_CLIENT_PORTAL_ORIGIN;
+}
+
+function qdClientPortalBaseUrl(locationValue) {
+    return qdClientPortalOrigin(locationValue) + '/client-portal.html';
+}
+
+function qdShortClientPortalUrl(token, companyName, locationValue) {
+    var cleanToken = String(token || '').trim();
+    if (!cleanToken) return '';
+    var location = locationValue || window.location;
+    var origin = qdClientPortalOrigin(location);
+    var isLocal = location && ['localhost', '127.0.0.1'].includes(String(location.hostname || '').toLowerCase());
+    if (isLocal) return origin + '/client-portal.html?p=' + encodeURIComponent(cleanToken);
+    var slug = qdPortalCompanySlug(companyName);
+    return origin + '/p/' + (slug ? encodeURIComponent(slug) + '/' : '') + encodeURIComponent(cleanToken);
+}
+
+window.QuoteDrPortalLinks = Object.freeze({
+    primaryOrigin: QUOTEDR_PRIMARY_CLIENT_PORTAL_ORIGIN,
+    legacyOrigins: QUOTEDR_LEGACY_CLIENT_PORTAL_ORIGINS,
+    companySlug: qdPortalCompanySlug,
+    portalOrigin: qdClientPortalOrigin,
+    portalBaseUrl: qdClientPortalBaseUrl,
+    shortUrl: qdShortClientPortalUrl
+});
+
 // Current user state
 let currentUser = null;
 

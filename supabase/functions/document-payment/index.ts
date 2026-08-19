@@ -21,6 +21,7 @@ import {
   AccountAccessError,
   requireAccountPermissionWithDefault,
 } from "../_shared/account-authorization.ts";
+import { isProductionClientPortalUrl } from "../_shared/client-portal-url.mjs";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://axmoffknvblluibuitrq.supabase.co";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -389,7 +390,7 @@ function assertPayable(row: QuoteRow, paymentTypeValue: string, state: any) {
 function safeReturnUrl(value: unknown, row: QuoteRow, token: string, portalAnchorId: string) {
   try {
     const url = new URL(String(value || ""));
-    const production = url.protocol === "https:" && ["quotedr.io", "www.quotedr.io"].includes(url.hostname);
+    const production = isProductionClientPortalUrl(url);
     const local = url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname);
     if (!production && !local) throw new Error("host");
     const allowedPaths = isInvoice(row)

@@ -2640,7 +2640,7 @@
     function portalShortTokenFromLocation() {
       const queryToken = String(urlParams.get('p') || '').trim();
       if (queryToken) return queryToken;
-      const match = String(window.location.pathname || '').match(/^\/p\/([^/?#]+)/i);
+      const match = String(window.location.pathname || '').match(/^\/p\/(?:[^/?#]+\/)?([^/?#]+)\/?$/i);
       if (!match) return '';
       try { return decodeURIComponent(match[1]); } catch (_) { return match[1]; }
     }

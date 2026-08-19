@@ -3290,7 +3290,18 @@
 
         function shortPortalUrlForDashboard(token) {
             var cleanToken = String(token || '').trim();
-            return cleanToken ? 'https://quotedr.io/p/' + encodeURIComponent(cleanToken) : '';
+            if (!cleanToken) return '';
+            var profile = {};
+            var legacyCompanyName = '';
+            try {
+                profile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}') || {};
+                legacyCompanyName = localStorage.getItem('ald_business_name') || '';
+            } catch(e) {}
+            var companyName = profile.business_name || profile.company_name || profile.businessName || profile.companyName || legacyCompanyName;
+            if (window.QuoteDrPortalLinks && typeof window.QuoteDrPortalLinks.shortUrl === 'function') {
+                return window.QuoteDrPortalLinks.shortUrl(cleanToken, companyName);
+            }
+            return 'https://quotedr.io/p/' + encodeURIComponent(cleanToken);
         }
 
         function portalUrlForDashboard(portal, quoteId, options) {
@@ -3316,9 +3327,10 @@
         }
 
         function getClientPortalBaseUrl() {
-            if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-                return window.location.origin + '/client-portal.html';
+            if (window.QuoteDrPortalLinks && typeof window.QuoteDrPortalLinks.portalBaseUrl === 'function') {
+                return window.QuoteDrPortalLinks.portalBaseUrl();
             }
+            if (['localhost', '127.0.0.1'].includes(window.location.hostname)) return window.location.origin + '/client-portal.html';
             return 'https://quotedr.io/client-portal.html';
         }
 

@@ -21,8 +21,15 @@ const notFoundBody = await fs.readFile(resolveInside(outputRoot, '404.html'));
 const server = http.createServer(async (request, response) => {
   try {
     const url = new URL(request.url, 'http://127.0.0.1');
-    if (url.pathname.startsWith('/p/')) {
-      response.writeHead(302, { Location: `/client-portal.html?p=${encodeURIComponent(url.pathname.slice(3))}` });
+    const brandedPortal = url.pathname.match(/^\/p\/[^/]+\/([^/]+)\/?$/);
+    if (brandedPortal) {
+      response.writeHead(302, { Location: `/client-portal.html?p=${encodeURIComponent(brandedPortal[1])}` });
+      response.end();
+      return;
+    }
+    const legacyPortal = url.pathname.match(/^\/p\/([^/]+)\/?$/);
+    if (legacyPortal) {
+      response.writeHead(302, { Location: `/client-portal.html?p=${encodeURIComponent(legacyPortal[1])}` });
       response.end();
       return;
     }
@@ -94,6 +101,10 @@ try {
   const portal = await fetch(`${origin}/p/synthetic`, { redirect: 'manual' });
   assert.equal(portal.status, 302);
   assert.equal(portal.headers.get('location'), '/client-portal.html?p=synthetic');
+
+  const brandedPortal = await fetch(`${origin}/p/northline/same-token`, { redirect: 'manual' });
+  assert.equal(brandedPortal.status, 302);
+  assert.equal(brandedPortal.headers.get('location'), '/client-portal.html?p=same-token');
 
   for (const forbiddenPath of publicArtifactConfig.knownForbiddenPaths) {
     const response = await fetch(`${origin}${forbiddenPath}`, { redirect: 'manual' });

@@ -5,6 +5,10 @@ import {
   AccountAccessError,
   requireAccountPermissionWithDefault,
 } from "../_shared/account-authorization.ts";
+import {
+  isProductionClientPortalUrl,
+  portalTokenFromUrl,
+} from "../_shared/client-portal-url.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,10 +29,9 @@ const PORTAL_EMAIL_KINDS = new Set([
 function isQuoteDrPortalUrl(value: unknown) {
   try {
     const url = new URL(String(value || "").trim());
-    const host = url.hostname.toLowerCase();
-    if (url.protocol !== "https:" || (host !== "quotedr.io" && host !== "www.quotedr.io") || (url.port && url.port !== "443")) return false;
+    if (!isProductionClientPortalUrl(url)) return false;
     if (["admin", "view", "theme_studio"].some((name) => ["1", "true", "admin", "studio"].includes(String(url.searchParams.get(name) || "").toLowerCase()))) return false;
-    if (/^\/p\/[^/?#]+\/?$/i.test(url.pathname)) return true;
+    if (/^\/p\/(?:[^/?#]+\/)?[^/?#]+\/?$/i.test(url.pathname)) return true;
     if (!/^\/client-portal(?:\.html)?\/?$/i.test(url.pathname)) return false;
     return !!(url.searchParams.get("token") || url.searchParams.get("p"));
   } catch (_) {
@@ -42,16 +45,6 @@ function isExternalReviewUrl(value: unknown) {
     return url.protocol === "https:" || url.protocol === "http:";
   } catch (_) {
     return false;
-  }
-}
-
-function portalTokenFromUrl(value: unknown) {
-  try {
-    const url = new URL(String(value || "").trim());
-    const shortMatch = url.pathname.match(/^\/p\/([^/?#]+)\/?$/i);
-    return String(shortMatch ? decodeURIComponent(shortMatch[1]) : (url.searchParams.get("token") || url.searchParams.get("p") || "")).trim();
-  } catch (_) {
-    return "";
   }
 }
 
