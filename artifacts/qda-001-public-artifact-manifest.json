@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "outputDirectory": "dist",
   "fileCount": 106,
-  "totalBytes": 22639261,
-  "treeSha256": "de712c4a7103a7d283a4ba175fd8f65e62491b7831313f833bd7c596fea21319",
+  "totalBytes": 22641902,
+  "treeSha256": "2de98e1215ec0867fd653d9b26ae6437d173676be83e900e0be5837f010b1d4b",
   "files": [
     {
       "path": "404.html",
@@ -53,7 +53,7 @@
     {
       "path": "ai-operations.html",
       "bytes": 26722,
-      "sha256": "688f861f827b7592ecb2c048f8b7e5cabf5bf8d4759ac04fab55993874fc8ab0"
+      "sha256": "e48ad62e59859645d5e061b01b58f7699c189011859b64a6ce74b5652a11a2f5"
     },
     {
       "path": "ai-operations.js",
@@ -143,7 +143,7 @@
     {
       "path": "client-portal.html",
       "bytes": 222772,
-      "sha256": "9cb8aaccd923848b6a10a9665c92872c97969d45a3c49ed8ad8eda803f2246af"
+      "sha256": "a2534c6ac70f39f9315817acdac915638ec47d6cde098fa4543fa658f197fd0c"
     },
     {
       "path": "community-starter-templates.js",
@@ -158,7 +158,7 @@
     {
       "path": "dashboard.html",
       "bytes": 357854,
-      "sha256": "ce0d47e5ee407869e8e6a1b7212516a18daa432732b55f529c4c0e189a910ff8"
+      "sha256": "a4f2309234889fe9f3b1fc199010c765792f134a07e98d26bf2d2f937d98f85c"
     },
     {
       "path": "data/whats-new.json",
@@ -193,12 +193,12 @@
     {
       "path": "home-depot-price-sync.html",
       "bytes": 22454,
-      "sha256": "aec517f0faef94b60903d10f4ea2abf83f4f777f22de54d276391c1526281a41"
+      "sha256": "49eb445d400f63d2530b8e3b0c9fb776ebac3e29362feb89806e17a321d710f4"
     },
     {
       "path": "home-depot-tracker.html",
       "bytes": 67618,
-      "sha256": "8c2c92931716f594b633333cf914e33acb440290ef9c9b7b68857b0b85bb9117"
+      "sha256": "50ebdd3da7feaff75d89033c01c7ccb0831038d239dfb58d79a29bc416b13a7f"
     },
     {
       "path": "icons/icon-192.png",
@@ -223,17 +223,17 @@
     {
       "path": "interactive-quote-viewer.html",
       "bytes": 340660,
-      "sha256": "82255dd09c0c6da3e1d330c06e68a449a07f67b337ab046b0f0221b21793f230"
+      "sha256": "b0479b3ed4a8aaf59681bc7ff5ae463112b7115cd54eeea681946ee5df9a9bbd"
     },
     {
       "path": "invoice-viewer.html",
       "bytes": 136469,
-      "sha256": "821c80e74946493335b59d4f36576b6d44179551d291ddff2b588edb20daae52"
+      "sha256": "c5c69b51f23efb10d7999580f6f8729944186b9b16f726bdfc0cecaf1846fecf"
     },
     {
       "path": "labor-tracker.html",
       "bytes": 53407,
-      "sha256": "8db9d2bd3bf540beb18478079ed073b1acbfc388e83427bff71e391e88bdaec6"
+      "sha256": "549898d1f9794c9ea92c6bd434cbdeb08420572af074d8a22b509f8c7bf98466"
     },
     {
       "path": "landing.html",
@@ -243,7 +243,7 @@
     {
       "path": "login.html",
       "bytes": 20573,
-      "sha256": "7364c55d78cc5cae8c6a08fd6fc8acb66f523ce6d3c9a75f68b8beba018e3b6a"
+      "sha256": "97c4165601a5695830b3db8964d9608598cfc0e03dd262a28fb47ce88bea9992"
     },
     {
       "path": "manifest.json",
@@ -273,17 +273,17 @@
     {
       "path": "onboarding.html",
       "bytes": 71233,
-      "sha256": "d9954ed37bcce7f636b0b26fd5f267a625530f19198c3a95ed19143c258419d5"
+      "sha256": "92dee13ca6e5eb1ff861f08702e560d2a29b90905e87027474e82e1901830e0a"
     },
     {
       "path": "portal-theme-studio.html",
       "bytes": 40198,
-      "sha256": "1d9e101f5061243b621a9b7b3a19f0442ddbfdcb2a8e0a8253c1c37290276f5b"
+      "sha256": "0326a0054646744651920ca60d252c7700acb3aee94454a0cf3410a09dc676ad"
     },
     {
       "path": "pricing.html",
       "bytes": 25005,
-      "sha256": "8d6c5dc8acb5af854cbe93154e837bdc53e27e1d48751e1b6daffa36c6302835"
+      "sha256": "dcf7709f66043851bc3d8a5da59fad020208af4886672fabde4724000dcba51c"
     },
     {
       "path": "privacy.html",
@@ -318,7 +318,7 @@
     {
       "path": "quote-builder.html",
       "bytes": 1383764,
-      "sha256": "0a95e0c1ff3266ef02ed399d0f867a3113a82850800c51d782278a260ba8c8f0"
+      "sha256": "1ad89c7f01c21020fa526412fcedd852e193ae5ee19f9be550b8439a4c4d4312"
     },
     {
       "path": "quote-calculators.js",
@@ -422,13 +422,13 @@
     },
     {
       "path": "save-coordinator.js",
-      "bytes": 96357,
-      "sha256": "341a7f36d3f9873dd9f0ff79ddd930e72e0796488a3d7da630470d5cab26ce1e"
+      "bytes": 98476,
+      "sha256": "83afdb2152a704d4485688f4e4f531df2c286ba887ca090f2937faa4d0847e48"
     },
     {
       "path": "settings.html",
       "bytes": 350088,
-      "sha256": "02e4d95d7161cd470e6b188c3421c4f762f4f823c03a83b9d9f21c1a0a8e5227"
+      "sha256": "bda6a0671d95c656c93918b36ba833b09087116028ffd5fa5b9d6a9af3098304"
     },
     {
       "path": "signup-gate.css",
@@ -442,8 +442,8 @@
     },
     {
       "path": "supabase-v2.js",
-      "bytes": 177067,
-      "sha256": "f28af3d6bc526829ebb038db4b36cbc8ef9bbdefa0863baa6ef8f7c901e54769"
+      "bytes": 177589,
+      "sha256": "0327cb078930ad5adb69a09188850b85b4005d83449f824c735c49d9f7713254"
     },
     {
       "path": "sw.js",
@@ -453,7 +453,7 @@
     {
       "path": "team-invite.html",
       "bytes": 9193,
-      "sha256": "04abe71b5cb717ac7ba20b1460932c38fce512172fdc8bc48e908a10d210f22c"
+      "sha256": "99c977e834f94d4529f10990fbfd286a4bd703e73768c7c33ff26b8272053b86"
     },
     {
       "path": "terms.html",
