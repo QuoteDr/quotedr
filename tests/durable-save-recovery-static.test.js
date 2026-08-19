@@ -141,7 +141,8 @@ assert(indicatorClasses.has('qd-sync-error'), 'A save conflict must remain style
 assert(
   supabase.includes('window.QuoteDrSave.registerAdapter(entityType') &&
     supabase.includes('async function qdDurableSupabaseOperation') &&
-    supabase.includes("throw new Error('Cloud save matched no records") &&
+    supabase.includes("new Error('Cloud save matched no records") &&
+    supabase.includes("noRowsError.code = 'QD_NO_ROWS_MATCHED'") &&
     supabase.includes("throw new Error('Cloud save acknowledgement did not match the local revision") &&
     supabase.includes('timeoutMs: options.timeoutMs || 15000'),
   'Supabase adapters should normalize acknowledgements, empty writes, revisions, and timeouts'

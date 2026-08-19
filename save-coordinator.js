@@ -328,6 +328,21 @@
         return /PGRST204|42P10|schema cache|column .* does not exist|no unique or exclusion constraint matching the ON CONFLICT specification/i.test(text);
     }
 
+    function isQuoteDeleteOperation(operation) {
+        var target = operation && operation.target || {};
+        return !!(operation && operation.entityType === 'quote' &&
+            String(target.action || operation.action || '').toLowerCase() === 'delete');
+    }
+
+    function isMissingCloudQuoteOperation(operation, error) {
+        var target = operation && operation.target || {};
+        if (!operation || operation.entityType !== 'quote' || target.table !== 'quotes' ||
+            String(target.action || operation.action || '').toLowerCase() === 'delete') return false;
+        var normalized = errorObject(error || operation.lastError);
+        return ['QD_NO_ROWS_MATCHED', 'QD_MISSING_CLOUD_QUOTE'].indexOf(String(normalized.code)) !== -1 ||
+            /cloud save matched no records/i.test(normalized.message);
+    }
+
     function retryDelay(attempts) {
         var schedule = [5000, 15000, 60000, 5 * 60000, 15 * 60000, MAX_BACKOFF_MS];
         return schedule[Math.min(Math.max(attempts - 1, 0), schedule.length - 1)];
@@ -605,6 +620,11 @@
             var normalizedError = errorObject(error);
             if (isClientSchemaContractError(latest, error)) {
                 return markActionRequired(latest, error, { recordAttempt: true });
+            }
+            if (isMissingCloudQuoteOperation(latest, error)) {
+                var missingQuoteError = new Error('This quote no longer exists in the cloud. If you deleted it intentionally, export a backup and clear this obsolete retry below. If you want to keep it, reopen the backup as a new quote.');
+                missingQuoteError.code = 'QD_MISSING_CLOUD_QUOTE';
+                return markActionRequired(latest, missingQuoteError, { recordAttempt: true });
             }
             if (String(normalizedError.code) === 'QD_INVALID_IDENTIFIER' || /invalid input syntax for type uuid/i.test(normalizedError.message)) {
                 return markActionRequired(latest, error);
@@ -982,6 +1002,16 @@
         var operation = await getStoreValue(OUTBOX_STORE, key);
         if (!operation || operation.state !== 'conflict') return { state: 'missing' };
         if (strategy === 'use_local') {
+            if (isQuoteDeleteOperation(operation)) {
+                operation.forceConflictOverwrite = true;
+                operation.state = 'delete_pending';
+                operation.attempts = 0;
+                operation.lastError = null;
+                operation.nextAttemptAt = 0;
+                await putStoreValue(OUTBOX_STORE, operation);
+                await notify();
+                return flushSavedOperation(operation, { force: true });
+            }
             if (operation.entityType === 'quote') {
                 var serverVersion = operation.lastError && operation.lastError.serverVersion || null;
                 var quoteAdapter = adapterFor(operation);
@@ -1446,10 +1476,12 @@
             var conflictActions = operation.state === 'conflict' ? '<div class="qd-recovery-actions mt-2"><button type="button" class="btn btn-sm btn-primary" data-qd-use-local data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-laptop me-1"></i>Use My Version</button>' +
                 (operation.entityType === 'quote' ? '<button type="button" class="btn btn-sm btn-outline-primary" data-qd-use-cloud data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-cloud-arrow-down me-1"></i>Load Cloud Copy</button>' : '') + '</div>' : '';
             var quoteExportAction = operation.entityType === 'quote' ? '<div class="qd-recovery-actions mt-2"><button type="button" class="btn btn-sm btn-outline-success" data-qd-export-quote data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-download me-1"></i>Export Quote Backup</button></div>' : '';
+            var missingCloudQuote = isMissingCloudQuoteOperation(operation, operation.lastError);
+            var failedSaveRemoveLabel = missingCloudQuote ? 'Export &amp; Clear Obsolete Retry' : 'Export &amp; Remove Failed Save';
             var actionRequiredActions = operation.state === 'action_required' ? '<div class="qd-recovery-actions mt-2">' +
                 (isRecoverableMalformedQuoteOperation(operation) ? '<button type="button" class="btn btn-sm btn-primary" data-qd-resolve-quote data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-magnifying-glass me-1"></i>Resolve Failed Save</button>' : '') +
                 (isRecoverableClientSchemaOperation(operation) ? '<button type="button" class="btn btn-sm btn-primary" data-qd-resolve-retry data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-rotate me-1"></i>Resolve Failed Save</button>' : '') +
-                '<button type="button" class="btn btn-sm btn-outline-danger" data-qd-discard-failed data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-download me-1"></i>Export &amp; Remove Failed Save</button></div>' : '';
+                '<button type="button" class="btn btn-sm btn-outline-danger" data-qd-discard-failed data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-download me-1"></i>' + failedSaveRemoveLabel + '</button></div>' : '';
             var stateLabel = operation.state === 'action_required' ? 'action required' : (operation.state || 'local_pending');
             return '<div class="qd-recovery-row">' +
                 '<div class="qd-recovery-title">' + escapeHtml(operation.entityLabel || operation.entityType) + '</div>' +
@@ -1600,7 +1632,7 @@
                 if (!confirmed) {
                     overlay.style.display = '';
                     button.disabled = false;
-                    button.innerHTML = '<i class="fas fa-download me-1"></i>Export & Remove Failed Save';
+                    button.innerHTML = '<i class="fas fa-download me-1"></i>' + (isMissingCloudQuoteOperation(operation, operation.lastError) ? 'Export & Clear Obsolete Retry' : 'Export & Remove Failed Save');
                     return;
                 }
                 await discardPendingByKey(operationKey, { state: 'discarded_after_backup' });

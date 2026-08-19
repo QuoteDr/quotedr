@@ -337,6 +337,14 @@ function qdApplyDurableFilters(query, filters) {
     return query;
 }
 
+function qdDurableWriteRequiresRows(action, target) {
+    // Deletes are idempotent: an empty response means the requested record is
+    // already absent. This also repairs delete operations queued by older app
+    // versions before delete targets explicitly set expectRows to false.
+    if (String(action || '').toLowerCase() === 'delete') return false;
+    return target.expectRows !== false && target.select !== false;
+}
+
 function qdTeamTargetFilterValue(target, column) {
     var filter = (target.filters || []).find(function(entry) {
         return entry && entry.column === column && (!entry.operator || entry.operator === 'eq');
@@ -485,8 +493,10 @@ async function qdExecuteDurableSupabaseTarget(operation) {
         result = await executeOnce(stripped);
     }
     if (result.error) throw qdDurableSaveError(result.error);
-    if (target.expectRows !== false && target.select !== false && Array.isArray(result.data) && result.data.length === 0) {
-        throw new Error('Cloud save matched no records. Your local copy is retained for retry.');
+    if (qdDurableWriteRequiresRows(action, target) && Array.isArray(result.data) && result.data.length === 0) {
+        var noRowsError = new Error('Cloud save matched no records. Your local copy is retained for retry.');
+        noRowsError.code = 'QD_NO_ROWS_MATCHED';
+        throw noRowsError;
     }
     if (target.verifyRevision) {
         var acknowledged = Array.isArray(result.data) ? result.data[0] : result.data;
@@ -2186,7 +2196,7 @@ async function deleteQuoteFromSupabase(quoteId) {
         entityLabel: (existing.data && (existing.data.client_name || existing.data.quote_number)) || 'Quote',
         action: 'delete',
         payload: existing.data || { id: quoteId },
-        target: { table: 'quotes', action: 'delete', values: {}, filters: [{ column: 'id', value: quoteId }] }
+        target: { table: 'quotes', action: 'delete', values: {}, filters: [{ column: 'id', value: quoteId }], expectRows: false }
     });
     if (result.error) return result;
     return Object.assign({ success: true }, result);
