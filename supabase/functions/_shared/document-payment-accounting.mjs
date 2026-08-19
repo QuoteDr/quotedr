@@ -35,18 +35,27 @@ export function legacyUnlinkedPaidCents(row) {
 }
 
 export function calculateRecordedPaymentState(row, records, requestedDepositCents) {
+  const data = rowData(row);
   const secured = (Array.isArray(records) ? records : []).filter(record => ['paid', 'confirmed'].includes(record?.status));
   const recordPaidCents = secured.reduce((sum, record) => sum + nonNegativeCents(record.amount_cents), 0);
   const paidCents = recordPaidCents + legacyUnlinkedPaidCents(row);
   const totalCents = canonicalDocumentTotalCents(row);
   const requiredCents = Math.min(totalCents, nonNegativeCents(requestedDepositCents));
+  const depositShortfallAccepted = data.deposit_shortfall_accepted === true
+    && requiredCents > 0
+    && paidCents > 0
+    && paidCents < requiredCents;
+  const depositSecured = requiredCents > 0 && (paidCents >= requiredCents || depositShortfallAccepted);
   return {
     secured,
     totalCents,
     paidCents,
     balanceDueCents: Math.max(0, totalCents - paidCents),
-    depositDueCents: Math.max(0, requiredCents - paidCents),
-    depositSecured: requiredCents > 0 && paidCents >= requiredCents,
+    requiredDepositCents: requiredCents,
+    depositDueCents: depositSecured ? 0 : Math.max(0, requiredCents - paidCents),
+    depositSecured,
+    depositShortfallAccepted,
+    acceptedDepositCents: depositShortfallAccepted ? paidCents : 0,
     fullPaid: totalCents > 0 && paidCents >= totalCents,
   };
 }

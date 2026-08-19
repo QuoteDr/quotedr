@@ -23,6 +23,8 @@ const ROOT_SAFE_KEYS = new Set([
   'portal_client_email', 'client_upgraded', 'client_upgraded_at', '_roomNotes',
   'paymentStatus', 'deposit_paid', 'deposit_paid_at', 'manual_payment_reported',
   'manual_payment_reported_at', 'accepted_total_cents', 'deposit_due_cents',
+  'balance_due_cents', 'deposit_shortfall_accepted', 'deposit_shortfall_accepted_at',
+  'deposit_shortfall_accepted_paid_cents', 'deposit_shortfall_required_cents',
   'quoted_total_cents', 'accepted_at', 'accepted_by', 'approved_at', 'approved_by',
   'signed_at', 'signed_by', 'signature_method', 'signature_text', 'signature_url',
   'signature_data_url', 'terms_accepted', 'terms_accepted_at', 'terms_accepted_snapshot',

@@ -57,13 +57,53 @@ test('owner-confirmed actual amount produces the exact client-visible balance', 
 
 test('payment state does not leak between quotes in the same session', async () => {
   const { calculateRecordedPaymentState } = await accounting();
-  const first = calculateRecordedPaymentState(affectedSignedQuote(), [{ id: 'manual-1', status: 'confirmed', amount_cents: 180973 }], 217008);
+  const acceptedShortfallQuote = affectedSignedQuote();
+  acceptedShortfallQuote.data.deposit_shortfall_accepted = true;
+  const first = calculateRecordedPaymentState(acceptedShortfallQuote, [{ id: 'manual-1', status: 'confirmed', amount_cents: 180973 }], 217008);
   const second = calculateRecordedPaymentState({ id: 'quote-2', total: 1130, data: {} }, [], 56500);
   assert.equal(first.paidCents, 180973);
+  assert.equal(first.depositSecured, true);
+  assert.equal(first.depositShortfallAccepted, true);
   assert.equal(second.totalCents, 113000);
   assert.equal(second.paidCents, 0);
+  assert.equal(second.depositSecured, false);
+  assert.equal(second.depositShortfallAccepted, false);
   assert.equal(second.depositDueCents, 56500);
   assert.equal(second.balanceDueCents, 113000);
+});
+
+test('contractor may accept a short deposit without forgiving the signed project balance', async () => {
+  const { calculateRecordedPaymentState } = await accounting();
+  const quote = {
+    id: 'quote-partial-deposit',
+    total: 6305.65,
+    data: { deposit_shortfall_accepted: true }
+  };
+  const state = calculateRecordedPaymentState(
+    quote,
+    [{ id: 'manual-2000', status: 'confirmed', amount_cents: 200000 }],
+    315283
+  );
+  assert.equal(state.totalCents, 630565);
+  assert.equal(state.requiredDepositCents, 315283);
+  assert.equal(state.paidCents, 200000);
+  assert.equal(state.acceptedDepositCents, 200000);
+  assert.equal(state.depositShortfallAccepted, true);
+  assert.equal(state.depositSecured, true);
+  assert.equal(state.depositDueCents, 0);
+  assert.equal(state.balanceDueCents, 430565, 'acceptance changes scheduling status, not the amount still owed on the project');
+  assert.equal(state.paidCents + state.balanceDueCents, state.totalCents);
+
+  quote.data.deposit_shortfall_accepted = false;
+  const outstanding = calculateRecordedPaymentState(quote, [{ id: 'manual-2000', status: 'confirmed', amount_cents: 200000 }], 315283);
+  assert.equal(outstanding.depositSecured, false);
+  assert.equal(outstanding.depositDueCents, 115283);
+  assert.equal(outstanding.balanceDueCents, 430565);
+
+  quote.data.deposit_shortfall_accepted = true;
+  const laterCompleted = calculateRecordedPaymentState(quote, [{ id: 'manual-full', status: 'confirmed', amount_cents: 315283 }], 315283);
+  assert.equal(laterCompleted.depositShortfallAccepted, false, 'a later full deposit must supersede the earlier exception');
+  assert.equal(laterCompleted.depositSecured, true);
 });
 
 test('dashboard, payment API, and client viewer share the correction contract', () => {
@@ -85,4 +125,13 @@ test('dashboard, payment API, and client viewer share the correction contract', 
   assert(paymentApi.includes('canonicalDocumentTotalCents'));
   assert(viewer.includes("quoteData.paymentsReceived = {"));
   assert(viewer.includes("if (_documentPaymentState) return !!(_documentPaymentState.depositSecured || _documentPaymentState.fullPaid)"));
+  assert(!viewer.includes("['partially_paid', 'paid'].includes(String(quoteData.paymentStatus"), 'a partial payment must never imply that the deposit is satisfied');
+  assert(dashboard.includes("action: 'resolve_deposit_shortfall'"));
+  assert(dashboard.includes('Review deposit decision'));
+  assert(dashboard.includes('still needed to satisfy deposit'));
+  assert(paymentApi.includes('deposit_shortfall_accepted'));
+  assert(paymentApi.includes('clearDepositShortfallAcceptance: true'), 'editing the received amount must clear a stale shortfall decision');
+  assert(viewer.includes('Deposit Balance Remaining'));
+  assert(viewer.includes('Lower deposit accepted.'));
+  assert(viewer.includes('Your remaining project balance is unchanged.'));
 });

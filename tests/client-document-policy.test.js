@@ -49,6 +49,12 @@ function quoteFixture() {
       payment_intent_id: 'pi_private'
     }],
     paymentsReceived: { name: 'Deposit paid', amount: 50, payment_intent_id: 'pi_summary_private' },
+    balance_due_cents: 61376,
+    deposit_shortfall_accepted: true,
+    deposit_shortfall_accepted_at: '2026-08-08T12:05:00Z',
+    deposit_shortfall_accepted_paid_cents: 5000,
+    deposit_shortfall_required_cents: 10000,
+    deposit_shortfall_accepted_by: 'contractor-user-id',
     signature_url: 'https://storage.example/signature.png?token=secret-signature-token',
     rooms: [{
       id: 'room-kitchen',
@@ -237,6 +243,11 @@ test('client projection is non-mutating, redacts every nested internal field, an
   assert.deepEqual(projected.data.payments[0], {
     type: 'deposit', status: 'paid', paid_at: '2026-08-08T12:00:00Z', amount: 50
   });
+  assert.equal(projected.data.balance_due_cents, 61376);
+  assert.equal(projected.data.deposit_shortfall_accepted, true);
+  assert.equal(projected.data.deposit_shortfall_accepted_paid_cents, 5000);
+  assert.equal(projected.data.deposit_shortfall_required_cents, 10000);
+  assert.equal(projected.data.deposit_shortfall_accepted_by, undefined, 'the contractor account id must remain private');
 
   const sourceTotals = api.calculateClientDocumentTotals(source.data, { documentType: 'quote' });
   const projectedTotals = api.calculateClientDocumentTotals(projected.data, { documentType: 'quote' });

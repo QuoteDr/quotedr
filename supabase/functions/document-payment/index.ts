@@ -274,7 +274,18 @@ async function documentPaymentState(admin: any, row: QuoteRow, settings: Record<
   const terms = resolveDepositTerms(row, settings);
   const requestedDepositCents = depositAmountCents(documentTotalCents(row), terms);
   const paymentState = calculateRecordedPaymentState(row, records, requestedDepositCents);
-  const { secured, totalCents, paidCents, balanceDueCents, depositDueCents, depositSecured, fullPaid } = paymentState;
+  const {
+    secured,
+    totalCents,
+    paidCents,
+    balanceDueCents,
+    requiredDepositCents,
+    depositDueCents,
+    depositSecured,
+    depositShortfallAccepted,
+    acceptedDepositCents,
+    fullPaid,
+  } = paymentState;
   const reported = records.find((record: any) => record.status === "client_reported");
   return {
     records,
@@ -282,8 +293,11 @@ async function documentPaymentState(admin: any, row: QuoteRow, settings: Record<
     paidCents,
     balanceDueCents,
     terms,
+    requiredDepositCents,
     depositDueCents,
     depositSecured,
+    depositShortfallAccepted,
+    acceptedDepositCents,
     fullPaid,
     reported: reported ? {
       id: reported.id,
@@ -308,8 +322,11 @@ function publicStatus(row: QuoteRow, state: any) {
     totalCents: state.totalCents,
     paidCents: state.paidCents,
     balanceDueCents: state.balanceDueCents,
+    requiredDepositCents: state.requiredDepositCents,
     depositDueCents: state.depositDueCents,
     depositSecured: state.depositSecured,
+    depositShortfallAccepted: state.depositShortfallAccepted,
+    acceptedDepositCents: state.acceptedDepositCents,
     fullPaid: state.fullPaid,
     report: state.reported,
   };
@@ -358,8 +375,16 @@ function idempotencyKey(value: unknown) {
   return key;
 }
 
-async function updateQuotePaymentState(admin: any, row: QuoteRow, record: any, paidAt: string) {
-  const data = rowData(row);
+async function updateQuotePaymentState(admin: any, row: QuoteRow, record: any, paidAt: string, options: Record<string, any> = {}) {
+  const originalData = rowData(row);
+  const data = options.clearDepositShortfallAcceptance === true ? {
+    ...originalData,
+    deposit_shortfall_accepted: false,
+    deposit_shortfall_accepted_at: null,
+    deposit_shortfall_accepted_paid_cents: 0,
+    deposit_shortfall_required_cents: 0,
+    deposit_shortfall_accepted_by: null,
+  } : originalData;
   const payments = Array.isArray(data.payments) ? data.payments : [];
   const paymentEntry = {
     payment_record_id: record.id,
@@ -378,9 +403,9 @@ async function updateQuotePaymentState(admin: any, row: QuoteRow, record: any, p
   else nextPayments.push(paymentEntry);
 
   const { settings } = await paymentSettings(admin, row.user_id);
-  const state = await documentPaymentState(admin, row, settings);
+  const state = await documentPaymentState(admin, { ...row, data }, settings);
   const nextReceived = state.paidCents / 100;
-  const nextData = {
+  const nextData: Record<string, any> = {
     ...data,
     paymentStatus: state.fullPaid ? "paid" : (state.paidCents > 0 ? "partially_paid" : "unpaid"),
     deposit_paid: state.depositSecured,
@@ -396,11 +421,22 @@ async function updateQuotePaymentState(admin: any, row: QuoteRow, record: any, p
     },
     payments: nextPayments,
   };
+  if (!state.depositShortfallAccepted) {
+    nextData.deposit_shortfall_accepted = false;
+    nextData.deposit_shortfall_accepted_at = null;
+    nextData.deposit_shortfall_accepted_paid_cents = 0;
+    nextData.deposit_shortfall_required_cents = 0;
+    nextData.deposit_shortfall_accepted_by = null;
+  } else {
+    nextData.deposit_shortfall_accepted_paid_cents = state.paidCents;
+    nextData.deposit_shortfall_required_cents = state.requiredDepositCents;
+  }
   const update: Record<string, any> = { data: nextData, updated_at: paidAt };
   if (state.fullPaid) update.status = "paid";
   else if (isInvoice(row) && String(row.status || "").toLowerCase() === "paid") update.status = "invoiced";
   const { error } = await admin.from("quotes").update(update).eq("id", row.id).eq("user_id", row.user_id);
   if (error) throw error;
+  return state;
 }
 
 async function stripeSession(path: string, accountId: string, init: RequestInit = {}) {
@@ -671,8 +707,71 @@ async function confirmManual(req: Request, admin: any, body: Record<string, any>
     },
   }).eq("id", record.id).select().single();
   if (confirmed.error) throw confirmed.error;
-  await updateQuotePaymentState(admin, row, confirmed.data, now);
-  return { record: { id: confirmed.data.id, status: confirmed.data.status, amountCents: confirmedAmountCents, confirmedAt: now } };
+  const state = await updateQuotePaymentState(admin, row, confirmed.data, now, { clearDepositShortfallAcceptance: true });
+  return {
+    record: { id: confirmed.data.id, status: confirmed.data.status, amountCents: confirmedAmountCents, confirmedAt: now },
+    payment: publicStatus({ ...row, data: { ...rowData(row), deposit_shortfall_accepted: false } }, state),
+  };
+}
+
+async function resolveDepositShortfall(req: Request, admin: any, body: Record<string, any>) {
+  const user = await authenticatedUser(req);
+  if (!user) throw new PaymentError("Authentication required", 401, "authentication_required");
+  const documentId = normalizeId(body.documentId || body.quoteId || body.invoiceId || body.id);
+  if (!documentId) throw new PaymentError("Payment document not found", 404, "payment_document_not_found");
+  const row = await fetchQuote(admin, documentId);
+  if (!row || row.user_id !== user.id) throw new PaymentError("Payment document not found", 404, "payment_document_not_found");
+  if (!isAccepted(row)) throw new PaymentError("Accept the quote before resolving its deposit.", 409, "quote_acceptance_required");
+
+  const decision = String(body.decision || "").trim().toLowerCase();
+  if (!["accept_shortfall", "keep_outstanding"].includes(decision)) {
+    throw new PaymentError("Choose whether to accept the lower deposit or keep the balance outstanding.", 400, "deposit_shortfall_decision_required");
+  }
+
+  const { settings } = await paymentSettings(admin, row.user_id);
+  const currentState = await documentPaymentState(admin, row, settings);
+  if (currentState.requiredDepositCents <= 0) {
+    throw new PaymentError("This document does not require a deposit.", 409, "deposit_not_required");
+  }
+  if (currentState.paidCents <= 0) {
+    throw new PaymentError("Record a received payment before resolving the deposit.", 409, "deposit_payment_required");
+  }
+  if (currentState.paidCents >= currentState.requiredDepositCents) {
+    throw new PaymentError("The required deposit has already been received in full.", 409, "deposit_already_satisfied");
+  }
+
+  const now = new Date().toISOString();
+  const accepted = decision === "accept_shortfall";
+  const candidateData = {
+    ...rowData(row),
+    deposit_shortfall_accepted: accepted,
+    deposit_shortfall_accepted_at: accepted ? now : null,
+    deposit_shortfall_accepted_paid_cents: accepted ? currentState.paidCents : 0,
+    deposit_shortfall_required_cents: accepted ? currentState.requiredDepositCents : 0,
+    deposit_shortfall_accepted_by: accepted ? user.id : null,
+  };
+  const candidateRow = { ...row, data: candidateData };
+  const nextState = await documentPaymentState(admin, candidateRow, settings);
+  const nextData: Record<string, any> = {
+    ...candidateData,
+    paymentStatus: nextState.fullPaid ? "paid" : (nextState.paidCents > 0 ? "partially_paid" : "unpaid"),
+    deposit_paid: nextState.depositSecured,
+    deposit_paid_at: nextState.depositSecured ? (rowData(row).deposit_paid_at || now) : null,
+    deposit_due_cents: nextState.depositDueCents,
+    balance_due_cents: nextState.balanceDueCents,
+  };
+  let updateQuery = admin.from("quotes").update({ data: nextData, updated_at: now })
+    .eq("id", row.id)
+    .eq("user_id", user.id);
+  if (row.updated_at) updateQuery = updateQuery.eq("updated_at", row.updated_at);
+  const { data: updated, error } = await updateQuery.select("id").maybeSingle();
+  if (error) throw error;
+  if (!updated) throw new PaymentError("The document changed while the deposit decision was being saved. Refresh and try again.", 409, "document_changed");
+
+  return {
+    decision,
+    payment: publicStatus({ ...row, data: nextData }, nextState),
+  };
 }
 
 Deno.serve(async (req) => {
@@ -686,6 +785,7 @@ Deno.serve(async (req) => {
   try {
     const admin = adminClient();
     if (action === "confirm_manual") return json(await confirmManual(req, admin, body));
+    if (action === "resolve_deposit_shortfall") return json(await resolveDepositShortfall(req, admin, body));
 
     const { target, token, portalAnchorId } = await assertDocumentAccess(admin, body);
     activeDocumentId = target.id;

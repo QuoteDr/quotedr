@@ -2331,7 +2331,12 @@ if (location.search.includes('debug')) {
                 amount: paidCents / 100
             };
             if (Number.isFinite(Number(payment.balanceDueCents))) quoteData.balance_due_cents = Math.max(0, Math.round(Number(payment.balanceDueCents)));
+            if (Number.isFinite(Number(payment.requiredDepositCents))) quoteData.deposit_shortfall_required_cents = Math.max(0, Math.round(Number(payment.requiredDepositCents)));
             if (Number.isFinite(Number(payment.depositDueCents))) quoteData.deposit_due_cents = Math.max(0, Math.round(Number(payment.depositDueCents)));
+            quoteData.deposit_shortfall_accepted = payment.depositShortfallAccepted === true;
+            quoteData.deposit_shortfall_accepted_paid_cents = payment.depositShortfallAccepted
+                ? Math.max(0, Math.round(Number(payment.acceptedDepositCents || paidCents)))
+                : 0;
             quoteData.manual_payment_reported = payment.status === 'client_reported';
             if (payment.report) {
                 quoteData.manual_payment_report_id = payment.report.id || '';
@@ -5420,11 +5425,21 @@ if (location.search.includes('debug')) {
         }
 
         function quoteDepositIsPaid() {
-            var payments = Array.isArray(quoteData.payments) ? quoteData.payments : [];
             if (_documentPaymentState) return !!(_documentPaymentState.depositSecured || _documentPaymentState.fullPaid);
             return quoteData.deposit_paid === true
-                || ['partially_paid', 'paid'].includes(String(quoteData.paymentStatus || '').toLowerCase())
-                || payments.some(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; });
+                || String(quoteData.paymentStatus || '').toLowerCase() === 'paid';
+        }
+
+        function quoteDepositShortfallAccepted() {
+            if (_documentPaymentState) return _documentPaymentState.depositShortfallAccepted === true;
+            return quoteData.deposit_shortfall_accepted === true;
+        }
+
+        function quotePaidAmountCents() {
+            if (_documentPaymentState && Number.isFinite(Number(_documentPaymentState.paidCents))) {
+                return Math.max(0, Math.round(Number(_documentPaymentState.paidCents)));
+            }
+            return QuoteDrPayableTotal.toCents(getViewerPaymentsReceived().amount || 0);
         }
 
         function applyQuoteCompletionState() {
@@ -6070,22 +6085,35 @@ if (location.search.includes('debug')) {
 
             if (quoteDepositIsPaid()) {
                 title.textContent = 'Project Secured';
-                prompt.textContent = 'Your deposit has been received and confirmed.';
-                status.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-1"></i><strong>Deposit received.</strong> Your contractor can now move ahead with scheduling.</div>';
+                if (quoteDepositShortfallAccepted()) {
+                    var acceptedCents = quotePaidAmountCents();
+                    prompt.textContent = 'Your contractor accepted the ' + viewerMoney(acceptedCents / 100) + ' received as the deposit for this project.';
+                    status.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-1"></i><strong>Lower deposit accepted.</strong> No additional deposit is required before scheduling. Your remaining project balance is unchanged.</div>';
+                } else {
+                    prompt.textContent = 'Your deposit has been received and confirmed.';
+                    status.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-1"></i><strong>Deposit received.</strong> Your contractor can now move ahead with scheduling.</div>';
+                }
                 stripeActions.innerHTML = '';
                 manualMethods.innerHTML = '';
                 return;
             }
 
-            title.textContent = 'Secure Your Project';
-            prompt.textContent = 'Send the ' + amountText + ' deposit to lock in this accepted quote.';
+            var paidCents = quotePaidAmountCents();
+            if (paidCents > 0 && amountCents > 0) {
+                title.textContent = 'Deposit Balance Remaining';
+                prompt.textContent = viewerMoney(paidCents / 100) + ' has been received. ' + amountText + ' is still needed to secure your project.';
+                status.innerHTML = '<div class="alert alert-warning"><i class="fas fa-clock me-1"></i><strong>Partial deposit received.</strong> Pay the remaining ' + escapeHtml(amountText) + ' to satisfy the deposit requirement.</div>';
+            } else {
+                title.textContent = 'Secure Your Project';
+                prompt.textContent = 'Send the ' + amountText + ' deposit to lock in this accepted quote.';
+                status.innerHTML = '';
+            }
             if (_documentPaymentState && _documentPaymentState.status === 'client_reported') {
                 status.innerHTML = '<div class="alert alert-warning"><i class="fas fa-clock me-1"></i><strong>Payment reported.</strong> Your contractor will confirm it after it arrives.</div>';
                 stripeActions.innerHTML = '';
                 manualMethods.innerHTML = '';
                 return;
             }
-            status.innerHTML = '';
 
             var card = _paymentOptions && (_paymentOptions.card || _paymentOptions.stripe) ? (_paymentOptions.card || _paymentOptions.stripe) : {};
             var cardAvailable = card.available === true || card.ready === true;

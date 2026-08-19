@@ -10,6 +10,7 @@ const connect = read('supabase/functions/stripe-connect/index.ts');
 const webhook = read('supabase/functions/stripe-webhook/index.ts');
 const clientDocument = read('supabase/functions/client-document/index.ts');
 const migration = read('supabase/migrations/20260719182624_stripe_connect_document_payments.sql');
+const partialDepositMigration = read('supabase/migrations/20260818211500_partial_deposit_summary_state.sql');
 const config = read('supabase/config.toml');
 const quoteViewer = read('interactive-quote-viewer.html');
 const invoiceViewer = read('invoice-viewer.html');
@@ -24,6 +25,11 @@ assert(!payment.includes('application_fee_amount') && !payment.includes('transfe
 assert(payment.includes('idempotency_key') && payment.includes('Idempotency-Key'), 'checkout and database writes must be idempotent');
 assert(payment.includes('status: "client_reported"') && payment.includes('status: "confirmed"'), 'manual payments must be reported before contractor confirmation');
 assert(payment.includes('authenticatedUser(req)') && payment.includes('record.user_id !== user.id'), 'manual confirmation must authenticate and authorize the contractor');
+assert(payment.includes('action === "resolve_deposit_shortfall"'), 'the contractor must be able to resolve a short confirmed deposit explicitly');
+assert(payment.includes('row.user_id !== user.id'), 'short-deposit decisions must be owner-authorized');
+assert(payment.includes('["accept_shortfall", "keep_outstanding"]'), 'short-deposit decisions must be constrained to the two supported policies');
+assert(payment.includes('deposit_shortfall_accepted_by'), 'the payment function must retain private decision provenance');
+assert(payment.includes('balance_due_cents: nextState.balanceDueCents'), 'accepting a short deposit must preserve the canonical remaining project balance');
 
 assert(connect.includes('type: "standard"') && connect.includes('type: "account_onboarding"'), 'Stripe Connect must use Standard hosted onboarding');
 assert(connect.includes('action === "dashboard"') && connect.includes('action === "disable"'), 'Stripe setup must support management and disabling');
@@ -34,6 +40,9 @@ assert(clientDocument.includes('loadPaymentOptions') && clientDocument.includes(
 assert(/\[functions\.document-payment\]\s*verify_jwt = false/.test(config), 'the token-authenticated public document payment function must bypass gateway JWT verification');
 assert(/\[functions\.stripe-connect\]\s*verify_jwt = true/.test(config), 'Stripe account management must require a user JWT');
 assert(migration.includes('enable row level security') && migration.includes('revoke all on table public.payment_records from authenticated'), 'payment tables must use RLS and block direct client mutation');
+assert(partialDepositMigration.includes('zz_quotedr_refresh_quote_payment_summary_trigger'), 'dashboard summaries must refresh after the existing quote summary trigger');
+assert(!partialDepositMigration.includes('deposit_shortfall_accepted_by'), 'private contractor provenance must never enter the dashboard cache projection');
+assert(partialDepositMigration.includes('revoke all on function public.quotedr_refresh_quote_payment_summary() from authenticated'), 'the summary trigger function must not be directly callable by users');
 
 assert(quoteViewer.includes("secureDocumentPaymentPayload('create_checkout'") && invoiceViewer.includes("secureInvoicePaymentPayload('create_checkout'"), 'quote and invoice viewers must use the secure document-payment function');
 assert(!quoteViewer.includes('/functions/v1/stripe-deposit') && !invoiceViewer.includes('/functions/v1/stripe-deposit'), 'public viewers must not call the legacy amount-trusting checkout endpoint');
