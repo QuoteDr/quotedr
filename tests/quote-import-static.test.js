@@ -19,6 +19,9 @@ assert(builderHtml.includes('image/jpeg') && builderHtml.includes('image/png') &
 assert(builderHtml.includes('crop unrelated information'), 'photo import should warn users to remove unrelated sensitive information');
 assert(builderHtml.includes('quoteImportImagePreview'), 'photo import should preview the selected document image');
 assert(builderHtml.includes('id="quoteImportParseBtn"'), 'quote import should identify the parse action so duplicate AI requests can be blocked');
+assert(builderHtml.includes('function openAiVoiceDestinationModal(preparedRooms, options)'), 'quote import should reuse the configurable AI Voice room destination flow');
+assert(builderHtml.includes('modalEl._aiVoiceDestinationRooms = destinationRooms'), 'the shared destination chooser should validate against the rooms offered to that workflow');
+assert(builderHtml.includes('quote-import.js?v=2026082002'), 'quote builder should cache-bust the importer destination update');
 
 const edgeFunctionPath = path.join(__dirname, '..', 'supabase', 'functions', 'quote-import', 'index.ts');
 assert(fs.existsSync(edgeFunctionPath), 'quote-import edge function should exist');
@@ -63,6 +66,7 @@ const importer = context.window.QuoteDrQuoteImport;
 assert(importer, 'QuoteDrQuoteImport should be exposed on window');
 assert(typeof importer.normalizeImportedQuote === 'function', 'normalizeImportedQuote should be exported');
 assert(typeof importer.extractSavedItemCandidates === 'function', 'extractSavedItemCandidates should be exported');
+assert(typeof importer.mergeSavedItemCandidates === 'function', 'mergeSavedItemCandidates should be exported');
 assert(typeof importer.buildPdfPageTextFromItems === 'function', 'PDF page text builder should be exported for testing');
 assert(typeof importer.buildSheetTextFromRows === 'function', 'spreadsheet text builder should be exported for testing');
 assert(typeof importer.splitQuoteImportText === 'function', 'frontend should split large quote imports before calling the Edge Function');
@@ -72,6 +76,7 @@ assert(typeof importer.buildQuoteImportDebugPayload === 'function', 'frontend sh
 assert(typeof importer.getQuoteImportDebugPayload === 'function', 'frontend should expose the current debug payload for troubleshooting');
 assert(typeof importer.recoverMissingSourceRows === 'function', 'frontend should recover clean source rows the AI missed');
 assert(typeof importer.prepareRoomsForBuilder === 'function', 'frontend should expose final import room preparation for regression testing');
+assert(typeof importer.buildQuoteImportDestinationRooms === 'function', 'frontend should expose imported room destination planning for regression testing');
 assert(typeof importer.detectFileType === 'function', 'frontend should expose image file detection for testing');
 assert(typeof importer.buildQuoteImportRequests === 'function', 'frontend should build mixed text/photo import requests');
 assert(typeof importer.collectQuoteImportReviewIssues === 'function', 'frontend should expose handwriting and arithmetic review checks');
@@ -84,6 +89,8 @@ assert(source.includes('execCommand'), 'debug export copy fallback should suppor
 assert(source.includes('Select recommended'), 'importer should provide a fast opt-in for reusable high-confidence items');
 assert(source.includes('will not be applied to the new QuoteDr quote'), 'detected historical payments should be visibly review-only');
 assert(source.includes('parseButton.disabled = true') && source.includes('parseButton.disabled = false'), 'the parse action should be disabled while the AI import request is running');
+assert(source.includes('await global.openAiVoiceDestinationModal'), 'applying an import should wait for the shared room destination choice');
+assert(source.includes("destinationRooms: mode === 'append' ? existingRooms : []"), 'replacement imports should not offer rooms that will be removed');
 
 assert(importer.detectFileType({ name: 'paper-invoice.JPG', type: 'image/jpeg' }) === 'image', 'JPEG photos should route to visual import');
 assert(importer.detectFileType({ name: 'scan.webp', type: 'image/webp' }) === 'image', 'WebP photos should route to visual import');
@@ -329,6 +336,64 @@ assert(handwritingIssues.some((issue) => /crosses two lines/.test(issue)), 'AI r
 const handwrittenCandidates = importer.extractSavedItemCandidates(handwrittenInvoice.quote);
 assert(handwrittenCandidates.find((item) => item.name === 'Permit and admin fee').recommended === false, 'permit and admin fees should not be recommended as reusable library items');
 assert(handwrittenCandidates.find((item) => item.name === '4 inch pot lights').recommended === true, 'clear high-confidence services should be recommended for reusable-library opt-in');
+const incompleteAiCandidates = [{
+  category: 'Lighting',
+  name: '4 inch pot lights',
+  unitType: 'ea',
+  rate: 95,
+  confidence: 0.94,
+  recommended: true,
+}, {
+  category: 'AI guess',
+  name: 'Unverified extra service',
+  unitType: 'ea',
+  rate: 999,
+  confidence: 0.99,
+  recommended: true,
+}];
+const completeHandwrittenCandidates = importer.mergeSavedItemCandidates(handwrittenInvoice.quote, incompleteAiCandidates);
+assert(completeHandwrittenCandidates.length === 5, 'an incomplete AI candidate list must not hide extracted billable lines');
+assert(completeHandwrittenCandidates.some((item) => item.name === 'Low voltage wiring for under-cabinet lighting' && item.recommended === true), 'clear wiring work omitted by the AI should still be recommended');
+assert(completeHandwrittenCandidates.some((item) => item.name === 'Relocate countertop receptacles' && item.recommended === true), 'clear receptacle work omitted by the AI should still be recommended');
+assert(completeHandwrittenCandidates.some((item) => item.name === 'Convert switch to 3-way and relocate door light' && item.recommended === false), 'low-confidence extracted work should remain visible for review');
+assert(completeHandwrittenCandidates.some((item) => item.name === 'Permit and admin fee' && item.recommended === false), 'permit fees should remain visible without being selected as recommended');
+assert(!completeHandwrittenCandidates.some((item) => item.name === 'Unverified extra service'), 'AI-only candidates without an extracted line item must not enter the reusable-library review');
+const currentQuoteForImport = {
+  rooms: [{ id: 7, name: 'Existing Kitchen', scopeNotes: '', items: [{ description: 'Existing work', quantity: 1, rate: 50, total: 50 }] }],
+  roomCounter: 7,
+};
+const existingRoomDestination = importer.buildQuoteImportDestinationRooms(
+  handwrittenInvoice.quote.rooms,
+  { mode: 'existing', roomId: 7 },
+  currentQuoteForImport,
+  'append',
+);
+assert(existingRoomDestination.rooms.length === 1, 'adding an import to an existing room should not create another room');
+assert(existingRoomDestination.rooms[0].items.length === 6, 'adding to an existing room should preserve existing work and append every imported line');
+assert(currentQuoteForImport.rooms[0].items.length === 1, 'destination planning must not mutate the active quote before confirmation');
+const newRoomDestination = importer.buildQuoteImportDestinationRooms(
+  handwrittenInvoice.quote.rooms,
+  { mode: 'new', roomName: 'Electrical Renovation' },
+  currentQuoteForImport,
+  'append',
+);
+assert(newRoomDestination.rooms.length === 2, 'creating a destination room should preserve existing rooms');
+assert(newRoomDestination.rooms[1].name === 'Electrical Renovation' && newRoomDestination.rooms[1].items.length === 5, 'a named destination room should receive every imported item');
+const parsedRoomDestination = importer.buildQuoteImportDestinationRooms(
+  handwrittenInvoice.quote.rooms,
+  { mode: 'parsed', roomNames: ['Imported Electrical'] },
+  currentQuoteForImport,
+  'append',
+);
+assert(parsedRoomDestination.rooms[1].name === 'Imported Electrical', 'parsed import rooms should be renameable before adding');
+const replacementDestination = importer.buildQuoteImportDestinationRooms(
+  handwrittenInvoice.quote.rooms,
+  { mode: 'new', roomName: 'Replacement Room' },
+  currentQuoteForImport,
+  'replace',
+);
+assert(replacementDestination.rooms.length === 1 && replacementDestination.rooms[0].id === 1, 'replacement imports should start a fresh room sequence');
+assert(importer.buildQuoteImportDestinationRooms(handwrittenInvoice.quote.rooms, { mode: 'existing', roomId: 7 }, currentQuoteForImport, 'replace') === null, 'replacement imports must not target a room that will be removed');
 const cleanedHandwrittenRooms = importer.prepareRoomsForBuilder(handwrittenInvoice.quote.rooms, 0);
 assert(cleanedHandwrittenRooms[0].items.every((item) => !Object.prototype.hasOwnProperty.call(item, 'confidence')), 'confidence metadata should not leak into saved quote line items');
 assert(!cleanedHandwrittenRooms[0].items.some((item) => /payment|balance/i.test(item.description)), 'payment history should never become a quote line item');

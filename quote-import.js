@@ -243,6 +243,33 @@
         };
     }
 
+    function isUnsuitableReusableItem(name) {
+        return /\b(permit|admin(?:istration)? fee|subtotal|total|tax|hst|gst|deposit|balance|payment|labou?r and material included)\b/i.test(String(name || ''));
+    }
+
+    function candidateKey(candidate) {
+        var name = String(candidate && (candidate.name || candidate.serviceName || candidate.description) || '').trim();
+        var normalizedName = name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        var unitType = normalizeUnit(candidate && (candidate.unitType || candidate.unit));
+        return normalizedName + '::' + unitType;
+    }
+
+    function normalizeSavedItemCandidate(candidate, fallback) {
+        var merged = Object.assign({}, fallback || {}, candidate || {});
+        merged.category = String(merged.category || 'Imported Quote').trim() || 'Imported Quote';
+        merged.name = String(merged.name || merged.serviceName || '').trim();
+        merged.unitType = normalizeUnit(merged.unitType || merged.unit);
+        merged.rate = parseMoney(merged.rate) || 0;
+        merged.materialCost = parseMoney(merged.materialCost) || 0;
+        merged.description = String(merged.description || '').trim();
+        merged.sourceRoom = String(merged.sourceRoom || '').trim();
+        merged.confidence = parseConfidence(merged.confidence);
+        var highEnoughConfidence = merged.confidence === null || merged.confidence >= 0.85;
+        merged.recommended = !isUnsuitableReusableItem(merged.name) && highEnoughConfidence && merged.recommended !== false;
+        merged.defaultSelected = false;
+        return merged;
+    }
+
     function extractSavedItemCandidates(quote) {
         var seen = {};
         var candidates = [];
@@ -253,13 +280,11 @@
                 if (!name || /\b(total|subtotal|hst|tax|tbd|to be determined)\b/i.test(name)) return;
                 var category = String(item.category || 'Imported Quote').trim() || 'Imported Quote';
                 var unitType = normalizeUnit(item.unitType || item.unit);
-                var key = (category + '::' + name + '::' + unitType).toLowerCase();
+                var key = candidateKey({ category: category, name: name, unitType: unitType });
                 if (seen[key]) return;
                 seen[key] = true;
                 var rate = parseMoney(item.rate) || 0;
-                var unsuitableReusableItem = /\b(permit|admin(?:istration)? fee|subtotal|total|tax|hst|gst|deposit|balance|payment|labou?r and material included)\b/i.test(name);
-                var highEnoughConfidence = item.confidence === null || item.confidence === undefined || item.confidence >= 0.85;
-                candidates.push({
+                candidates.push(normalizeSavedItemCandidate({
                     category: category,
                     name: name,
                     unitType: unitType,
@@ -268,12 +293,29 @@
                     description: String(item.itemDescription || item.notes || item.displayDescription || '').trim(),
                     sourceRoom: room.name || '',
                     confidence: item.confidence,
-                    recommended: !unsuitableReusableItem && highEnoughConfidence,
-                    defaultSelected: false
-                });
+                    recommended: true
+                }));
             });
         });
         return candidates;
+    }
+
+    function mergeSavedItemCandidates(quote, aiCandidates) {
+        var extracted = extractSavedItemCandidates(quote);
+        var aiByKey = {};
+        var result = [];
+
+        asArray(aiCandidates).forEach(function(candidate) {
+            if (!candidate || !String(candidate.name || '').trim()) return;
+            aiByKey[candidateKey(candidate)] = candidate;
+        });
+
+        extracted.forEach(function(candidate) {
+            var key = candidateKey(candidate);
+            result.push(normalizeSavedItemCandidate(aiByKey[key], candidate));
+        });
+
+        return result;
     }
 
     function inferRecoveredCategory(description) {
@@ -1090,8 +1132,7 @@
         var container = document.getElementById('quoteImportCandidates');
         if (!container || !_quoteImportState.parsed) return;
         var parsed = _quoteImportState.parsed;
-        var candidates = asArray(parsed.savedItemCandidates);
-        if (!candidates.length) candidates = extractSavedItemCandidates(parsed.quote);
+        var candidates = mergeSavedItemCandidates(parsed.quote, parsed.savedItemCandidates);
         parsed.savedItemCandidates = candidates;
         if (!candidates.length) {
             container.innerHTML = '<div class="alert alert-light border small mb-0">No reusable saved item candidates were found.</div>';
@@ -1120,6 +1161,84 @@
             var checkbox = document.getElementById('quoteImportCandidate' + index);
             if (checkbox) checkbox.checked = item.recommended !== false;
         });
+    }
+
+    function combineImportedRooms(importedRooms, roomName) {
+        var scopeNotes = asArray(importedRooms).map(function(room) {
+            return String(room && room.scopeNotes || '').trim();
+        }).filter(Boolean).join('\n\n');
+        return {
+            name: roomName || 'Imported Quote',
+            scopeNotes: scopeNotes,
+            items: asArray(importedRooms).reduce(function(items, room) {
+                return items.concat(asArray(room && room.items));
+            }, [])
+        };
+    }
+
+    function buildQuoteImportDestinationRooms(importedRooms, destination, currentData, mode) {
+        var existingRooms = deepClone(asArray(currentData && currentData.rooms));
+        var currentCounter = Number(currentData && currentData.roomCounter || existingRooms.length) || existingRooms.length;
+        var destinationMode = destination && destination.mode;
+
+        if (destinationMode === 'existing') {
+            if (mode === 'replace') return null;
+            var targetRoom = existingRooms.find(function(room) { return room.id === destination.roomId; });
+            if (!targetRoom) return null;
+            if (!Array.isArray(targetRoom.items)) targetRoom.items = [];
+            asArray(importedRooms).forEach(function(room) {
+                asArray(room && room.items).forEach(function(item) {
+                    targetRoom.items.push(scrubImportedItemForBuilder(deepClone(item)));
+                });
+            });
+            var importedNotes = asArray(importedRooms).map(function(room) {
+                return String(room && room.scopeNotes || '').trim();
+            }).filter(Boolean).join('\n\n');
+            if (importedNotes) {
+                targetRoom.scopeNotes = [targetRoom.scopeNotes || '', importedNotes].filter(function(note) {
+                    return String(note || '').trim();
+                }).join('\n\n');
+            }
+            return { rooms: existingRooms, roomCounter: currentCounter };
+        }
+
+        var roomsToCreate;
+        if (destinationMode === 'parsed') {
+            roomsToCreate = deepClone(asArray(importedRooms));
+            roomsToCreate.forEach(function(room, index) {
+                var chosenName = String(destination.roomNames && destination.roomNames[index] || room.name || '').trim();
+                if (chosenName) room.name = chosenName;
+            });
+        } else if (destinationMode === 'new') {
+            roomsToCreate = [combineImportedRooms(importedRooms, destination.roomName)];
+        } else {
+            return null;
+        }
+
+        var startCounter = mode === 'replace' ? 0 : currentCounter;
+        var preparedRooms = prepareRoomsForBuilder(roomsToCreate, startCounter);
+        return {
+            rooms: mode === 'replace' ? preparedRooms : existingRooms.concat(preparedRooms),
+            roomCounter: startCounter + preparedRooms.length
+        };
+    }
+
+    function hideQuoteImportModalForDestination(modalEl) {
+        return new Promise(function(resolve) {
+            if (!modalEl || !modalEl.classList.contains('show')) {
+                resolve();
+                return;
+            }
+            modalEl.addEventListener('hidden.bs.modal', function() { resolve(); }, { once: true });
+            var instance = bootstrap.Modal.getInstance(modalEl);
+            if (instance) instance.hide();
+            else resolve();
+        });
+    }
+
+    function reopenQuoteImportModal(modalEl) {
+        if (!modalEl) return;
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
     async function openQuoteImportModal() {
@@ -1224,7 +1343,7 @@
                 content
             );
             if (!parsed.quote.rooms.length) throw new Error('No quote rooms or line items were found.');
-            if (!parsed.savedItemCandidates.length) parsed.savedItemCandidates = extractSavedItemCandidates(parsed.quote);
+            parsed.savedItemCandidates = mergeSavedItemCandidates(parsed.quote, parsed.savedItemCandidates);
             _quoteImportState.parsed = parsed;
             renderQuoteImportPreview();
             setImportStatus('');
@@ -1397,7 +1516,7 @@
         setImportStatus('<div class="alert alert-info py-2 small">Browser download attempted. If it does not appear, use Copy JSON instead.</div>');
     }
 
-    function applyImportedQuote() {
+    async function applyImportedQuote() {
         var parsed = _quoteImportState.parsed;
         if (!parsed || !parsed.quote || !parsed.quote.rooms.length) return;
         var acknowledged = document.getElementById('quoteImportReviewAcknowledged');
@@ -1409,8 +1528,30 @@
         var quote = deepClone(parsed.quote);
         var currentData = getCurrentQuoteDataFallback();
         var existingRooms = asArray(currentData.rooms);
-        var importedRooms = prepareRoomsForBuilder(quote.rooms, mode === 'replace' ? 0 : (currentData.roomCounter || existingRooms.length));
-        var nextCounter = (mode === 'replace' ? 0 : (currentData.roomCounter || existingRooms.length)) + importedRooms.length;
+        if (typeof global.openAiVoiceDestinationModal !== 'function') {
+            setImportStatus('<div class="alert alert-danger py-2 small">The room destination chooser is not available. Refresh QuoteDr and try again.</div>');
+            return;
+        }
+        var importModalEl = document.getElementById('quoteImportModal');
+        await hideQuoteImportModalForDestination(importModalEl);
+        var destination = await global.openAiVoiceDestinationModal(quote.rooms, {
+            contextLabel: 'imported quote',
+            title: 'Choose where to add these imported items',
+            iconClass: 'fas fa-file-import',
+            parsedSummary: 'QuoteDr found ' + quote.rooms.length + ' room sections. Rename any room before adding.',
+            destinationRooms: mode === 'append' ? existingRooms : []
+        });
+        if (!destination) {
+            reopenQuoteImportModal(importModalEl);
+            setImportStatus('<div class="alert alert-info py-2 small">Import destination cancelled. No quote items were changed.</div>');
+            return;
+        }
+        var destinationResult = buildQuoteImportDestinationRooms(quote.rooms, destination, currentData, mode);
+        if (!destinationResult) {
+            reopenQuoteImportModal(importModalEl);
+            setImportStatus('<div class="alert alert-warning py-2 small">That destination room is no longer available. No quote items were changed.</div>');
+            return;
+        }
         var appliedData = mode === 'replace' ? {
             quoteTitle: quote.quoteTitle || 'Imported Quote',
             clientName: quote.clientName || '',
@@ -1419,8 +1560,8 @@
             clientEmail: quote.clientEmail || '',
             projectAddress: quote.projectAddress || '',
             status: 'draft',
-            rooms: importedRooms,
-            roomCounter: nextCounter
+            rooms: destinationResult.rooms,
+            roomCounter: destinationResult.roomCounter
         } : {
             ...currentData,
             quoteTitle: currentData.quoteTitle || quote.quoteTitle || 'Imported Quote',
@@ -1429,8 +1570,8 @@
             clientPhone: currentData.clientPhone || quote.clientPhone || '',
             clientEmail: currentData.clientEmail || quote.clientEmail || '',
             projectAddress: currentData.projectAddress || quote.projectAddress || '',
-            rooms: existingRooms.concat(importedRooms),
-            roomCounter: nextCounter
+            rooms: destinationResult.rooms,
+            roomCounter: destinationResult.roomCounter
         };
 
         if (typeof applyQuoteData === 'function') {
@@ -1463,8 +1604,7 @@
             message += ' Source total was $' + sourceTotal.toFixed(2) + '; QuoteDr now shows $' + displayedTotal.toFixed(2) + '.';
         }
         setImportStatus('<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>' + escapeHtml(message) + '</div>');
-        var modal = bootstrap.Modal.getInstance(document.getElementById('quoteImportModal'));
-        if (modal) setTimeout(function() { modal.hide(); }, 900);
+        if (typeof global.showToast === 'function') global.showToast(message, 'success');
     }
 
     async function saveQuoteImportCandidates() {
@@ -1525,8 +1665,10 @@
         getQuoteImportDebugPayload: getQuoteImportDebugPayload,
         recoverMissingSourceRows: recoverMissingSourceRows,
         prepareRoomsForBuilder: prepareRoomsForBuilder,
+        buildQuoteImportDestinationRooms: buildQuoteImportDestinationRooms,
         normalizeImportedQuote: normalizeImportedQuote,
         extractSavedItemCandidates: extractSavedItemCandidates,
+        mergeSavedItemCandidates: mergeSavedItemCandidates,
         extractFileText: extractFileText,
         detectFileType: detectFileType,
         buildQuoteImportRequests: buildQuoteImportRequests,

@@ -11211,8 +11211,8 @@ Example:
             return [buildAutoChoiceGroupLine(item, match)];
         }
 
-        function _aiVoiceDestinationRoomOptions() {
-            return (rooms || []).map(function(room, index) {
+        function _aiVoiceDestinationRoomOptions(destinationRooms) {
+            return (destinationRooms || rooms || []).map(function(room, index) {
                 var label = (room && room.name) || ('Room ' + (index + 1));
                 return '<option value="' + room.id + '">' + qdTemplateEscapeHtml(label) + '</option>';
             }).join('');
@@ -11231,20 +11231,26 @@ Example:
             }).join('');
         }
 
-        function openAiVoiceDestinationModal(preparedRooms) {
+        function openAiVoiceDestinationModal(preparedRooms, options) {
             return new Promise(function(resolve) {
+                options = options || {};
                 var existing = document.getElementById('aiVoiceDestinationModal');
                 if (existing) existing.remove();
-                var hasRooms = Array.isArray(rooms) && rooms.length > 0;
+                var destinationRooms = Array.isArray(options.destinationRooms) ? options.destinationRooms : rooms;
+                var hasRooms = Array.isArray(destinationRooms) && destinationRooms.length > 0;
                 var parsedRoomCount = Array.isArray(preparedRooms) ? preparedRooms.length : 0;
                 var hasParsedRooms = parsedRoomCount > 1;
                 var suggestedName = (preparedRooms && preparedRooms[0] && preparedRooms[0].name) || 'AI Voice Room';
                 var defaultMode = hasParsedRooms ? 'parsed' : (hasRooms ? 'existing' : 'new');
+                var contextLabel = String(options.contextLabel || 'AI Voice').trim() || 'AI Voice';
+                var modalTitle = String(options.title || ('Choose where to add these ' + contextLabel + ' items')).trim();
+                var iconClass = String(options.iconClass || 'fas fa-microphone').trim();
+                var parsedSummary = String(options.parsedSummary || ('QuoteDr heard ' + parsedRoomCount + ' room breaks. Rename any room before adding.')).trim();
                 var parsedRoomsHtml = hasParsedRooms
                     ? '<div class="form-check border rounded p-3 mb-2">'
                         + '<input class="form-check-input" type="radio" name="aiVoiceDestinationMode" id="aiVoiceDestinationParsed" value="parsed"' + (defaultMode === 'parsed' ? ' checked' : '') + '>'
                         + '<label class="form-check-label fw-semibold" for="aiVoiceDestinationParsed">Create the parsed rooms</label>'
-                        + '<div class="small text-muted mt-1 mb-2">QuoteDr heard ' + parsedRoomCount + ' room breaks. Rename any room before adding.</div>'
+                        + '<div class="small text-muted mt-1 mb-2">' + qdTemplateEscapeHtml(parsedSummary) + '</div>'
                         + '<div id="aiVoiceParsedRoomsList">' + _aiVoiceParsedRoomsListHtml(preparedRooms) + '</div>'
                     + '</div>'
                     : '';
@@ -11253,7 +11259,7 @@ Example:
                     + '<div class="modal-dialog modal-dialog-centered">'
                     + '<div class="modal-content">'
                     + '<div class="modal-header bg-primary text-white">'
-                    + '<h5 class="modal-title"><i class="fas fa-microphone me-2"></i>Choose where to add these AI Voice items</h5>'
+                    + '<h5 class="modal-title"><i class="' + qdTemplateEscapeHtml(iconClass) + ' me-2"></i>' + qdTemplateEscapeHtml(modalTitle) + '</h5>'
                     + '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>'
                     + '</div>'
                     + '<div class="modal-body">'
@@ -11262,7 +11268,7 @@ Example:
                     + '<div class="form-check border rounded p-3 mb-2' + (hasRooms ? '' : ' opacity-50') + '">'
                     + '<input class="form-check-input" type="radio" name="aiVoiceDestinationMode" id="aiVoiceDestinationExisting" value="existing"' + (defaultMode === 'existing' && hasRooms ? ' checked' : '') + (hasRooms ? '' : ' disabled') + '>'
                     + '<label class="form-check-label fw-semibold" for="aiVoiceDestinationExisting">Add everything to one room</label>'
-                    + '<select id="aiVoiceDestinationRoom" class="form-select form-select-sm mt-2" ' + (hasRooms ? '' : 'disabled') + '>' + _aiVoiceDestinationRoomOptions() + '</select>'
+                    + '<select id="aiVoiceDestinationRoom" class="form-select form-select-sm mt-2" ' + (hasRooms ? '' : 'disabled') + '>' + _aiVoiceDestinationRoomOptions(destinationRooms) + '</select>'
                     + '</div>'
                     + '<div class="form-check border rounded p-3">'
                     + '<input class="form-check-input" type="radio" name="aiVoiceDestinationMode" id="aiVoiceDestinationNew" value="new"' + (defaultMode === 'new' ? ' checked' : '') + '>'
@@ -11279,6 +11285,8 @@ Example:
                 var modalEl = document.getElementById('aiVoiceDestinationModal');
                 modalEl._aiVoiceDestinationResolve = resolve;
                 modalEl._aiVoiceDestinationAccepted = false;
+                modalEl._aiVoiceDestinationRooms = destinationRooms;
+                modalEl._aiVoiceDestinationContextLabel = contextLabel;
                 modalEl.addEventListener('hidden.bs.modal', function() {
                     var accepted = modalEl._aiVoiceDestinationAccepted === true;
                     var resolver = modalEl._aiVoiceDestinationResolve;
@@ -11297,8 +11305,9 @@ Example:
             var destination = null;
             if (mode === 'existing') {
                 var roomId = parseInt(document.getElementById('aiVoiceDestinationRoom')?.value || '', 10);
-                if (!rooms.some(function(room) { return room.id === roomId; })) {
-                    qdAlert('Choose the room where these AI Voice items should be added.');
+                var destinationRooms = Array.isArray(modalEl._aiVoiceDestinationRooms) ? modalEl._aiVoiceDestinationRooms : rooms;
+                if (!destinationRooms.some(function(room) { return room.id === roomId; })) {
+                    qdAlert('Choose the room where these ' + (modalEl._aiVoiceDestinationContextLabel || 'AI Voice') + ' items should be added.');
                     return;
                 }
                 destination = { mode: 'existing', roomId: roomId };
@@ -17828,7 +17837,7 @@ Example:
     <script src="quote-review-construction-knowledge.js?v=2026080201"></script>
     <script src="quote-starter-item-library.js?v=2026080201"></script>
     <script src="quote-items.js?v=2026081902"></script>
-    <script src="quote-import.js?v=2026082001"></script>
+    <script src="quote-import.js?v=2026082002"></script>
     <script>
         // Load templates from localStorage on startup
         let templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');
