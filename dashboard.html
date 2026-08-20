@@ -116,6 +116,35 @@
             color: #146c43;
             font-size: 0.82rem;
         }
+        .dashboard-quote-search {
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 8px rgba(15, 52, 96, 0.08);
+            transition: box-shadow 0.18s ease;
+        }
+        .dashboard-quote-search .input-group-text,
+        .dashboard-quote-search .form-control {
+            background: #fbfdff;
+            border-color: #9bb9da;
+        }
+        .dashboard-quote-search .input-group-text {
+            color: #175a9b;
+            border-right: 0;
+        }
+        .dashboard-quote-search .form-control {
+            border-left: 0;
+            font-weight: 500;
+        }
+        .dashboard-quote-search .form-control::placeholder {
+            color: #52677e;
+            opacity: 0.92;
+        }
+        .dashboard-quote-search .form-control:focus {
+            border-color: #5d91c8;
+            box-shadow: none;
+        }
+        .dashboard-quote-search:focus-within {
+            box-shadow: 0 0 0 0.2rem rgba(23, 90, 155, 0.15), 0 3px 10px rgba(15, 52, 96, 0.12);
+        }
         .portal-locked-note {
             border: 1px solid #badbcc;
             background: #f0fff7;
@@ -333,11 +362,11 @@
                         <!-- Search and Filter Bar -->
                         <div class="row mb-3">
                             <div class="col-md-6 mb-2 mb-md-0">
-                                <div class="input-group">
-                                    <span class="input-group-text bg-white">
-                                        <i class="fas fa-search text-muted"></i>
+                                <div class="input-group dashboard-quote-search">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-search" aria-hidden="true"></i>
                                     </span>
-                                    <input type="text" id="searchInput" class="form-control" placeholder="Search by file name, client name, or quote number..." oninput="filterQuotes()">
+                                    <input type="text" id="searchInput" class="form-control" aria-label="Search quotes" placeholder="Search by file name, client name, or quote number..." oninput="filterQuotes()">
                                 </div>
                             </div>
                             <div class="col-md-3">
