@@ -15,6 +15,10 @@ assert(builderHtml.includes('id="quoteImportModal"'), 'quote builder should incl
 assert(builderHtml.includes('quote-import.js'), 'quote builder should load quote-import.js');
 assert(builderHtml.includes('quoteImportExportDebugBtn'), 'quote import modal should include a debug export button');
 assert(builderHtml.includes('quoteImportDebugOutput'), 'quote import modal should include a visible debug output fallback');
+assert(builderHtml.includes('image/jpeg') && builderHtml.includes('image/png') && builderHtml.includes('image/webp'), 'quote import should accept supported quote photos');
+assert(builderHtml.includes('crop unrelated information'), 'photo import should warn users to remove unrelated sensitive information');
+assert(builderHtml.includes('quoteImportImagePreview'), 'photo import should preview the selected document image');
+assert(builderHtml.includes('id="quoteImportParseBtn"'), 'quote import should identify the parse action so duplicate AI requests can be blocked');
 
 const edgeFunctionPath = path.join(__dirname, '..', 'supabase', 'functions', 'quote-import', 'index.ts');
 assert(fs.existsSync(edgeFunctionPath), 'quote-import edge function should exist');
@@ -30,6 +34,13 @@ assert(edgeSource.includes('clientChunkIndex'), 'quote-import edge function shou
 assert(edgeSource.includes('finish_reason'), 'quote-import edge function should detect truncated AI output');
 assert(edgeSource.includes('Leave job-specific notes blank during import'), 'quote-import prompt should keep imported descriptions out of job notes');
 assert(edgeSource.includes('If an item has no quantity or unit'), 'quote-import prompt should ask missing quantity/unit items to default to each');
+assert(edgeSource.includes("'scanned_pdf', 'image'"), 'quote-import edge function should support photos and scanned PDFs');
+assert(edgeSource.includes("type: 'image_url'"), 'quote-import edge function should send validated photos as OpenAI image inputs');
+assert(edgeSource.includes("detail: 'high'"), 'handwriting extraction should request high-detail image analysis');
+assert(edgeSource.includes('MAX_TOTAL_IMAGE_DATA_URL_CHARS'), 'quote-import edge function should bound total image payload size');
+assert(edgeSource.includes('must be JPEG, PNG, or WebP image data'), 'quote-import edge function should reject arbitrary image URLs and unsupported formats');
+assert(edgeSource.includes('Payment history will not be applied automatically'), 'historical payment mismatches should remain review-only');
+assert(edgeSource.includes('OPENAI_QUOTE_IMPORT_VISION_MODEL'), 'photo import should support a dedicated vision model override');
 
 const source = fs.readFileSync(importerPath, 'utf8');
 assert(source.includes('This may take a few minutes depending on quote size'), 'import loading state should set expectations for large quotes');
@@ -61,12 +72,24 @@ assert(typeof importer.buildQuoteImportDebugPayload === 'function', 'frontend sh
 assert(typeof importer.getQuoteImportDebugPayload === 'function', 'frontend should expose the current debug payload for troubleshooting');
 assert(typeof importer.recoverMissingSourceRows === 'function', 'frontend should recover clean source rows the AI missed');
 assert(typeof importer.prepareRoomsForBuilder === 'function', 'frontend should expose final import room preparation for regression testing');
+assert(typeof importer.detectFileType === 'function', 'frontend should expose image file detection for testing');
+assert(typeof importer.buildQuoteImportRequests === 'function', 'frontend should build mixed text/photo import requests');
+assert(typeof importer.collectQuoteImportReviewIssues === 'function', 'frontend should expose handwriting and arithmetic review checks');
 assert(source.includes('clientChunkIndex'), 'frontend should send chunk position metadata to the Edge Function');
 assert(source.includes('clientChunkTotal'), 'frontend should send chunk total metadata to the Edge Function');
 assert(source.includes('clipboard.writeText'), 'debug export should copy JSON to clipboard as a fallback');
 assert(source.includes('quoteImportDebugOutput'), 'debug export should write JSON into the modal as a visible fallback');
 assert(source.includes('copyQuoteImportDebugJson'), 'debug export should provide an explicit copy button fallback');
 assert(source.includes('execCommand'), 'debug export copy fallback should support browsers without clipboard permissions');
+assert(source.includes('Select recommended'), 'importer should provide a fast opt-in for reusable high-confidence items');
+assert(source.includes('will not be applied to the new QuoteDr quote'), 'detected historical payments should be visibly review-only');
+assert(source.includes('parseButton.disabled = true') && source.includes('parseButton.disabled = false'), 'the parse action should be disabled while the AI import request is running');
+
+assert(importer.detectFileType({ name: 'paper-invoice.JPG', type: 'image/jpeg' }) === 'image', 'JPEG photos should route to visual import');
+assert(importer.detectFileType({ name: 'scan.webp', type: 'image/webp' }) === 'image', 'WebP photos should route to visual import');
+const visualRequests = importer.buildQuoteImportRequests('', [{ dataUrl: 'data:image/jpeg;base64,AAAA', label: 'Front page' }]);
+assert(visualRequests.length === 1, 'one document photo should produce one visual import request');
+assert(visualRequests[0].text === '' && visualRequests[0].images.length === 1, 'visual import should not put base64 image data into extracted text');
 
 const sheetText = importer.buildSheetTextFromRows([
   ['ALD Direct Inc.', '', '', '', '', 'INVOICE'],
@@ -274,5 +297,40 @@ const candidates = importer.extractSavedItemCandidates(parsed.quote);
 assert(candidates.some((item) => item.name === 'Drywall' && item.defaultSelected === false), 'saved-item candidates should default to unchecked');
 assert(candidates.some((item) => item.name === 'Toilet Installation'), 'lump sum item should still be available as a candidate');
 assert(!candidates.some((item) => /total|tbd/i.test(item.name)), 'totals and TBD rows should not become saved-item candidates');
+
+const handwrittenInvoice = importer.normalizeImportedQuote({
+  quote: {
+    quoteTitle: 'Kitchen renovation and living room lighting',
+    clientName: 'Synthetic Test Client',
+    projectAddress: '48 Example Drive, Hamilton',
+    rooms: [{
+      name: 'Electrical work',
+      items: [
+        { category: 'Administration', description: 'Permit and admin fee', quantity: 1, unit: 'ea', rate: 300, total: 300, confidence: 0.98, sourceExcerpt: 'Permit + admin fee' },
+        { category: 'Lighting', description: '4 inch pot lights', quantity: 11, unit: 'ea', rate: 95, total: 1045, confidence: 0.94, sourceExcerpt: '11 4 inch potlights' },
+        { category: 'Electrical', description: 'Low voltage wiring for under-cabinet lighting', quantity: 1, unit: 'ea', rate: 300, total: 300, confidence: 0.9 },
+        { category: 'Electrical', description: 'Convert switch to 3-way and relocate door light', quantity: 1, unit: 'ea', rate: 250, total: 250, confidence: 0.82, reviewReasons: ['Handwritten description crosses two lines.'] },
+        { category: 'Electrical', description: 'Relocate countertop receptacles', quantity: 1, unit: 'ea', rate: 175, total: 175, confidence: 0.91 },
+      ],
+    }],
+  },
+  sourceTotals: { subtotal: 2070, tax: 269.10, total: 2339.10, amountPaid: 1000, balanceDue: 1339.10, taxLabel: 'HST', taxRate: 13 },
+  sourceDocument: { documentType: 'invoice', handwritten: true, confidence: 0.91 },
+});
+assert(handwrittenInvoice.quote.clientName === 'Synthetic Test Client', 'handwritten import should preserve extracted client metadata for review');
+assert(handwrittenInvoice.quote.rooms[0].items.length === 5, 'handwritten invoice fixture should preserve every priced line');
+assert(handwrittenInvoice.quote.rooms[0].items.reduce((sum, item) => sum + item.total, 0) === 2070, 'handwritten line items should reconcile to the source subtotal');
+assert(handwrittenInvoice.sourceTotals.tax === 269.10 && handwrittenInvoice.sourceTotals.total === 2339.10, 'handwritten import should keep tax separate from the final total');
+assert(handwrittenInvoice.sourceTotals.amountPaid === 1000 && handwrittenInvoice.sourceTotals.balanceDue === 1339.10, 'handwritten import should detect payment history separately from line items');
+assert(handwrittenInvoice.sourceTotals.amountPaid + handwrittenInvoice.sourceTotals.balanceDue === handwrittenInvoice.sourceTotals.total, 'detected payment plus balance should reconcile to the source total');
+const handwritingIssues = importer.collectQuoteImportReviewIssues(handwrittenInvoice);
+assert(handwritingIssues.some((issue) => /Low-confidence handwriting/.test(issue)), 'low-confidence handwritten rows should require review');
+assert(handwritingIssues.some((issue) => /crosses two lines/.test(issue)), 'AI review reasons should remain visible to the user');
+const handwrittenCandidates = importer.extractSavedItemCandidates(handwrittenInvoice.quote);
+assert(handwrittenCandidates.find((item) => item.name === 'Permit and admin fee').recommended === false, 'permit and admin fees should not be recommended as reusable library items');
+assert(handwrittenCandidates.find((item) => item.name === '4 inch pot lights').recommended === true, 'clear high-confidence services should be recommended for reusable-library opt-in');
+const cleanedHandwrittenRooms = importer.prepareRoomsForBuilder(handwrittenInvoice.quote.rooms, 0);
+assert(cleanedHandwrittenRooms[0].items.every((item) => !Object.prototype.hasOwnProperty.call(item, 'confidence')), 'confidence metadata should not leak into saved quote line items');
+assert(!cleanedHandwrittenRooms[0].items.some((item) => /payment|balance/i.test(item.description)), 'payment history should never become a quote line item');
 
 console.log('quote import static test passed');

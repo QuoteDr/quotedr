@@ -3257,9 +3257,11 @@ Example:
                     <div class="row g-3">
                         <div class="col-lg-5">
                             <div class="border rounded p-3 h-100">
-                                <label class="form-label fw-semibold">Upload old quote file</label>
-                                <input type="file" id="quoteImportFile" class="form-control" accept=".pdf,.xlsx,.xls,.csv,.txt,text/plain,application/pdf">
-                                <div class="form-text">Text-based PDFs, Excel files, CSV, TXT, or pasted quote text. Scanned/image-only PDFs are not included in this first version.</div>
+                                <label class="form-label fw-semibold">Upload or photograph an old quote</label>
+                                <input type="file" id="quoteImportFile" class="form-control" accept=".pdf,.xlsx,.xls,.csv,.txt,.jpg,.jpeg,.png,.webp,text/plain,application/pdf,image/jpeg,image/png,image/webp">
+                                <div class="form-text">JPEG, PNG, WebP, scanned or text PDFs, Excel, CSV, TXT, or pasted text. On mobile, use the camera option to photograph paper quotes and invoices.</div>
+                                <div class="alert alert-warning py-2 small mt-2 mb-0"><i class="fas fa-user-shield me-1"></i><strong>Before uploading:</strong> crop unrelated information and check for card, banking, password, or other sensitive details. QuoteDr does not attach the source image to the quote; it is sent to the AI service for extraction.</div>
+                                <div id="quoteImportImagePreview" class="mt-3" style="display:none;"></div>
 
                                 <div class="d-flex align-items-center gap-2 my-3">
                                     <hr class="flex-grow-1">
@@ -3271,7 +3273,7 @@ Example:
                                 <textarea id="quoteImportPaste" class="form-control font-monospace" rows="12" placeholder="Paste an old quote, invoice, Excel export, CSV rows, or copied PDF text here..."></textarea>
 
                                 <div class="mt-3 d-flex gap-2 flex-wrap">
-                                    <button type="button" class="btn btn-success" onclick="runQuoteImport()"><i class="fas fa-wand-magic-sparkles me-1"></i>Parse Quote</button>
+                                    <button type="button" class="btn btn-success" id="quoteImportParseBtn" onclick="runQuoteImport()"><i class="fas fa-wand-magic-sparkles me-1"></i>Parse Quote</button>
                                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                                 </div>
                                 <div id="quoteImportStatus" class="mt-3"></div>
@@ -3293,7 +3295,7 @@ Example:
                                     </div>
                                 </div>
                                 <div id="quoteImportPreview" class="small">
-                                    <div class="alert alert-light border mb-0">Upload or paste an old quote, then click Parse Quote to preview the converted rooms and line items.</div>
+                                    <div class="alert alert-light border mb-0">Upload a photo/file or paste an old quote, then click Parse Quote to preview the converted rooms and line items. Handwriting and arithmetic must be reviewed before applying.</div>
                                 </div>
                             </div>
 
@@ -17826,7 +17828,7 @@ Example:
     <script src="quote-review-construction-knowledge.js?v=2026080201"></script>
     <script src="quote-starter-item-library.js?v=2026080201"></script>
     <script src="quote-items.js?v=2026081902"></script>
-    <script src="quote-import.js?v=2026071202"></script>
+    <script src="quote-import.js?v=2026082001"></script>
     <script>
         // Load templates from localStorage on startup
         let templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');

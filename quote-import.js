@@ -3,11 +3,17 @@
     'use strict';
 
     var QUOTE_IMPORT_URL = 'https://axmoffknvblluibuitrq.supabase.co/functions/v1/quote-import';
+    var QUOTE_IMPORT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+    var QUOTE_IMPORT_MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+    var QUOTE_IMPORT_MAX_IMAGE_EDGE = 2400;
+    var QUOTE_IMPORT_MAX_PDF_PAGES = 12;
     var _quoteImportState = {
         extractedText: '',
+        sourceImages: [],
         fileName: '',
         fileType: 'paste',
         parsed: null,
+        requiresReviewAcknowledgement: false,
         debugText: '',
         debugFileName: ''
     };
@@ -74,6 +80,14 @@
         return isFinite(parsed) ? Math.round(parsed * 100) / 100 : null;
     }
 
+    function parseConfidence(value) {
+        if (value === null || value === undefined || value === '') return null;
+        var parsed = Number(value);
+        if (!isFinite(parsed)) return null;
+        if (parsed > 1 && parsed <= 100) parsed = parsed / 100;
+        return Math.max(0, Math.min(1, Math.round(parsed * 100) / 100));
+    }
+
     function normalizeUnit(unit) {
         var text = String(unit || '').trim().toLowerCase();
         if (!text) return 'ls';
@@ -123,6 +137,9 @@
         );
         item.itemDescription = importedDescription;
         item.notes = '';
+        delete item.confidence;
+        delete item.sourceExcerpt;
+        delete item.reviewReasons;
         return item;
     }
 
@@ -170,6 +187,9 @@
             itemDescription: importedDescription,
             notes: '',
             displayDescription: String(item.displayDescription || description).trim(),
+            confidence: parseConfidence(item.confidence),
+            sourceExcerpt: String(item.sourceExcerpt || item.source_excerpt || '').trim().slice(0, 500),
+            reviewReasons: asArray(item.reviewReasons || item.review_reasons).map(function(reason) { return String(reason); }).filter(Boolean),
             optional: false,
             upgrade: false
         };
@@ -180,7 +200,11 @@
         return {
             subtotal: parseMoney(totals.subtotal) || 0,
             tax: parseMoney(totals.tax) || 0,
-            total: parseMoney(totals.total || totals.grandTotal || totals.grand_total) || 0
+            total: parseMoney(totals.total || totals.grandTotal || totals.grand_total) || 0,
+            amountPaid: parseMoney(totals.amountPaid || totals.amount_paid || totals.deposit || totals.payment) || 0,
+            balanceDue: parseMoney(totals.balanceDue || totals.balance_due || totals.remainingBalance || totals.remaining_balance) || 0,
+            taxLabel: String(totals.taxLabel || totals.tax_label || '').trim().slice(0, 40),
+            taxRate: parseQuantity(totals.taxRate || totals.tax_rate)
         };
     }
 
@@ -213,6 +237,7 @@
         return {
             quote: normalizedQuote,
             sourceTotals: normalizeTotals(payload.sourceTotals || payload.source_totals || {}),
+            sourceDocument: payload.sourceDocument || payload.source_document || {},
             savedItemCandidates: asArray(payload.savedItemCandidates || payload.saved_item_candidates),
             warnings: asArray(payload.warnings).map(function(warning) { return String(warning); }).filter(Boolean)
         };
@@ -232,6 +257,8 @@
                 if (seen[key]) return;
                 seen[key] = true;
                 var rate = parseMoney(item.rate) || 0;
+                var unsuitableReusableItem = /\b(permit|admin(?:istration)? fee|subtotal|total|tax|hst|gst|deposit|balance|payment|labou?r and material included)\b/i.test(name);
+                var highEnoughConfidence = item.confidence === null || item.confidence === undefined || item.confidence >= 0.85;
                 candidates.push({
                     category: category,
                     name: name,
@@ -240,6 +267,8 @@
                     materialCost: parseMoney(item.materialCost) || 0,
                     description: String(item.itemDescription || item.notes || item.displayDescription || '').trim(),
                     sourceRoom: room.name || '',
+                    confidence: item.confidence,
+                    recommended: !unsuitableReusableItem && highEnoughConfidence,
                     defaultSelected: false
                 });
             });
@@ -467,6 +496,7 @@
             fileName: options.fileName || '',
             fileType: options.fileType || '',
             sourceCharacterCount: sourceText.length,
+            sourceImageCount: Number(options.sourceImageCount || 0),
             roomCount: asArray(quote.rooms).length,
             itemCount: rows.length,
             totals: {
@@ -489,6 +519,8 @@
 
     function detectFileType(file) {
         var name = String(file && file.name || '').toLowerCase();
+        var mime = String(file && file.type || '').toLowerCase();
+        if (QUOTE_IMPORT_IMAGE_TYPES.indexOf(mime) !== -1 || /\.(jpe?g|png|webp)$/.test(name)) return 'image';
         if (name.endsWith('.pdf')) return 'pdf';
         if (name.endsWith('.xlsx') || name.endsWith('.xls')) return 'xlsx';
         if (name.endsWith('.csv')) return 'csv';
@@ -511,6 +543,82 @@
             reader.onerror = function() { reject(reader.error || new Error('Could not read file.')); };
             reader.readAsArrayBuffer(file);
         });
+    }
+
+    function canvasToJpegDataUrl(canvas, quality) {
+        return new Promise(function(resolve, reject) {
+            canvas.toBlob(function(blob) {
+                if (!blob) {
+                    reject(new Error('Could not prepare the image for handwriting recognition.'));
+                    return;
+                }
+                var reader = new FileReader();
+                reader.onload = function(event) { resolve(String(event.target.result || '')); };
+                reader.onerror = function() { reject(reader.error || new Error('Could not read the prepared image.')); };
+                reader.readAsDataURL(blob);
+            }, 'image/jpeg', quality || 0.9);
+        });
+    }
+
+    function scaledImageDimensions(width, height) {
+        var longest = Math.max(width, height);
+        var scale = longest > QUOTE_IMPORT_MAX_IMAGE_EDGE ? QUOTE_IMPORT_MAX_IMAGE_EDGE / longest : 1;
+        return {
+            width: Math.max(1, Math.round(width * scale)),
+            height: Math.max(1, Math.round(height * scale))
+        };
+    }
+
+    async function prepareQuoteImportImage(file) {
+        var mime = String(file && file.type || '').toLowerCase();
+        var name = String(file && file.name || 'photo').toLowerCase();
+        if (QUOTE_IMPORT_IMAGE_TYPES.indexOf(mime) === -1 && !/\.(jpe?g|png|webp)$/.test(name)) {
+            throw new Error('Use a JPEG, PNG, or WebP photo. HEIC photos must be converted to JPEG first.');
+        }
+        if (Number(file && file.size || 0) > QUOTE_IMPORT_MAX_IMAGE_BYTES) {
+            throw new Error('This photo is larger than 12 MB. Crop it or choose a smaller image.');
+        }
+
+        var drawable;
+        var cleanup = function() {};
+        if (typeof global.createImageBitmap === 'function') {
+            try {
+                drawable = await global.createImageBitmap(file, { imageOrientation: 'from-image' });
+            } catch (bitmapError) {
+                drawable = await global.createImageBitmap(file);
+            }
+            cleanup = function() { if (drawable && typeof drawable.close === 'function') drawable.close(); };
+        } else {
+            drawable = await new Promise(function(resolve, reject) {
+                var image = new Image();
+                var objectUrl = URL.createObjectURL(file);
+                image.onload = function() { URL.revokeObjectURL(objectUrl); resolve(image); };
+                image.onerror = function() { URL.revokeObjectURL(objectUrl); reject(new Error('Could not open this image.')); };
+                image.src = objectUrl;
+            });
+        }
+
+        try {
+            var width = Number(drawable.width || drawable.naturalWidth || 0);
+            var height = Number(drawable.height || drawable.naturalHeight || 0);
+            if (!width || !height) throw new Error('The selected image has no readable dimensions.');
+            var size = scaledImageDimensions(width, height);
+            var canvas = document.createElement('canvas');
+            canvas.width = size.width;
+            canvas.height = size.height;
+            var context = canvas.getContext('2d', { alpha: false });
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, size.width, size.height);
+            context.drawImage(drawable, 0, 0, size.width, size.height);
+            return {
+                dataUrl: await canvasToJpegDataUrl(canvas, 0.9),
+                label: String(file.name || 'Quote photo'),
+                width: size.width,
+                height: size.height
+            };
+        } finally {
+            cleanup();
+        }
     }
 
     function buildPdfPageTextFromItems(items) {
@@ -558,7 +666,7 @@
         }).filter(Boolean).join('\n');
     }
 
-    async function extractPdfText(file) {
+    async function extractPdfDocument(file) {
         await loadQuoteImportScript('pdfjsLib', 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js');
         if (global.pdfjsLib.GlobalWorkerOptions && !global.pdfjsLib.GlobalWorkerOptions.workerSrc) {
             global.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
@@ -566,12 +674,51 @@
         var buffer = await readFileAsArrayBuffer(file);
         var pdf = await global.pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
         var pages = [];
+        var pdfPages = [];
+        var sourceImages = [];
+        var needsVision = false;
         for (var pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
             var page = await pdf.getPage(pageNumber);
+            pdfPages.push(page);
             var textContent = await page.getTextContent();
-            pages.push(buildPdfPageTextFromItems(textContent.items));
+            var pageText = buildPdfPageTextFromItems(textContent.items);
+            pages.push(pageText);
+            if (pageText.replace(/[^A-Za-z0-9]/g, '').length < 80) needsVision = true;
         }
-        return pages.join('\n\n--- PAGE BREAK ---\n\n');
+        if (needsVision) {
+            if (pdf.numPages > QUOTE_IMPORT_MAX_PDF_PAGES) {
+                throw new Error('This scanned PDF has more than 12 image pages. Split it into smaller files and import each section.');
+            }
+            for (var visualPageIndex = 0; visualPageIndex < pdfPages.length; visualPageIndex++) {
+                var page = pdfPages[visualPageIndex];
+                var baseViewport = page.getViewport({ scale: 1 });
+                var dimensions = scaledImageDimensions(baseViewport.width * 2, baseViewport.height * 2);
+                var viewport = page.getViewport({ scale: Math.min(dimensions.width / baseViewport.width, dimensions.height / baseViewport.height) });
+                var canvas = document.createElement('canvas');
+                canvas.width = Math.ceil(viewport.width);
+                canvas.height = Math.ceil(viewport.height);
+                var context = canvas.getContext('2d', { alpha: false });
+                context.fillStyle = '#ffffff';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                sourceImages.push({
+                    dataUrl: await canvasToJpegDataUrl(canvas, 0.9),
+                    label: 'PDF page ' + (visualPageIndex + 1),
+                    width: canvas.width,
+                    height: canvas.height
+                });
+            }
+        }
+        return {
+            text: needsVision ? '' : pages.join('\n\n--- PAGE BREAK ---\n\n'),
+            images: sourceImages,
+            type: sourceImages.length ? 'scanned_pdf' : 'pdf'
+        };
+    }
+
+    async function extractPdfText(file) {
+        var extracted = await extractPdfDocument(file);
+        return extracted.text;
     }
 
     function normalizeSheetCell(value) {
@@ -674,7 +821,8 @@
                 quoteNumber: '',
                 rooms: []
             },
-            sourceTotals: { subtotal: 0, tax: 0, total: 0 },
+            sourceTotals: { subtotal: 0, tax: 0, total: 0, amountPaid: 0, balanceDue: 0, taxLabel: '', taxRate: null },
+            sourceDocument: {},
             savedItemCandidates: [],
             warnings: []
         };
@@ -701,6 +849,13 @@
             merged.sourceTotals.subtotal = Math.max(merged.sourceTotals.subtotal, parseMoney(totals.subtotal) || 0);
             merged.sourceTotals.tax = Math.max(merged.sourceTotals.tax, parseMoney(totals.tax) || 0);
             merged.sourceTotals.total = Math.max(merged.sourceTotals.total, parseMoney(totals.total) || 0);
+            merged.sourceTotals.amountPaid = Math.max(merged.sourceTotals.amountPaid, parseMoney(totals.amountPaid || totals.amount_paid) || 0);
+            merged.sourceTotals.balanceDue = Math.max(merged.sourceTotals.balanceDue, parseMoney(totals.balanceDue || totals.balance_due) || 0);
+            if (!merged.sourceTotals.taxLabel && totals.taxLabel) merged.sourceTotals.taxLabel = String(totals.taxLabel);
+            if (merged.sourceTotals.taxRate === null && totals.taxRate !== null && totals.taxRate !== undefined) merged.sourceTotals.taxRate = parseQuantity(totals.taxRate);
+            if (!Object.keys(merged.sourceDocument).length && payload && (payload.sourceDocument || payload.source_document)) {
+                merged.sourceDocument = payload.sourceDocument || payload.source_document;
+            }
             asArray(payload && payload.savedItemCandidates).forEach(function(candidate) {
                 var name = String(candidate && candidate.name || '').trim();
                 if (!name) return;
@@ -737,9 +892,10 @@
 
     async function extractFileText(file) {
         var type = detectFileType(file);
-        if (type === 'pdf') return { text: await extractPdfText(file), type: type };
+        if (type === 'image') return { text: '', images: [await prepareQuoteImportImage(file)], type: type };
+        if (type === 'pdf') return extractPdfDocument(file);
         if (type === 'xlsx') return { text: await extractXlsxText(file), type: type };
-        return { text: await readFileAsText(file), type: type };
+        return { text: await readFileAsText(file), images: [], type: type };
     }
 
     function setImportStatus(html) {
@@ -752,6 +908,59 @@
             var btn = document.getElementById(id);
             if (btn) btn.disabled = !enabled;
         });
+    }
+
+    function buildQuoteImportRequests(sourceText, sourceImages) {
+        var requests = [];
+        var text = String(sourceText || '').trim();
+        if (text) {
+            splitQuoteImportText(text).forEach(function(chunk) {
+                requests.push({ label: chunk.label, text: chunk.text, images: [] });
+            });
+        }
+        var imageList = asArray(sourceImages);
+        for (var imageIndex = 0; imageIndex < imageList.length; imageIndex += 4) {
+            var imageBatch = imageList.slice(imageIndex, imageIndex + 4);
+            requests.push({
+                label: imageBatch.length === 1
+                    ? (imageBatch[0].label || ('Photo ' + (imageIndex + 1)))
+                    : 'Pages ' + (imageIndex + 1) + '-' + (imageIndex + imageBatch.length),
+                text: '',
+                images: imageBatch
+            });
+        }
+        return requests;
+    }
+
+    function collectQuoteImportReviewIssues(parsed) {
+        var issues = [];
+        var subtotal = sumQuoteSubtotal(parsed && parsed.quote);
+        var totals = normalizeTotals(parsed && parsed.sourceTotals);
+        asArray(parsed && parsed.quote && parsed.quote.rooms).forEach(function(room) {
+            asArray(room.items).forEach(function(item) {
+                if (item.confidence !== null && item.confidence !== undefined && item.confidence < 0.85) {
+                    issues.push('Low-confidence handwriting: ' + String(item.description || 'line item'));
+                }
+                asArray(item.reviewReasons).forEach(function(reason) { issues.push(String(reason)); });
+            });
+        });
+        if (totals.subtotal && Math.abs(subtotal - totals.subtotal) > 0.01) {
+            issues.push('Imported line items do not equal the source subtotal.');
+        }
+        if (totals.subtotal && totals.total && Math.abs((totals.subtotal + totals.tax) - totals.total) > 0.01) {
+            issues.push('The source subtotal plus tax does not equal the source total.');
+        }
+        if (totals.total && totals.amountPaid && totals.balanceDue && Math.abs((totals.amountPaid + totals.balanceDue) - totals.total) > 0.01) {
+            issues.push('The detected payment plus remaining balance does not equal the source total.');
+        }
+        return issues.filter(function(issue, index, all) { return all.indexOf(issue) === index; });
+    }
+
+    function refreshQuoteImportApplyAvailability() {
+        var apply = document.getElementById('quoteImportApplyBtn');
+        if (!apply) return;
+        var acknowledged = document.getElementById('quoteImportReviewAcknowledged');
+        apply.disabled = !_quoteImportState.parsed || (_quoteImportState.requiresReviewAcknowledgement && !(acknowledged && acknowledged.checked));
     }
 
     function renderImportLoadingStatus(progress) {
@@ -826,8 +1035,13 @@
         var sourceSubtotal = parseMoney(parsed.sourceTotals && parsed.sourceTotals.subtotal) || 0;
         var sourceTax = parseMoney(parsed.sourceTotals && parsed.sourceTotals.tax) || 0;
         var sourceTotal = parseMoney(parsed.sourceTotals && parsed.sourceTotals.total) || 0;
+        var sourceAmountPaid = parseMoney(parsed.sourceTotals && parsed.sourceTotals.amountPaid) || 0;
+        var sourceBalanceDue = parseMoney(parsed.sourceTotals && parsed.sourceTotals.balanceDue) || 0;
+        var sourceTaxLabel = String(parsed.sourceTotals && parsed.sourceTotals.taxLabel || 'HST/tax').trim() || 'HST/tax';
         var subtotalDifference = sourceSubtotal ? Math.round((subtotal - sourceSubtotal) * 100) / 100 : 0;
         var warnings = asArray(parsed.warnings);
+        var reviewIssues = collectQuoteImportReviewIssues(parsed);
+        _quoteImportState.requiresReviewAcknowledgement = reviewIssues.length > 0;
 
         var html = '<div class="alert alert-success py-2"><strong>Import ready.</strong> Found ' + rooms.length + ' room' + (rooms.length === 1 ? '' : 's') + ' and ' + itemCount + ' line item' + (itemCount === 1 ? '' : 's') + '.</div>';
         if (sourceSubtotal || sourceTotal) {
@@ -838,7 +1052,11 @@
                 html += '<div><strong>Imported subtotal:</strong> $' + subtotal.toFixed(2) + '</div>';
             }
             if (sourceTax || sourceTotal) {
-                html += '<div>Source HST/tax: $' + sourceTax.toFixed(2) + ' | Source grand total: $' + sourceTotal.toFixed(2) + '</div>';
+                html += '<div>Source ' + escapeHtml(sourceTaxLabel) + ': $' + sourceTax.toFixed(2) + ' | Source grand total: $' + sourceTotal.toFixed(2) + '</div>';
+            }
+            if (sourceAmountPaid || sourceBalanceDue) {
+                html += '<div><strong>Historical payment:</strong> $' + sourceAmountPaid.toFixed(2) + ' | Remaining balance: $' + sourceBalanceDue.toFixed(2) + '</div>';
+                html += '<div class="text-warning-emphasis"><i class="fas fa-shield-halved me-1"></i>Detected payment history is shown for verification only and will not be applied to the new QuoteDr quote.</div>';
             }
             html += '</div>';
         }
@@ -851,12 +1069,21 @@
             html += '<tr class="small text-muted"><th>Description</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Total</th></tr>';
             room.items.forEach(function(item) {
                 var previewDescription = item.itemDescription || item.notes || '';
-                html += '<tr><td><div class="fw-semibold">' + escapeHtml(item.description) + '</div>' + (previewDescription ? '<div class="small text-muted">' + escapeHtml(previewDescription) + '</div>' : '') + '</td><td>' + escapeHtml(item.quantity) + '</td><td>' + escapeHtml(item.unitType) + '</td><td>$' + (parseMoney(item.rate) || 0).toFixed(2) + '</td><td>$' + (parseMoney(item.total) || 0).toFixed(2) + '</td></tr>';
+                var lowConfidence = item.confidence !== null && item.confidence !== undefined && item.confidence < 0.85;
+                var confidenceBadge = lowConfidence ? '<span class="badge text-bg-warning ms-1">Check handwriting</span>' : '';
+                var sourceExcerpt = item.sourceExcerpt ? '<div class="small text-body-secondary">Read from: “' + escapeHtml(item.sourceExcerpt) + '”</div>' : '';
+                html += '<tr' + (lowConfidence ? ' class="table-warning"' : '') + '><td><div class="fw-semibold">' + escapeHtml(item.description) + confidenceBadge + '</div>' + (previewDescription ? '<div class="small text-muted">' + escapeHtml(previewDescription) + '</div>' : '') + sourceExcerpt + '</td><td>' + escapeHtml(item.quantity) + '</td><td>' + escapeHtml(item.unitType) + '</td><td>$' + (parseMoney(item.rate) || 0).toFixed(2) + '</td><td>$' + (parseMoney(item.total) || 0).toFixed(2) + '</td></tr>';
             });
         });
         html += '</table></div>';
+        if (reviewIssues.length) {
+            html += '<div class="alert alert-warning py-2 small mt-3 mb-0"><strong>Review required before applying.</strong><ul class="mb-2 mt-1">' + reviewIssues.map(function(issue) { return '<li>' + escapeHtml(issue) + '</li>'; }).join('') + '</ul><label class="form-check mb-0"><input class="form-check-input" type="checkbox" id="quoteImportReviewAcknowledged"><span class="form-check-label">I checked the highlighted handwriting and source arithmetic.</span></label></div>';
+        }
         container.innerHTML = html;
+        var acknowledged = document.getElementById('quoteImportReviewAcknowledged');
+        if (acknowledged) acknowledged.addEventListener('change', refreshQuoteImportApplyAvailability);
         renderSavedItemCandidates();
+        refreshQuoteImportApplyAvailability();
     }
 
     function renderSavedItemCandidates() {
@@ -870,18 +1097,29 @@
             container.innerHTML = '<div class="alert alert-light border small mb-0">No reusable saved item candidates were found.</div>';
             return;
         }
-        var html = '<div class="fw-semibold mb-2">Optional: save reusable items from this quote</div>';
-        html += '<div class="small text-muted mb-2">Nothing is saved unless you check it and click Save Selected Items.</div>';
+        var recommendedCount = candidates.filter(function(item) { return item.recommended !== false; }).length;
+        var html = '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2"><div class="fw-semibold">Optional: build your reusable item library</div>';
+        if (recommendedCount) html += '<button type="button" class="btn btn-outline-primary btn-sm" onclick="selectRecommendedQuoteImportCandidates()"><i class="fas fa-check-double me-1"></i>Select recommended</button>';
+        html += '</div>';
+        html += '<div class="small text-muted mb-2">Nothing is saved unless you select it and click Save Selected Items. Permit fees, vague bundled work, and uncertain handwriting should stay unchecked.</div>';
         html += '<div class="quote-import-candidate-list">';
         candidates.forEach(function(item, index) {
             html += '<label class="d-flex gap-2 border rounded p-2 mb-2" for="quoteImportCandidate' + index + '">';
             html += '<input class="form-check-input mt-1 quote-import-candidate" type="checkbox" id="quoteImportCandidate' + index + '" data-index="' + index + '">';
-            html += '<span><span class="fw-semibold">' + escapeHtml(item.name) + '</span><span class="small text-muted"> - ' + escapeHtml(item.category || 'Imported Quote') + ' | ' + escapeHtml(item.unitType || 'ls') + ' | $' + (parseMoney(item.rate) || 0).toFixed(2) + '</span>';
+            html += '<span><span class="fw-semibold">' + escapeHtml(item.name) + '</span>' + (item.recommended !== false ? '<span class="badge text-bg-light border ms-1">Recommended</span>' : '<span class="badge text-bg-warning ms-1">Review first</span>') + '<span class="small text-muted"> - ' + escapeHtml(item.category || 'Imported Quote') + ' | ' + escapeHtml(item.unitType || 'ls') + ' | $' + (parseMoney(item.rate) || 0).toFixed(2) + '</span>';
             if (item.description) html += '<span class="d-block small text-muted">' + escapeHtml(item.description) + '</span>';
             html += '</span></label>';
         });
         html += '</div>';
         container.innerHTML = html;
+    }
+
+    function selectRecommendedQuoteImportCandidates() {
+        if (!_quoteImportState.parsed) return;
+        asArray(_quoteImportState.parsed.savedItemCandidates).forEach(function(item, index) {
+            var checkbox = document.getElementById('quoteImportCandidate' + index);
+            if (checkbox) checkbox.checked = item.recommended !== false;
+        });
     }
 
     async function openQuoteImportModal() {
@@ -892,12 +1130,13 @@
             allowed = await global.requireFeature('quote_import', 'Legacy Quote Import');
         }
         if (!allowed) return;
-        _quoteImportState = { extractedText: '', fileName: '', fileType: 'paste', parsed: null, debugText: '', debugFileName: '' };
+        _quoteImportState = { extractedText: '', sourceImages: [], fileName: '', fileType: 'paste', parsed: null, requiresReviewAcknowledgement: false, debugText: '', debugFileName: '' };
         var file = document.getElementById('quoteImportFile');
         var paste = document.getElementById('quoteImportPaste');
         var preview = document.getElementById('quoteImportPreview');
         var candidates = document.getElementById('quoteImportCandidates');
         var debugOutput = document.getElementById('quoteImportDebugOutput');
+        var imagePreview = document.getElementById('quoteImportImagePreview');
         if (file) file.value = '';
         if (paste) paste.value = '';
         if (preview) preview.innerHTML = '';
@@ -905,6 +1144,10 @@
         if (debugOutput) {
             debugOutput.style.display = 'none';
             debugOutput.innerHTML = '';
+        }
+        if (imagePreview) {
+            imagePreview.style.display = 'none';
+            imagePreview.innerHTML = '';
         }
         setImportStatus('');
         setApplyButtonsEnabled(false);
@@ -926,11 +1169,25 @@
         try {
             var extracted = await extractFileText(file);
             _quoteImportState.extractedText = extracted.text;
+            _quoteImportState.sourceImages = asArray(extracted.images);
             _quoteImportState.fileName = file.name;
             _quoteImportState.fileType = extracted.type;
             var paste = document.getElementById('quoteImportPaste');
             if (paste) paste.value = extracted.text;
-            setImportStatus('<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>File text extracted. Review or edit the text, then click Parse Quote.</div>');
+            var imagePreview = document.getElementById('quoteImportImagePreview');
+            if (imagePreview) {
+                if (_quoteImportState.sourceImages.length) {
+                    imagePreview.style.display = '';
+                    imagePreview.innerHTML = '<div class="small fw-semibold mb-2"><i class="fas fa-camera me-1"></i>' + _quoteImportState.sourceImages.length + ' page/photo' + (_quoteImportState.sourceImages.length === 1 ? '' : 's') + ' ready for handwriting recognition</div><img src="' + escapeHtml(_quoteImportState.sourceImages[0].dataUrl) + '" alt="Selected quote preview" class="img-fluid rounded border" style="max-height:240px;object-fit:contain;">';
+                } else {
+                    imagePreview.style.display = 'none';
+                    imagePreview.innerHTML = '';
+                }
+            }
+            var readyMessage = _quoteImportState.sourceImages.length
+                ? 'Photo prepared. QuoteDr will read handwriting and flag uncertain lines for review.'
+                : 'File text extracted. Review or edit the text, then click Parse Quote.';
+            setImportStatus('<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>' + escapeHtml(readyMessage) + '</div>');
         } catch (err) {
             setImportStatus('<div class="alert alert-danger py-2 small">File read failed: ' + escapeHtml(err.message || err) + '</div>');
         }
@@ -938,19 +1195,22 @@
 
     async function runQuoteImport() {
         var paste = document.getElementById('quoteImportPaste');
+        var parseButton = document.getElementById('quoteImportParseBtn');
         var content = String((paste && paste.value) || _quoteImportState.extractedText || '').trim();
-        if (!content) {
-            setImportStatus('<div class="alert alert-warning py-2 small">Upload a file or paste quote text first.</div>');
+        var sourceImages = asArray(_quoteImportState.sourceImages);
+        if (!content && !sourceImages.length) {
+            setImportStatus('<div class="alert alert-warning py-2 small">Upload a photo or file, or paste quote text first.</div>');
             return;
         }
         setApplyButtonsEnabled(false);
+        if (parseButton) parseButton.disabled = true;
         setImportStatus(renderImportLoadingStatus());
         try {
             if (typeof getSupabaseFunctionAuthHeaders !== 'function') {
                 throw new Error('Please sign in before using AI quote import.');
             }
             var headers = await getSupabaseFunctionAuthHeaders();
-            var chunks = splitQuoteImportText(content);
+            var chunks = buildQuoteImportRequests(content, sourceImages);
             var payloads = [];
             for (var index = 0; index < chunks.length; index++) {
                 setImportStatus(renderImportLoadingStatus({
@@ -969,8 +1229,11 @@
             renderQuoteImportPreview();
             setImportStatus('');
             setApplyButtonsEnabled(true);
+            refreshQuoteImportApplyAvailability();
         } catch (err) {
             setImportStatus('<div class="alert alert-danger py-2 small">Import failed: ' + escapeHtml(err.message || err) + '</div>');
+        } finally {
+            if (parseButton) parseButton.disabled = false;
         }
     }
 
@@ -1000,6 +1263,9 @@
             headers: headers,
             body: JSON.stringify({
                 sourceText: chunk.text,
+                sourceImages: asArray(chunk.images).map(function(image) {
+                    return { dataUrl: image.dataUrl, label: image.label || chunk.label };
+                }),
                 fileName: _quoteImportState.fileName || 'Pasted quote',
                 fileType: _quoteImportState.fileType || 'paste',
                 clientChunkIndex: index + 1,
@@ -1040,7 +1306,8 @@
             parsed: _quoteImportState.parsed,
             extractedText: String((paste && paste.value) || _quoteImportState.extractedText || ''),
             fileName: _quoteImportState.fileName || 'legacy-quote',
-            fileType: _quoteImportState.fileType || 'paste'
+            fileType: _quoteImportState.fileType || 'paste',
+            sourceImageCount: asArray(_quoteImportState.sourceImages).length
         });
     }
 
@@ -1133,6 +1400,11 @@
     function applyImportedQuote() {
         var parsed = _quoteImportState.parsed;
         if (!parsed || !parsed.quote || !parsed.quote.rooms.length) return;
+        var acknowledged = document.getElementById('quoteImportReviewAcknowledged');
+        if (_quoteImportState.requiresReviewAcknowledgement && !(acknowledged && acknowledged.checked)) {
+            setImportStatus('<div class="alert alert-warning py-2 small">Check the highlighted handwriting and arithmetic, then confirm the review checkbox before applying.</div>');
+            return;
+        }
         var mode = document.querySelector('input[name="quoteImportApplyMode"]:checked')?.value || 'replace';
         var quote = deepClone(parsed.quote);
         var currentData = getCurrentQuoteDataFallback();
@@ -1255,13 +1527,17 @@
         prepareRoomsForBuilder: prepareRoomsForBuilder,
         normalizeImportedQuote: normalizeImportedQuote,
         extractSavedItemCandidates: extractSavedItemCandidates,
-        extractFileText: extractFileText
+        extractFileText: extractFileText,
+        detectFileType: detectFileType,
+        buildQuoteImportRequests: buildQuoteImportRequests,
+        collectQuoteImportReviewIssues: collectQuoteImportReviewIssues
     };
     global.openQuoteImportModal = openQuoteImportModal;
     global.handleQuoteImportFileChange = handleQuoteImportFileChange;
     global.runQuoteImport = runQuoteImport;
     global.applyImportedQuote = applyImportedQuote;
     global.saveQuoteImportCandidates = saveQuoteImportCandidates;
+    global.selectRecommendedQuoteImportCandidates = selectRecommendedQuoteImportCandidates;
     global.exportQuoteImportDebug = exportQuoteImportDebug;
     global.copyQuoteImportDebugJson = copyQuoteImportDebugJson;
     global.downloadQuoteImportDebugJson = downloadQuoteImportDebugJson;

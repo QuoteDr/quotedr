@@ -6,7 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SUPPORTED_TYPES = new Set(['pdf', 'xlsx', 'csv', 'txt', 'paste']);
+const SUPPORTED_TYPES = new Set(['pdf', 'scanned_pdf', 'image', 'xlsx', 'csv', 'txt', 'paste']);
+const MAX_SOURCE_IMAGES = 4;
+const MAX_IMAGE_DATA_URL_CHARS = 8_500_000;
+const MAX_TOTAL_IMAGE_DATA_URL_CHARS = 24_000_000;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://axmoffknvblluibuitrq.supabase.co";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -24,7 +27,7 @@ const QUOTE_IMPORT_POLICY = Object.freeze({
 
 const MODEL_PRICES_PER_MILLION_TOKENS: Record<string, { input: number; output: number }> = {
   'gpt-4o-mini': { input: 0.15, output: 0.60 },
-  'gpt-4o': { input: 5.00, output: 15.00 },
+  'gpt-4o': { input: 2.50, output: 10.00 },
   default: { input: 1.00, output: 3.00 },
 };
 
@@ -212,6 +215,42 @@ function cleanText(value: unknown) {
   return String(value || '').replace(/\u0000/g, '').trim();
 }
 
+function normalizeSourceImages(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  if (value.length > MAX_SOURCE_IMAGES) {
+    throw new AiGuardError(`Import up to ${MAX_SOURCE_IMAGES} quote photos at a time.`, 413, {
+      error: `Import up to ${MAX_SOURCE_IMAGES} quote photos at a time.`,
+      code: 'quote_import_too_many_images',
+    });
+  }
+  let totalChars = 0;
+  const images = value.map((entry: any, index: number) => {
+    const dataUrl = cleanText(entry?.dataUrl || entry?.data_url);
+    const label = cleanText(entry?.label || `Photo ${index + 1}`).slice(0, 120);
+    if (!/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/\r\n]+={0,2}$/i.test(dataUrl)) {
+      throw new AiGuardError('Quote photos must be JPEG, PNG, or WebP image data.', 400, {
+        error: 'Quote photos must be JPEG, PNG, or WebP image data.',
+        code: 'quote_import_invalid_image',
+      });
+    }
+    if (dataUrl.length > MAX_IMAGE_DATA_URL_CHARS) {
+      throw new AiGuardError('One quote photo is too large. Crop it or choose a smaller image.', 413, {
+        error: 'One quote photo is too large. Crop it or choose a smaller image.',
+        code: 'quote_import_image_too_large',
+      });
+    }
+    totalChars += dataUrl.length;
+    return { dataUrl, label };
+  });
+  if (totalChars > MAX_TOTAL_IMAGE_DATA_URL_CHARS) {
+    throw new AiGuardError('The combined quote photos are too large. Import fewer pages at a time.', 413, {
+      error: 'The combined quote photos are too large. Import fewer pages at a time.',
+      code: 'quote_import_images_too_large',
+    });
+  }
+  return images;
+}
+
 function lineLooksLikeRoomHeading(line: string) {
   const trimmed = line.trim();
   if (!trimmed || trimmed.length > 70 || trimmed.length < 3) return false;
@@ -290,7 +329,8 @@ function mergeImportedQuotePayloads(payloads: any[]) {
       quoteNumber: '',
       rooms: [],
     },
-    sourceTotals: { subtotal: 0, tax: 0, total: 0 },
+    sourceTotals: { subtotal: 0, tax: 0, total: 0, amountPaid: 0, balanceDue: 0, taxLabel: '', taxRate: null },
+    sourceDocument: {},
     savedItemCandidates: [],
     warnings: [],
   };
@@ -319,6 +359,11 @@ function mergeImportedQuotePayloads(payloads: any[]) {
     merged.sourceTotals.subtotal = Math.max(Number(merged.sourceTotals.subtotal || 0), Number(totals.subtotal || 0));
     merged.sourceTotals.tax = Math.max(Number(merged.sourceTotals.tax || 0), Number(totals.tax || 0));
     merged.sourceTotals.total = Math.max(Number(merged.sourceTotals.total || 0), Number(totals.total || 0));
+    merged.sourceTotals.amountPaid = Math.max(Number(merged.sourceTotals.amountPaid || 0), Number(totals.amountPaid || 0));
+    merged.sourceTotals.balanceDue = Math.max(Number(merged.sourceTotals.balanceDue || 0), Number(totals.balanceDue || 0));
+    if (!merged.sourceTotals.taxLabel && totals.taxLabel) merged.sourceTotals.taxLabel = String(totals.taxLabel);
+    if (merged.sourceTotals.taxRate === null && totals.taxRate !== null && totals.taxRate !== undefined) merged.sourceTotals.taxRate = Number(totals.taxRate);
+    if (!Object.keys(merged.sourceDocument).length && payload?.sourceDocument) merged.sourceDocument = payload.sourceDocument;
     for (const candidate of Array.isArray(payload?.savedItemCandidates) ? payload.savedItemCandidates : []) {
       const name = String(candidate?.name || '').trim();
       if (!name) continue;
@@ -345,14 +390,15 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const sourceText = cleanText(body.sourceText);
+    const sourceImages = normalizeSourceImages(body.sourceImages);
     const fileName = cleanText(body.fileName).slice(0, 180) || 'Pasted quote';
     const fileType = cleanText(body.fileType || 'paste').toLowerCase();
     const clientChunkIndex = Number(body.clientChunkIndex || 0);
     const clientChunkTotal = Number(body.clientChunkTotal || 0);
     const clientChunkLabel = cleanText(body.clientChunkLabel || '');
 
-    if (!sourceText) {
-      return jsonResponse({ error: 'Missing quote text to import.' }, 400, corsHeaders);
+    if (!sourceText && !sourceImages.length) {
+      return jsonResponse({ error: 'Missing quote text or photo to import.' }, 400, corsHeaders);
     }
     if (!SUPPORTED_TYPES.has(fileType)) {
       return jsonResponse({ error: 'Unsupported quote import file type.' }, 400, corsHeaders);
@@ -361,7 +407,7 @@ Deno.serve(async (req) => {
     usageGuard = await startAiUsage(req, {
       feature: 'quote_import',
       endpoint: 'quote-import',
-      inputChars: sourceText.length,
+      inputChars: sourceText.length + (sourceImages.length * 2000),
     });
     assertWithinAiInputLimit(usageGuard.policy, sourceText, 'Legacy quote text');
 
@@ -370,7 +416,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'OpenAI key not configured' }, 500, corsHeaders);
     }
 
-    const systemPrompt = `You are QuoteDr's legacy quote conversion engine for renovation and service contractors.
+    const systemPrompt = `You are QuoteDr's legacy quote conversion engine for renovation and service contractors. You can read photographed, scanned, printed, and handwritten estimates, work orders, quotes, and invoices.
 
 Convert old quote text into QuoteDr JSON. You may receive one chunk/page/section from a larger source document. Parse every billable line item visible in the supplied chunk. Return ONLY valid JSON in this exact shape:
 {
@@ -393,7 +439,10 @@ Convert old quote text into QuoteDr JSON. You may receive one chunk/page/section
             "unitType": "ls",
             "rate": 0,
             "total": 0,
-            "notes": ""
+            "notes": "",
+            "confidence": 0.95,
+            "sourceExcerpt": "Exact source wording for this row",
+            "reviewReasons": []
           }
         ]
       }
@@ -402,7 +451,16 @@ Convert old quote text into QuoteDr JSON. You may receive one chunk/page/section
   "sourceTotals": {
     "subtotal": 0,
     "tax": 0,
-    "total": 0
+    "total": 0,
+    "amountPaid": 0,
+    "balanceDue": 0,
+    "taxLabel": "HST",
+    "taxRate": 13
+  },
+  "sourceDocument": {
+    "documentType": "invoice",
+    "handwritten": true,
+    "confidence": 0.9
   },
   "savedItemCandidates": [
     {
@@ -412,6 +470,8 @@ Convert old quote text into QuoteDr JSON. You may receive one chunk/page/section
       "rate": 0,
       "materialCost": 0,
       "description": "",
+      "confidence": 0.95,
+      "recommended": true,
       "defaultSelected": false
     }
   ],
@@ -420,22 +480,28 @@ Convert old quote text into QuoteDr JSON. You may receive one chunk/page/section
 
 Rules:
 - Preserve source pricing. Do not match against saved items, price books, or industry defaults.
+- Read the document itself, including handwriting. Never guess an unclear digit, quantity, price, client field, or address. Use null/blank where allowed, lower confidence, add a reviewReasons entry, and explain the uncertainty in warnings.
+- confidence values must be numbers from 0 to 1. Use sourceExcerpt to preserve the exact short phrase or row you read. Any item below 0.85 confidence must explain why in reviewReasons.
 - Extract every valid billable item. Do not summarize and do not return only a sample.
 - Preserve room or section headings such as 2ND FLOOR, MAIN FLOOR, KITCHEN, BASEMENT BATHROOM, EXTERIOR, etc.
 - If an item has quantity, unit, rate, and total, preserve them as numbers.
 - If an item has no quantity or unit but does have pricing, set quantity to 1, unit and unitType to "ea", rate to that total, and total to that total.
 - Preserve long imported item descriptions in itemDescription/displayDescription. Keep description as the short item/service name.
 - Leave job-specific notes blank during import. Do not duplicate imported descriptions into notes; notes are reserved for contractor-added job notes later.
-- Ignore document headers, footers, dates, page numbers, bill-to labels, terms, disclaimers, subtotals, taxes, total rows, balance due rows, payment rows, and repeated table headers as billable items.
+- Ignore document headers, footers, dates, page numbers, bill-to labels, terms, disclaimers, subtotals, taxes, total rows, balance due rows, deposit/payment rows, and repeated table headers as billable items.
 - Ignore TBD, to-be-determined, included-only, blank, or zero-price rows as billable line items unless they are clearly a priced line item.
-- Detect sourceTotals from subtotal, tax/HST/GST, and final total rows, but do not include those as room items.
+- Detect sourceTotals from subtotal, tax/HST/GST, final total, amount paid/deposit, and balance due rows, but do not include any of those as room items. Preserve the printed tax label and rate exactly when visible.
 - Use unitType values like "sq ft", "lf", "ea", "hr", "ls", "sheet", "box", or "bag".
-- Build savedItemCandidates only from clean reusable service items. No totals, taxes, headers, room labels, vague one-off notes, or TBD items. defaultSelected must always be false because the user must opt in manually.
+- Build savedItemCandidates only from clean reusable service items. Do not recommend permit/admin fees, totals, taxes, headers, room labels, vague bundled one-off scopes, payment history, or uncertain handwriting. Set recommended true only for a clear reusable service at confidence 0.85 or higher. defaultSelected must always be false because the user must opt in manually.
+- Treat invoice history as read-only evidence. Do not apply source payments, deposits, signatures, or balances to the new quote.
+- Check arithmetic to the cent: line items versus subtotal, subtotal plus tax versus total, and amount paid plus balance due versus total. Add a warning for every mismatch; do not alter a source number merely to force a match.
 - If the source text order is messy, use room headings and nearby context to group items sensibly.
 - If you are unsure about a row, include a warning instead of inventing data.
 - Return JSON only.`;
 
-    const model = Deno.env.get('OPENAI_QUOTE_IMPORT_MODEL') || 'gpt-4o-mini';
+    const model = sourceImages.length
+      ? (Deno.env.get('OPENAI_QUOTE_IMPORT_VISION_MODEL') || 'gpt-4o')
+      : (Deno.env.get('OPENAI_QUOTE_IMPORT_MODEL') || 'gpt-4o-mini');
     const chunks = splitLegacyQuoteText(sourceText);
     const parsedPayloads: any[] = [];
     let combinedUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
@@ -445,6 +511,16 @@ Rules:
       const displayedChunkIndex = clientChunkTotal > 1 ? clientChunkIndex || index + 1 : index + 1;
       const displayedChunkTotal = clientChunkTotal > 1 ? clientChunkTotal : chunks.length;
       const displayedChunkLabel = clientChunkLabel || chunk.label;
+      const userPrompt = `File name: ${fileName}\nFile type: ${fileType}\nChunk: ${displayedChunkIndex} of ${displayedChunkTotal} (${displayedChunkLabel})\n\n${sourceImages.length ? 'Inspect every supplied document image carefully, including handwriting. ' : ''}LEGACY QUOTE TEXT CHUNK:\n${chunk.text || '(No extracted text; use the supplied document image.)'}`;
+      const userContent: any = sourceImages.length
+        ? [
+            { type: 'text', text: userPrompt },
+            ...sourceImages.flatMap((image) => [
+              { type: 'text', text: `Document image: ${image.label}` },
+              { type: 'image_url', image_url: { url: image.dataUrl, detail: 'high' } },
+            ]),
+          ]
+        : userPrompt;
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -457,7 +533,7 @@ Rules:
             { role: 'system', content: systemPrompt },
             {
               role: 'user',
-              content: `File name: ${fileName}\nFile type: ${fileType}\nChunk: ${displayedChunkIndex} of ${displayedChunkTotal} (${displayedChunkLabel})\n\nLEGACY QUOTE TEXT CHUNK:\n${chunk.text}`,
+              content: userContent,
             },
           ],
           temperature: 0.1,
@@ -491,15 +567,53 @@ Rules:
 
     const parsed = chunks.length > 1 ? mergeImportedQuotePayloads(parsedPayloads) : parsedPayloads[0];
     parsed.savedItemCandidates = Array.isArray(parsed.savedItemCandidates)
-      ? parsed.savedItemCandidates.map((candidate: any) => ({ ...candidate, defaultSelected: false }))
+      ? parsed.savedItemCandidates.map((candidate: any) => {
+          const confidence = Number(candidate?.confidence);
+          const reusableName = cleanText(candidate?.name);
+          const unsuitable = /\b(permit|admin(?:istration)? fee|subtotal|total|tax|hst|gst|deposit|balance|payment)\b/i.test(reusableName);
+          return {
+            ...candidate,
+            confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
+            recommended: !unsuitable && Number.isFinite(confidence) && confidence >= 0.85 && candidate?.recommended !== false,
+            defaultSelected: false,
+          };
+        })
       : [];
+
+    parsed.warnings = Array.isArray(parsed.warnings) ? parsed.warnings : [];
+    if (sourceImages.length) {
+      for (const room of Array.isArray(parsed?.quote?.rooms) ? parsed.quote.rooms : []) {
+        for (const item of Array.isArray(room?.items) ? room.items : []) {
+          const confidence = Number(item?.confidence);
+          if (!Number.isFinite(confidence)) {
+            item.confidence = 0.5;
+            item.reviewReasons = Array.isArray(item.reviewReasons) ? item.reviewReasons : [];
+            item.reviewReasons.push('The image parser did not provide a confidence score for this handwritten line.');
+          } else {
+            item.confidence = Math.max(0, Math.min(1, confidence));
+          }
+        }
+      }
+    }
 
     const importedSubtotal = (Array.isArray(parsed?.quote?.rooms) ? parsed.quote.rooms : []).reduce((roomSum: number, room: any) => {
       return roomSum + (Array.isArray(room?.items) ? room.items : []).reduce((itemSum: number, item: any) => itemSum + (Number(item?.total || 0) || 0), 0);
     }, 0);
+    const sourceSubtotal = Number(parsed?.sourceTotals?.subtotal || 0);
+    const sourceTax = Number(parsed?.sourceTotals?.tax || 0);
     const sourceTotal = Number(parsed?.sourceTotals?.total || 0);
+    const sourceAmountPaid = Number(parsed?.sourceTotals?.amountPaid || 0);
+    const sourceBalanceDue = Number(parsed?.sourceTotals?.balanceDue || 0);
+    if (sourceSubtotal > 0 && Math.abs(importedSubtotal - sourceSubtotal) > 0.01) {
+      parsed.warnings.push(`Imported line items total $${importedSubtotal.toFixed(2)}, but the detected source subtotal is $${sourceSubtotal.toFixed(2)}. Review the highlighted rows before applying.`);
+    }
+    if (sourceSubtotal > 0 && sourceTotal > 0 && Math.abs((sourceSubtotal + sourceTax) - sourceTotal) > 0.01) {
+      parsed.warnings.push(`Detected subtotal plus tax is $${(sourceSubtotal + sourceTax).toFixed(2)}, but the detected source total is $${sourceTotal.toFixed(2)}.`);
+    }
+    if (sourceTotal > 0 && sourceAmountPaid > 0 && sourceBalanceDue > 0 && Math.abs((sourceAmountPaid + sourceBalanceDue) - sourceTotal) > 0.01) {
+      parsed.warnings.push(`Detected payment plus remaining balance is $${(sourceAmountPaid + sourceBalanceDue).toFixed(2)}, but the detected source total is $${sourceTotal.toFixed(2)}. Payment history will not be applied automatically.`);
+    }
     if (sourceTotal > 0 && importedSubtotal > 0 && importedSubtotal < sourceTotal * 0.75) {
-      parsed.warnings = Array.isArray(parsed.warnings) ? parsed.warnings : [];
       parsed.warnings.push(`Imported line items total $${importedSubtotal.toFixed(2)}, which is much lower than the detected source total $${sourceTotal.toFixed(2)}. Review the source text and imported rooms before applying.`);
     }
 
@@ -510,6 +624,7 @@ Rules:
         label: usageGuard.policy.label,
         fileName,
         fileType,
+        sourceImageCount: sourceImages.length,
         chunks: chunks.length,
         clientChunkIndex: clientChunkIndex || null,
         clientChunkTotal: clientChunkTotal || null,
