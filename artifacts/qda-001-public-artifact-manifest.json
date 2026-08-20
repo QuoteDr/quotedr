@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "outputDirectory": "dist",
   "fileCount": 108,
-  "totalBytes": 22782257,
-  "treeSha256": "0cddd3f329945fe27e5ac27c4fdcf5820df19b2ae7802d8a2fe6b5363d043bc5",
+  "totalBytes": 22785743,
+  "treeSha256": "05768c89d1a293e4caf24f63d0fba079ddcbcbb6f40e7376a212662d5a4ac9d7",
   "files": [
     {
       "path": "404.html",
@@ -328,7 +328,7 @@
     {
       "path": "quote-builder.html",
       "bytes": 1405972,
-      "sha256": "17d0f1bf21fe9b4cb7360b945180bf702312b911919772c8ff3e7a56b3d1a7d5"
+      "sha256": "f642ce83646b42aa24e61d4fbd6003f3fbace2e1a78d0d3cc59b0b4a4928bee9"
     },
     {
       "path": "quote-calculators.js",
@@ -362,8 +362,8 @@
     },
     {
       "path": "quote-import.js",
-      "bytes": 86817,
-      "sha256": "548e91e5fbcf04ea037961373549971711ccb85594185bf018777a133587f85d"
+      "bytes": 90303,
+      "sha256": "ca9ad011ebaf2c02b3c1a93c2b58bef66703b16eaaf99c8b1648b573289896ca"
     },
     {
       "path": "quote-items.js",

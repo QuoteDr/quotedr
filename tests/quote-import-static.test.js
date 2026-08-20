@@ -21,7 +21,7 @@ assert(builderHtml.includes('quoteImportImagePreview'), 'photo import should pre
 assert(builderHtml.includes('id="quoteImportParseBtn"'), 'quote import should identify the parse action so duplicate AI requests can be blocked');
 assert(builderHtml.includes('function openAiVoiceDestinationModal(preparedRooms, options)'), 'quote import should reuse the configurable AI Voice room destination flow');
 assert(builderHtml.includes('modalEl._aiVoiceDestinationRooms = destinationRooms'), 'the shared destination chooser should validate against the rooms offered to that workflow');
-assert(builderHtml.includes('quote-import.js?v=2026082002'), 'quote builder should cache-bust the importer destination update');
+assert(builderHtml.includes('quote-import.js?v=2026082003'), 'quote builder should cache-bust the importer bulk-selection update');
 
 const edgeFunctionPath = path.join(__dirname, '..', 'supabase', 'functions', 'quote-import', 'index.ts');
 assert(fs.existsSync(edgeFunctionPath), 'quote-import edge function should exist');
@@ -67,6 +67,7 @@ assert(importer, 'QuoteDrQuoteImport should be exposed on window');
 assert(typeof importer.normalizeImportedQuote === 'function', 'normalizeImportedQuote should be exported');
 assert(typeof importer.extractSavedItemCandidates === 'function', 'extractSavedItemCandidates should be exported');
 assert(typeof importer.mergeSavedItemCandidates === 'function', 'mergeSavedItemCandidates should be exported');
+assert(typeof importer.getQuoteImportBulkSelection === 'function', 'getQuoteImportBulkSelection should be exported');
 assert(typeof importer.buildPdfPageTextFromItems === 'function', 'PDF page text builder should be exported for testing');
 assert(typeof importer.buildSheetTextFromRows === 'function', 'spreadsheet text builder should be exported for testing');
 assert(typeof importer.splitQuoteImportText === 'function', 'frontend should split large quote imports before calling the Edge Function');
@@ -87,10 +88,26 @@ assert(source.includes('quoteImportDebugOutput'), 'debug export should write JSO
 assert(source.includes('copyQuoteImportDebugJson'), 'debug export should provide an explicit copy button fallback');
 assert(source.includes('execCommand'), 'debug export copy fallback should support browsers without clipboard permissions');
 assert(source.includes('Select recommended'), 'importer should provide a fast opt-in for reusable high-confidence items');
+assert(source.includes('Deselect recommended'), 'recommended-item control should visibly support clearing its selection');
+assert(source.includes('Select all') && source.includes('Deselect all'), 'importer should provide a toggle for all reusable candidates');
 assert(source.includes('will not be applied to the new QuoteDr quote'), 'detected historical payments should be visibly review-only');
 assert(source.includes('parseButton.disabled = true') && source.includes('parseButton.disabled = false'), 'the parse action should be disabled while the AI import request is running');
 assert(source.includes('await global.openAiVoiceDestinationModal'), 'applying an import should wait for the shared room destination choice');
 assert(source.includes("destinationRooms: mode === 'append' ? existingRooms : []"), 'replacement imports should not offer rooms that will be removed');
+
+const bulkCandidates = [
+  { name: 'Pot lights', recommended: true },
+  { name: 'Permit', recommended: false },
+  { name: 'Receptacles', recommended: true },
+];
+let bulkSelection = importer.getQuoteImportBulkSelection(bulkCandidates, [false, true, false], 'recommended');
+assert(JSON.stringify(bulkSelection.checkedStates) === JSON.stringify([true, true, true]), 'select recommended should preserve an individually selected review-first item');
+bulkSelection = importer.getQuoteImportBulkSelection(bulkCandidates, bulkSelection.checkedStates, 'recommended');
+assert(JSON.stringify(bulkSelection.checkedStates) === JSON.stringify([false, true, false]), 'pressing recommended again should clear only recommended items');
+bulkSelection = importer.getQuoteImportBulkSelection(bulkCandidates, [false, true, false], 'all');
+assert(JSON.stringify(bulkSelection.checkedStates) === JSON.stringify([true, true, true]), 'select all should select every reusable candidate');
+bulkSelection = importer.getQuoteImportBulkSelection(bulkCandidates, bulkSelection.checkedStates, 'all');
+assert(JSON.stringify(bulkSelection.checkedStates) === JSON.stringify([false, false, false]), 'pressing select all again should clear every reusable candidate');
 
 assert(importer.detectFileType({ name: 'paper-invoice.JPG', type: 'image/jpeg' }) === 'image', 'JPEG photos should route to visual import');
 assert(importer.detectFileType({ name: 'scan.webp', type: 'image/webp' }) === 'image', 'WebP photos should route to visual import');

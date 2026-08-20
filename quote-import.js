@@ -1139,9 +1139,9 @@
             return;
         }
         var recommendedCount = candidates.filter(function(item) { return item.recommended !== false; }).length;
-        var html = '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2"><div class="fw-semibold">Optional: build your reusable item library</div>';
-        if (recommendedCount) html += '<button type="button" class="btn btn-outline-primary btn-sm" onclick="selectRecommendedQuoteImportCandidates()"><i class="fas fa-check-double me-1"></i>Select recommended</button>';
-        html += '</div>';
+        var html = '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2"><div class="fw-semibold">Optional: build your reusable item library</div><div class="d-flex gap-2 flex-wrap">';
+        if (recommendedCount) html += '<button type="button" class="btn btn-outline-primary btn-sm" id="quoteImportRecommendedToggleBtn" onclick="selectRecommendedQuoteImportCandidates()" aria-pressed="false"><i class="fas fa-check-double me-1"></i><span>Select recommended</span></button>';
+        html += '<button type="button" class="btn btn-outline-primary btn-sm" id="quoteImportAllToggleBtn" onclick="selectAllQuoteImportCandidates()" aria-pressed="false"><i class="fas fa-list-check me-1"></i><span>Select all</span></button></div></div>';
         html += '<div class="small text-muted mb-2">Nothing is saved unless you select it and click Save Selected Items. Permit fees, vague bundled work, and uncertain handwriting should stay unchecked.</div>';
         html += '<div class="quote-import-candidate-list">';
         candidates.forEach(function(item, index) {
@@ -1153,14 +1153,68 @@
         });
         html += '</div>';
         container.innerHTML = html;
+        Array.from(container.querySelectorAll('.quote-import-candidate')).forEach(function(checkbox) {
+            checkbox.addEventListener('change', refreshQuoteImportCandidateToggleButtons);
+        });
+        refreshQuoteImportCandidateToggleButtons();
+    }
+
+    function getQuoteImportBulkSelection(candidates, checkedStates, mode) {
+        var items = asArray(candidates);
+        var states = asArray(checkedStates);
+        var current = items.map(function(_, index) { return Boolean(states[index]); });
+        var targetIndexes = items.map(function(item, index) {
+            return mode === 'recommended' && item.recommended === false ? -1 : index;
+        }).filter(function(index) { return index >= 0; });
+        var allSelected = targetIndexes.length > 0 && targetIndexes.every(function(index) { return current[index]; });
+        targetIndexes.forEach(function(index) { current[index] = !allSelected; });
+        return { checkedStates: current, selected: !allSelected, targetCount: targetIndexes.length };
+    }
+
+    function refreshQuoteImportCandidateToggleButtons() {
+        if (!_quoteImportState.parsed) return;
+        var candidates = asArray(_quoteImportState.parsed.savedItemCandidates);
+        var checkedStates = candidates.map(function(_, index) {
+            return Boolean(document.getElementById('quoteImportCandidate' + index)?.checked);
+        });
+        var recommendedIndexes = candidates.map(function(item, index) {
+            return item.recommended === false ? -1 : index;
+        }).filter(function(index) { return index >= 0; });
+        var allRecommendedSelected = recommendedIndexes.length > 0 && recommendedIndexes.every(function(index) { return checkedStates[index]; });
+        var allSelected = candidates.length > 0 && checkedStates.every(Boolean);
+        var recommendedButton = document.getElementById('quoteImportRecommendedToggleBtn');
+        var allButton = document.getElementById('quoteImportAllToggleBtn');
+        if (recommendedButton) {
+            recommendedButton.setAttribute('aria-pressed', String(allRecommendedSelected));
+            recommendedButton.querySelector('span').textContent = allRecommendedSelected ? 'Deselect recommended' : 'Select recommended';
+        }
+        if (allButton) {
+            allButton.setAttribute('aria-pressed', String(allSelected));
+            allButton.querySelector('span').textContent = allSelected ? 'Deselect all' : 'Select all';
+        }
+    }
+
+    function toggleQuoteImportCandidateSelection(mode) {
+        if (!_quoteImportState.parsed) return;
+        var candidates = asArray(_quoteImportState.parsed.savedItemCandidates);
+        var checkboxes = candidates.map(function(_, index) {
+            return document.getElementById('quoteImportCandidate' + index);
+        });
+        var next = getQuoteImportBulkSelection(candidates, checkboxes.map(function(checkbox) {
+            return Boolean(checkbox?.checked);
+        }), mode);
+        checkboxes.forEach(function(checkbox, index) {
+            if (checkbox) checkbox.checked = next.checkedStates[index];
+        });
+        refreshQuoteImportCandidateToggleButtons();
     }
 
     function selectRecommendedQuoteImportCandidates() {
-        if (!_quoteImportState.parsed) return;
-        asArray(_quoteImportState.parsed.savedItemCandidates).forEach(function(item, index) {
-            var checkbox = document.getElementById('quoteImportCandidate' + index);
-            if (checkbox) checkbox.checked = item.recommended !== false;
-        });
+        toggleQuoteImportCandidateSelection('recommended');
+    }
+
+    function selectAllQuoteImportCandidates() {
+        toggleQuoteImportCandidateSelection('all');
     }
 
     function combineImportedRooms(importedRooms, roomName) {
@@ -1669,6 +1723,7 @@
         normalizeImportedQuote: normalizeImportedQuote,
         extractSavedItemCandidates: extractSavedItemCandidates,
         mergeSavedItemCandidates: mergeSavedItemCandidates,
+        getQuoteImportBulkSelection: getQuoteImportBulkSelection,
         extractFileText: extractFileText,
         detectFileType: detectFileType,
         buildQuoteImportRequests: buildQuoteImportRequests,
@@ -1680,6 +1735,7 @@
     global.applyImportedQuote = applyImportedQuote;
     global.saveQuoteImportCandidates = saveQuoteImportCandidates;
     global.selectRecommendedQuoteImportCandidates = selectRecommendedQuoteImportCandidates;
+    global.selectAllQuoteImportCandidates = selectAllQuoteImportCandidates;
     global.exportQuoteImportDebug = exportQuoteImportDebug;
     global.copyQuoteImportDebugJson = copyQuoteImportDebugJson;
     global.downloadQuoteImportDebugJson = downloadQuoteImportDebugJson;
