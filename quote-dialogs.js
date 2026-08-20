@@ -49,6 +49,7 @@
                     '</div>' +
                     '<div class="modal-footer">' +
                         '<button type="button" class="btn btn-outline-secondary" id="qdDialogCancel">Cancel</button>' +
+                        '<button type="button" class="btn btn-outline-primary" id="qdDialogTertiary" style="display:none;">View</button>' +
                         '<button type="button" class="btn btn-outline-primary" id="qdDialogSecondary" style="display:none;">No</button>' +
                         '<button type="button" class="btn btn-primary" id="qdDialogOk">OK</button>' +
                     '</div>' +
@@ -62,6 +63,16 @@
     function ensureDialogButtons(el) {
         var footer = el.querySelector('.modal-footer');
         if (!footer) return el;
+        if (!el.querySelector('#qdDialogTertiary')) {
+            var tertiary = document.createElement('button');
+            tertiary.type = 'button';
+            tertiary.className = 'btn btn-outline-primary';
+            tertiary.id = 'qdDialogTertiary';
+            tertiary.style.display = 'none';
+            tertiary.textContent = 'View';
+            var secondary = el.querySelector('#qdDialogSecondary');
+            footer.insertBefore(tertiary, secondary || el.querySelector('#qdDialogOk') || null);
+        }
         if (!el.querySelector('#qdDialogSecondary')) {
             var secondary = document.createElement('button');
             secondary.type = 'button';
@@ -134,6 +145,7 @@
             var input = el.querySelector('#qdDialogInput');
             var ok = el.querySelector('#qdDialogOk');
             var cancel = el.querySelector('#qdDialogCancel');
+            var tertiary = el.querySelector('#qdDialogTertiary');
             var secondary = el.querySelector('#qdDialogSecondary');
             var help = el.querySelector('#qdDialogHelp');
             var helpText = el.querySelector('#qdDialogHelpText');
@@ -146,6 +158,9 @@
             input.value = opts.defaultValue || '';
             cancel.style.display = opts.cancelText === null ? 'none' : '';
             cancel.textContent = opts.cancelText || 'Cancel';
+            tertiary.style.display = opts.tertiaryText ? '' : 'none';
+            tertiary.textContent = opts.tertiaryText || 'View';
+            tertiary.className = 'btn ' + (opts.tertiaryClass || 'btn-outline-primary');
             secondary.style.display = opts.secondaryText ? '' : 'none';
             secondary.textContent = opts.secondaryText || 'No';
             secondary.className = 'btn ' + (opts.secondaryClass || 'btn-outline-primary');
@@ -169,6 +184,7 @@
                 settled = true;
                 ok.onclick = null;
                 cancel.onclick = null;
+                tertiary.onclick = null;
                 secondary.onclick = null;
                 if (help) help.onclick = null;
                 el.removeEventListener('keydown', onEnterSubmit);
@@ -204,6 +220,9 @@
             };
             cancel.onclick = function() {
                 cleanup(opts.prompt ? null : false, true);
+            };
+            tertiary.onclick = function() {
+                cleanup(opts.tertiaryValue !== undefined ? opts.tertiaryValue : 'tertiary', true);
             };
             secondary.onclick = function() {
                 if (opts.prompt && opts.secondaryPromptValue) {

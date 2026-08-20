@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "outputDirectory": "dist",
   "fileCount": 108,
-  "totalBytes": 22786797,
-  "treeSha256": "467f1489e00b007b8e586ca7a07b868a72f8e0ad8fc211f261a1ad044aff2241",
+  "totalBytes": 22788202,
+  "treeSha256": "a9100d7c4e5649db897b1b57f32d19c5e4b2227c11330988048c0088dec88896",
   "files": [
     {
       "path": "404.html",
@@ -162,8 +162,8 @@
     },
     {
       "path": "dashboard.html",
-      "bytes": 380159,
-      "sha256": "21dcec7bc5fcebde6ada295bd2d8651d4952053038c4b5aa450b38821f7d473b"
+      "bytes": 380414,
+      "sha256": "697291addd9d8e4c5052d63bc8a39c6700dff453374f7e3872a519ef60a0963b"
     },
     {
       "path": "data/whats-new.json",
@@ -352,8 +352,8 @@
     },
     {
       "path": "quote-dialogs.js",
-      "bytes": 15021,
-      "sha256": "bc001e620d55a67b9ac479bee126a725d95907fee56d2d84e8584b44d60e8943"
+      "bytes": 16171,
+      "sha256": "eac124024b9b7f0884170b858bce552242325493f736b4ecd9ae664456ec0d77"
     },
     {
       "path": "quote-discounts.js",

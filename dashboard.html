@@ -496,7 +496,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="quote-dialogs.js?v=2026071501"></script>
+    <script src="quote-dialogs.js?v=2026082001"></script>
     <script src="help-content.js?v=2026080801"></script>
     <script src="modal-help.js?v=1777741200"></script>
     <script src="change-orders.js?v=1778060200"></script>
@@ -1797,6 +1797,9 @@
                 secondaryText: 'Duplicate As Revision',
                 secondaryValue: 'duplicate',
                 secondaryClass: 'btn-outline-primary',
+                tertiaryText: 'Client View',
+                tertiaryValue: 'client_view',
+                tertiaryClass: 'btn-outline-primary',
                 cancelText: 'Cancel',
                 type: 'warning'
             });
@@ -1804,6 +1807,8 @@
                 await removeQuoteFromPortalAndEdit(quote.id);
             } else if (choice === 'duplicate') {
                 await duplicateQuoteAsRevision(quote.id, title);
+            } else if (choice === 'client_view') {
+                await openClientDocumentPreview(quote.id);
             }
         }
 

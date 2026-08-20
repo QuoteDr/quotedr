@@ -13,8 +13,11 @@ assert(
 assert(
   dashboard.includes('This document is already in a client portal and cannot be edited directly.') &&
     dashboard.includes('Remove From Portal & Edit') &&
-    dashboard.includes('Duplicate As Revision'),
-  'Portal edit lock should explain why editing is blocked and offer remove/duplicate paths'
+    dashboard.includes('Duplicate As Revision') &&
+    dashboard.includes("tertiaryText: 'Client View'") &&
+    dashboard.includes("choice === 'client_view'") &&
+    dashboard.includes('await openClientDocumentPreview(quote.id)'),
+  'Portal edit lock should explain why editing is blocked and offer view, remove, and duplicate paths'
 );
 
 assert(
