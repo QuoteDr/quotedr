@@ -3479,15 +3479,14 @@
             // Pre-populate with loading state
             var nameEl = document.getElementById('portalClientName');
             var urlEl = document.getElementById('portalUrlDisplay');
-            var adminUrlEl = document.getElementById('portalAdminUrlDisplay');
             var pinEl = document.getElementById('portalPinDisplay');
             if (nameEl) nameEl.textContent = clientName;
             if (urlEl) urlEl.value = 'Loading...';
-            if (adminUrlEl) adminUrlEl.value = 'Loading...';
             if (pinEl) pinEl.textContent = '...';
             window._currentPortalClient = clientName;
             window._currentPortalQuoteId = quoteId || '';
             window._currentPortalClientEmail = savedEmail || '';
+            window._currentPortalAdminUrl = '';
 
             // Show modal - try multiple approaches
             try {
@@ -3613,8 +3612,7 @@
                     secureAnchorId: stableShare.anchorId
                 }), quoteId || '', { admin: true });
                 document.getElementById('portalUrlDisplay').value = url;
-                adminUrlEl = document.getElementById('portalAdminUrlDisplay');
-                if (adminUrlEl) adminUrlEl.value = adminUrl;
+                window._currentPortalAdminUrl = adminUrl;
                 document.getElementById('portalPinDisplay').textContent = pin;
                 if (options.autoCopy !== false && url) {
                     var copied = false;
@@ -3636,45 +3634,47 @@
             } catch(err) {
                 console.error('shareClientPortal error:', err);
                 document.getElementById('portalUrlDisplay').value = 'Error loading - try again';
-                var adminUrlErrorEl = document.getElementById('portalAdminUrlDisplay');
-                if (adminUrlErrorEl) adminUrlErrorEl.value = 'Error loading - try again';
+                window._currentPortalAdminUrl = '';
                 document.getElementById('portalPinDisplay').textContent = '----';
             }
         }
 
-        function copyPortalUrl() {
+        function copyPortalUrl(copyEvent, showFullLabel) {
+            if (copyEvent) {
+                copyEvent.preventDefault();
+                copyEvent.stopPropagation();
+            }
             var url = document.getElementById('portalUrlDisplay').value;
+            if (!url || url === 'Loading...' || url.startsWith('Error')) return;
             if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).catch(function(){});
-            var btn = event.target.closest('button');
-            if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check"></i>'; setTimeout(function(){ btn.innerHTML = orig; }, 1500); }
+            var btn = copyEvent && copyEvent.target ? copyEvent.target.closest('button') : null;
+            if (btn) {
+                var orig = btn.innerHTML;
+                btn.innerHTML = showFullLabel ? '<i class="fas fa-check me-1"></i>Client Link Copied!' : '<i class="fas fa-check"></i>';
+                setTimeout(function(){ btn.innerHTML = orig; }, 1500);
+            }
         }
 
-        function openPortalClientUrl() {
+        function openPortalClientUrl(openEvent) {
+            if (openEvent) {
+                openEvent.preventDefault();
+                openEvent.stopPropagation();
+            }
             var url = document.getElementById('portalUrlDisplay').value;
             if (url && url !== 'Loading...' && !url.startsWith('Error')) {
                 window.location.href = url;
             }
         }
 
-        function copyPortalAdminUrl() {
-            var url = document.getElementById('portalAdminUrlDisplay').value;
-            navigator.clipboard.writeText(url).catch(function(){});
-            var btn = event.target.closest('button');
-            if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check"></i>'; setTimeout(function(){ btn.innerHTML = orig; }, 1500); }
-        }
-
-        function openPortalAdminUrl() {
-            var url = document.getElementById('portalAdminUrlDisplay').value;
-            if (url && url !== 'Loading...' && !url.startsWith('Error')) {
+        function openPortalAdminUrl(openEvent) {
+            if (openEvent) {
+                openEvent.preventDefault();
+                openEvent.stopPropagation();
+            }
+            var url = window._currentPortalAdminUrl || '';
+            if (url) {
                 window.location.href = url;
             }
-        }
-
-        function copyPortalBoth() {
-            var url = document.getElementById('portalUrlDisplay').value;
-            navigator.clipboard.writeText(url).catch(function(){});
-            var btn = event.target.closest('button');
-            if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check me-1"></i>Link Copied!'; setTimeout(function(){ btn.innerHTML = orig; }, 1500); }
         }
 
         async function resetPortalPin() {
@@ -5940,27 +5940,23 @@ function renderBusinessInsights(quotes) {
           <label class="form-label fw-bold small mb-1" style="color:#1a2940;">CLIENT VIEWER LINK</label>
           <div class="input-group">
             <input type="text" class="form-control form-control-sm" id="portalUrlDisplay" readonly aria-label="Client portal link">
-            <button class="btn btn-outline-secondary btn-sm" onclick="copyPortalUrl()" title="Copy client portal link" aria-label="Copy client portal link"><i class="fas fa-copy"></i></button>
-            <button class="btn btn-outline-primary btn-sm" onclick="openPortalClientUrl()" title="View client portal" aria-label="View client portal"><i class="fas fa-arrow-up-right-from-square me-1"></i>View</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyPortalUrl(event)" title="Copy client portal link" aria-label="Copy client portal link"><i class="fas fa-copy"></i></button>
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="openPortalClientUrl(event)" title="View client portal" aria-label="View client portal"><i class="fas fa-arrow-up-right-from-square me-1"></i>View</button>
           </div>
           <div class="form-text">Client-facing link that requires the PIN below.</div>
         </div>
-        <div class="text-start mb-3">
-          <label class="form-label fw-bold small mb-1" style="color:#1a2940;">ADMIN PREVIEW LINK</label>
-          <div class="input-group">
-            <input type="text" class="form-control form-control-sm" id="portalAdminUrlDisplay" readonly aria-label="Admin preview link">
-            <button class="btn btn-outline-secondary btn-sm" onclick="copyPortalAdminUrl()" title="Copy admin preview link" aria-label="Copy admin preview link"><i class="fas fa-copy"></i></button>
-            <button class="btn btn-outline-primary btn-sm" onclick="openPortalAdminUrl()" title="Open admin preview" aria-label="Open admin preview"><i class="fas fa-arrow-up-right-from-square me-1"></i>Preview</button>
-          </div>
-          <div class="form-text">For you only. Opens the portal in admin preview mode.</div>
+        <div class="d-grid text-start mb-3">
+          <label class="form-label fw-bold small mb-1" style="color:#1a2940;">ADMIN VIEW</label>
+          <button type="button" class="btn btn-outline-primary" onclick="openPortalAdminUrl(event)" title="Open admin view" aria-label="Open admin view"><i class="fas fa-eye me-1"></i>Admin View</button>
+          <div class="form-text">For you only. Opens the portal in admin mode without exposing a shareable link.</div>
         </div>
         <div class="mb-3">
           <div class="text-muted small mb-1">Client PIN (they need this to log in):</div>
           <div id="portalPinDisplay" style="font-size:2.5rem; font-weight:bold; letter-spacing:0.5rem; color:#1a2940; background:#f8f9fa; border-radius:8px; padding:12px 24px; display:inline-block;"></div>
         </div>
         <div class="d-grid gap-2">
-          <button class="btn btn-primary" onclick="copyPortalBoth()"><i class="fas fa-copy me-1"></i>Copy Link</button>
-          <button class="btn btn-outline-secondary btn-sm" onclick="resetPortalPin()"><i class="fas fa-sync me-1"></i>Reset PIN (generate new)</button>
+          <button type="button" class="btn btn-primary" onclick="copyPortalUrl(event, true)"><i class="fas fa-copy me-1"></i>Copy Client Viewer Link</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetPortalPin()"><i class="fas fa-sync me-1"></i>Reset PIN (generate new)</button>
         </div>
       </div>
     </div>
