@@ -1730,13 +1730,13 @@ if (location.search.includes('debug')) {
         <div class="sig-modal-overlay" id="sigModalOverlay" role="dialog" aria-modal="true" aria-labelledby="quoteSignatureModalTitle" aria-describedby="quoteSignatureModalDescription">
             <div class="sig-modal">
                 <h5 class="mb-2" id="quoteSignatureModalTitle"><i class="fas fa-pen-nib text-primary"></i> Accept Quote</h5>
-                <p class="signature-help mb-3" id="quoteSignatureModalDescription">Enter the full client name shown on this quote and confirm the terms. Your typed name becomes your electronic signature.</p>
+                <p class="signature-help mb-3" id="quoteSignatureModalDescription">Enter one complete client name shown on this quote and confirm the terms. If multiple clients are listed, either person may sign using their own full name.</p>
                 <div class="alert alert-warning py-2 mb-3" id="signatureApprovalMessage" style="display:none;" role="alert"></div>
 
                 <div class="mb-3 signer-name-wrap" id="signerNameWrap">
                     <label class="form-label fw-bold" for="signerName">Your Full Name <span class="text-danger">*</span></label>
                     <input type="text" id="signerName" class="form-control" placeholder="e.g. Jane Smith" autocomplete="name" aria-describedby="signerNameHelp">
-                    <div class="form-text" id="signerNameHelp">This must match the client name associated with the quote.</div>
+                    <div class="form-text" id="signerNameHelp">Enter your own full name as listed on the quote; you do not need to enter every client name.</div>
                 </div>
 
                 <div class="mb-3">
@@ -5535,7 +5535,7 @@ if (location.search.includes('debug')) {
             var expectedName = quoteSignatureClientName();
             if (help) {
                 help.textContent = expectedName
-                    ? 'Enter a full name listed for this quote: ' + expectedName
+                    ? 'Enter your own full name from the client names listed here: ' + expectedName
                     : 'The quote must have an associated client name before it can be signed.';
             }
             if (input && input.dataset.typedSignatureReady !== '1') {
@@ -5768,8 +5768,8 @@ if (location.search.includes('debug')) {
                 return;
             }
             if (!nameValidation.matches) {
-                showSignatureApprovalMessage('The signer name must match the client name shown on this quote.');
-                showSignerNameRequiredModal('Enter a complete client name exactly as shown on this quote. Differences in capitalization and extra spaces are okay.', 'Name does not match').then(emphasizeSignerName);
+                showSignatureApprovalMessage('The signer name must match one complete client name shown on this quote.');
+                showSignerNameRequiredModal('Enter one listed person’s complete name. If multiple clients are shown, either person may sign using their own full name. Differences in capitalization and extra spaces are okay.', 'Name does not match').then(emphasizeSignerName);
                 return;
             }
             if (!document.getElementById('termsCheck').checked) {
