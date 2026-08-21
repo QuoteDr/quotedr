@@ -315,6 +315,31 @@
             font-weight: 700;
             line-height: 1.25;
         }
+        .quote-upgrade-zero-quantity-alert {
+            border: 1px solid #f59e0b;
+            border-left: 4px solid #dc2626;
+            border-radius: 6px;
+            background: #fff7ed;
+            color: #7c2d12;
+        }
+        .quote-upgrade-zero-quantity-alert .btn {
+            font-weight: 700;
+        }
+        .item-upgrade-option-wrap.quote-upgrade-zero-quantity {
+            padding: 0.3rem;
+            border: 2px solid #f59e0b;
+            border-radius: 6px;
+            background: #fffbeb;
+            box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.12);
+        }
+        .quote-upgrade-zero-quantity-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
+            color: #9a3412;
+            font-size: 0.72rem;
+            font-weight: 800;
+        }
         .quote-generation-progress {
             position: fixed;
             z-index: 1095;
@@ -4498,6 +4523,26 @@ Example:
             return getQuoteItemUpgradeBaseQuantity(item);
         }
 
+        function getZeroQuantityItemUpgradeOptions(item) {
+            if (!item) return [];
+            var groups = normalizeQuoteItemUpgradeGroups(item);
+            var selectedIds = groups.reduce(function(ids, group) {
+                return ids.concat(Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds : []);
+            }, []);
+            return groups.reduce(function(zeroOptions, group) {
+                return zeroOptions.concat((group.options || []).filter(function(option) {
+                    if (isQuoteItemConsultationUpgradeOption(option)) return false;
+                    if (!isItemUpgradeOptionCompatible(option, selectedIds.filter(function(id) { return id !== option.id; }))) return false;
+                    return getQuoteItemUpgradeOptionQuantity(item, option) <= 0;
+                }));
+            }, []);
+        }
+
+        function quoteItemHasUndismissedZeroUpgradeQuantities(item) {
+            if (!item || window._zeroUpgradeQuantityWarningsDismissed === true || item.zeroUpgradeQuantityWarningDismissed === true) return false;
+            return getZeroQuantityItemUpgradeOptions(item).length > 0;
+        }
+
         function getQuoteItemUpgradeOptionQuantitySummary(item, option) {
             if (!item || !option || isQuoteItemConsultationUpgradeOption(option)) return '';
             var mode = normalizeQuoteItemUpgradeQuantityMode(option.quantityMode);
@@ -4755,6 +4800,42 @@ Example:
             if (input && typeof input.blur === 'function') input.blur();
         }
 
+        function dismissZeroUpgradeQuantityWarningForItem(event, roomId, itemIndex) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            var room = rooms.find(function(candidate) { return candidate.id === roomId; });
+            var item = room && Array.isArray(room.items) ? room.items[itemIndex] : null;
+            if (!item) return;
+            item.zeroUpgradeQuantityWarningDismissed = true;
+            syncChoiceGroupSelectedOptionUpgradeRuntimeState(item);
+            renderRooms();
+            markUnsaved();
+        }
+
+        async function dismissZeroUpgradeQuantityWarningsForQuote(event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            var message = 'Are you sure you want to dismiss this warning across the entire quote? Zero-quantity upgrades will remain available to the client unless you remove them.';
+            var confirmed = typeof qdConfirm === 'function'
+                ? await qdConfirm(message, {
+                    title: 'Dismiss Zero-Quantity Warnings?',
+                    okText: 'Dismiss for Entire Quote',
+                    cancelText: 'Keep Warnings',
+                    type: 'warning'
+                })
+                : window.confirm(message);
+            if (!confirmed) return;
+            window._zeroUpgradeQuantityWarningsDismissed = true;
+            if (window._loadedQuoteData) window._loadedQuoteData.zeroUpgradeQuantityWarningsDismissed = true;
+            if (window._currentQuoteData) window._currentQuoteData.zeroUpgradeQuantityWarningsDismissed = true;
+            renderRooms();
+            markUnsaved();
+        }
+
         function hasManualQuantityUpgradeForItem(item) {
             if (!item) return false;
             var groupSets = [Array.isArray(item.upgradeGroups) ? item.upgradeGroups : []];
@@ -4788,12 +4869,24 @@ Example:
             if (!item.upgradeGroups.length) return '';
             var selectedIds = getAllSelectedItemUpgradeOptionIds(item);
             var hasManualQuantityUpgrade = hasManualQuantityUpgradeForItem(item);
+            var zeroQuantityOptions = getZeroQuantityItemUpgradeOptions(item);
+            var showZeroQuantityWarning = quoteItemHasUndismissedZeroUpgradeQuantities(item);
+            var zeroQuantityOptionIds = showZeroQuantityWarning ? zeroQuantityOptions.map(function(option) { return option.id; }) : [];
             var html = '<div class="item-upgrade-groups quote-upgrade-groups mt-2 border rounded p-2">';
             html += '<div class="small fw-bold quote-upgrade-title mb-1"><i class="fas fa-arrow-up me-1"></i>Upgrade options';
             if (hasManualQuantityUpgrade) {
                 html += '<span class="quote-upgrade-manual-quantity-hint"><i class="fas fa-circle-info" aria-hidden="true"></i>(Select an upgrade below to enter quantity)</span>';
             }
             html += '</div>';
+            if (showZeroQuantityWarning) {
+                html += '<div class="quote-upgrade-zero-quantity-alert small p-2 mb-2" role="alert">' +
+                    '<div class="fw-bold"><i class="fas fa-triangle-exclamation me-1" aria-hidden="true"></i>Upgrade quantities need attention</div>' +
+                    '<div class="mt-1">' + zeroQuantityOptions.length + ' upgrade option' + (zeroQuantityOptions.length === 1 ? ' is' : 's are') + ' set to 0. Set the quantities before sending unless zero is intentional.</div>' +
+                    '<div class="d-flex flex-wrap gap-2 mt-2">' +
+                    '<button type="button" class="btn btn-sm btn-outline-warning" onclick="dismissZeroUpgradeQuantityWarningForItem(event, ' + roomId + ', ' + itemIndex + ')">Dismiss for this item</button>' +
+                    '<button type="button" class="btn btn-sm btn-outline-danger" onclick="dismissZeroUpgradeQuantityWarningsForQuote(event)">Dismiss for all</button>' +
+                    '</div></div>';
+            }
             item.upgradeGroups.forEach(function(group) {
                 var compatible = (group.options || []).filter(function(option) {
                     return isItemUpgradeOptionCompatible(option, selectedIds.filter(function(id) { return id !== option.id; }));
@@ -4819,14 +4912,18 @@ Example:
                     var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
                     var description = getItemUpgradeOptionDescription(option);
                     var panelId = itemUpgradeDescriptionPanelId(roomId, itemIndex, group.id || '', option.id || '');
+                    var zeroQuantityNeedsAttention = zeroQuantityOptionIds.indexOf(option.id) !== -1;
                     var checkedIcon = group.type === 'multiple' ? 'fa-square-check' : 'fa-circle-check';
                     var uncheckedIcon = group.type === 'multiple' ? 'fa-square' : 'fa-circle';
                     var optionTitle = requiresConsultation ? 'Consultation required' : (priceTbd ? qdFormatPriceTbd() : (option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on'));
                     var optionPriceHtml = requiresConsultation ? '<span class="opacity-75">Consultation required</span>' : (priceTbd ? '<span class="opacity-75">' + qdFormatPriceTbd() + '</span>' : '<span class="opacity-75">' + qdFormatMoney(optionTotal, '$', { showSign: option.upgradeType !== 'replacement' }) + '</span>');
-                    html += '<div class="item-upgrade-option-wrap d-inline-flex flex-column align-items-start gap-1">';
+                    html += '<div class="item-upgrade-option-wrap ' + (zeroQuantityNeedsAttention ? 'quote-upgrade-zero-quantity ' : '') + 'd-inline-flex flex-column align-items-start gap-1">';
                     html += '<button type="button" class="btn btn-sm quote-upgrade-option-btn ' + (selected ? 'is-selected' : '') + ' py-0" onclick="event.stopPropagation(); toggleItemUpgradeOption(' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')" title="' + qdTemplateEscapeHtml(optionTitle) + '">' +
                         '<i class="fas ' + (selected ? checkedIcon : uncheckedIcon) + ' me-1"></i>' + qdTemplateEscapeHtml(option.name || 'Upgrade') + ' ' + optionPriceHtml +
                         '</button>';
+                    if (zeroQuantityNeedsAttention) {
+                        html += '<span class="quote-upgrade-zero-quantity-badge"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i>Quantity not set</span>';
+                    }
                     if (selected && !requiresConsultation) {
                         if (normalizeQuoteItemUpgradeQuantityMode(option.quantityMode) === 'manual') {
                             html += '<label class="quote-upgrade-quantity-note small d-flex align-items-center gap-1 mb-0">Qty <input type="number" min="0" step="0.01" class="form-control form-control-sm item-upgrade-manual-quantity" value="' + qdTemplateEscapeHtml(optionQuantity) + '" onclick="event.stopPropagation()" oninput="setItemUpgradeManualQuantity(event, ' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ', { render: false })" onchange="setItemUpgradeManualQuantity(event, ' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')" onkeydown="handleItemUpgradeManualQuantityKeydown(event, ' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')"><button type="button" class="btn btn-sm btn-outline-success py-0 px-2 item-upgrade-manual-quantity-set" onclick="setItemUpgradeManualQuantityFromButton(event, ' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')" title="Set quantity" aria-label="Set quantity"><i class="fas fa-check"></i></button> ' + qdTemplateEscapeHtml(option.unitType || item.unitType || '') + '</label>';
@@ -9359,8 +9456,12 @@ Example:
                 let previousSavedItemSource = null;
                 let editedSavedItemData = null;
                 let editedQuoteItem = null;
+                let previousItemQuantity = null;
+                let previousItemUnitType = '';
                 if (editingItemIndex !== null && rooms[roomIndex].items[editingItemIndex]) {
                     const item = rooms[roomIndex].items[editingItemIndex];
+                    previousItemQuantity = parseFloat(item.quantity) || 0;
+                    previousItemUnitType = item.unitType || item.unit || '';
                     editedSavedItemData = buildSavedItemFromEditedLineItem(item);
                     previousSavedItemSource = cloneSavedItemForQuoteSync(item.savedItemSource || savedItemQuoteSource(item.category, { name: item.serviceName || item.description, unitType: item.unitType, rate: item.rate, materialCost: item.materialCost, priceTbd: item.priceTbd, pricingMode: item.pricingMode, supplierUrl: item.supplierUrl, itemDescription: item.itemDescription, photo: item.photo, photos: item.photos, photoFull: item.photoFull, photosFull: item.photosFull, laborTime: item.laborTime, upgrade: item.upgrade }));
                     editedQuoteItem = item;
@@ -9376,6 +9477,7 @@ Example:
                     item.serviceName = document.getElementById('lineService').value;
                     item.unitType = unitType;
                     item.quantity = quantity;
+                    if (previousItemQuantity !== quantity || previousItemUnitType !== unitType) item.zeroUpgradeQuantityWarningDismissed = false;
                     item.rate = rate;
                     item.priceTbd = priceTbd;
                     item.pricingMode = priceTbd ? 'tbd' : 'fixed';
@@ -17730,7 +17832,7 @@ Example:
         // Save/load/session core moved to quote-storage.js
     </script>
     <script src="change-orders.js?v=1778152100"></script>
-    <script src="quote-storage.js?v=2026081901"></script>
+    <script src="quote-storage.js?v=2026082001"></script>
     <script src="property-memory.js?v=2026081001"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------

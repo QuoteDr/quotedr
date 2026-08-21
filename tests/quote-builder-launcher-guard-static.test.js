@@ -28,7 +28,7 @@ assert(
 );
 
 assert(
-  builder.includes('quote-storage.js?v=2026081901') &&
+  builder.includes('quote-storage.js?v=2026082001') &&
     !builder.includes('generateQuoteNumber()') &&
     !builder.includes('randomizeQuoteNumber()') &&
     !builder.includes('nextQuoteNumber()'),

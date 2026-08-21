@@ -53,6 +53,7 @@
             if (quoteStorageDocumentState === 'closed') {
                 window._loadedQuoteData = {};
                 window._currentQuoteData = {};
+                window._zeroUpgradeQuantityWarningsDismissed = false;
                 window._selectedQuoteClient = null;
                 window._selectedQuoteProperty = null;
                 window._propertyMemoryReminderAcknowledgements = [];
@@ -1056,6 +1057,7 @@
                 dividerSingular: dividerLabels.singular,
                 dividerPlural: dividerLabels.plural,
                 quoteDividerLabels: { singular: dividerLabels.singular, plural: dividerLabels.plural },
+                zeroUpgradeQuantityWarningsDismissed: window._zeroUpgradeQuantityWarningsDismissed === true,
                 rooms: sanitizeQuoteRoomsForSave(rooms),
                 reviewProfile: (window.QuoteDrConstructionKnowledge && typeof window.QuoteDrConstructionKnowledge.normalizeReviewProfile === 'function')
                     ? window.QuoteDrConstructionKnowledge.normalizeReviewProfile(window._quoteReviewProfile)
@@ -1220,6 +1222,7 @@
             if (document.getElementById('clientEmail'))    document.getElementById('clientEmail').value    = data.clientEmail || data.email || '';
             renderTermsCheckboxes(getQuoteTermsForRender(data));
             rooms = data.rooms || [];
+            window._zeroUpgradeQuantityWarningsDismissed = data.zeroUpgradeQuantityWarningsDismissed === true;
             window._quoteReviewProfile = data.reviewProfile || null;
             if (data.categoryStyles && typeof categoryStyles !== 'undefined') {
                 Object.assign(categoryStyles, data.categoryStyles || {});
