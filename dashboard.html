@@ -497,6 +497,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="quote-dialogs.js?v=2026082001"></script>
+    <script src="quote-portal-readiness.js?v=2026082001"></script>
     <script src="help-content.js?v=2026080801"></script>
     <script src="modal-help.js?v=1777741200"></script>
     <script src="change-orders.js?v=1778060200"></script>
@@ -2630,6 +2631,19 @@
             openPortalAssignment(quoteId);
         }
 
+        async function confirmDashboardPortalZeroPricedItems(quote) {
+            if (!window.QuoteDrPortalReadiness || typeof window.QuoteDrPortalReadiness.confirmZeroPricedItems !== 'function') {
+                var unavailableMessage = 'The zero-price safety check is unavailable. Refresh QuoteDr and try again before adding this document to the portal.';
+                if (typeof qdAlert === 'function') await qdAlert(unavailableMessage, { title: 'Safety Check Unavailable', type: 'warning' });
+                else window.alert(unavailableMessage);
+                return false;
+            }
+            return window.QuoteDrPortalReadiness.confirmZeroPricedItems(quote && quote.data ? quote.data : quote, function(message, options) {
+                if (typeof qdConfirm === 'function') return qdConfirm(message, options);
+                return window.confirm(message);
+            });
+        }
+
         async function togglePortalPinEditor(portalId) {
             window._portalPinEditorId = window._portalPinEditorId === portalId ? '' : portalId;
             renderPortalAssignmentList();
@@ -3143,6 +3157,7 @@
             var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
             if (!target || !portal) return;
             target = await loadDashboardFullQuote(target);
+            if (!(await confirmDashboardPortalZeroPricedItems(target))) return;
             if (portal.quotes && portal.quotes[0]) await loadDashboardFullQuote(portal.quotes[0]);
             var durablePortalId = portal.legacy ? makePortalId(portal.name) : portal.id;
             var pin = portal.pin || Math.floor(1000 + Math.random() * 9000).toString();
@@ -3222,6 +3237,7 @@
             try {
                 if (target) {
                     target = await loadDashboardFullQuote(target);
+                    if (!(await confirmDashboardPortalZeroPricedItems(target))) return;
                     var data = Object.assign({}, target.data || {}, {
                         portal_visible: true,
                         portal_id: portalId,

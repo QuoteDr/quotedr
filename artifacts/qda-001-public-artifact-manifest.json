@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 108,
-  "totalBytes": 22794373,
-  "treeSha256": "f41fbbe5336eabdf51faada7457cd37d8b29659f8d21ba5f3f3bc146db4ec127",
+  "fileCount": 109,
+  "totalBytes": 22800875,
+  "treeSha256": "a63446b4915fc4c4c6311a9b796fa101d471488f32c684732c807bbe1a84863a",
   "files": [
     {
       "path": "404.html",
@@ -162,8 +162,8 @@
     },
     {
       "path": "dashboard.html",
-      "bytes": 380414,
-      "sha256": "697291addd9d8e4c5052d63bc8a39c6700dff453374f7e3872a519ef60a0963b"
+      "bytes": 381556,
+      "sha256": "1709faa6eaae556bfa13c295e0b68e8ce92a781b105b94e3aca9e2daae691161"
     },
     {
       "path": "data/whats-new.json",
@@ -327,8 +327,8 @@
     },
     {
       "path": "quote-builder.html",
-      "bytes": 1411853,
-      "sha256": "da449ae92a6f4f1322cf8193fdff2a93f076e683bea5bf18462eaf43ed4d391f"
+      "bytes": 1413531,
+      "sha256": "c6691d81ec80b3ff50d1562252611e5e48c807fdc51d6475a97b1c667ee04ac2"
     },
     {
       "path": "quote-calculators.js",
@@ -379,6 +379,11 @@
       "path": "quote-payable-total.js",
       "bytes": 2557,
       "sha256": "70a715fff0c8c2c781d4f1722d6d85d27220093de2e29fe516ad84c8f7864ea0"
+    },
+    {
+      "path": "quote-portal-readiness.js",
+      "bytes": 3682,
+      "sha256": "f0095de89b2a808a32725f89106a88e5cf530ea918752826245981d27b884ee1"
     },
     {
       "path": "quote-review-construction-knowledge.js",

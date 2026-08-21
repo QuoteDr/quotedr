@@ -4099,6 +4099,7 @@ Example:
     <script src="quote-dialogs.js?v=2026071501"></script>
     <script src="quote-discounts.js?v=2026081602"></script>
     <script src="quote-payable-total.js?v=2026081801"></script>
+    <script src="quote-portal-readiness.js?v=2026082001"></script>
     <script src="app-broadcasts.js?v=1779131000"></script>
     <script src="quote-template-files.js?v=1778012600"></script>
     <script src="community-starter-templates.js?v=1785751200"></script>
@@ -13095,7 +13096,9 @@ Example:
                 var roomRevenue = 0, roomMaterial = 0;
                 (room.items || []).forEach(function(item) {
                     if (item._removed) return;
-                    var qty = parseFloat(item.quantity) || 1;
+                    if (!quoteOptionalItemIncludedByDefault(item)) return;
+                    var qty = parseFloat(item.quantity);
+                    if (!isFinite(qty)) qty = 1;
                     var rate = parseFloat(item.rate) || 0;
                     var mat = parseFloat(item.materialCost) || 0;
                     roomRevenue += quoteItemMarkedAmount(room, item, itemChargedTotal(item));
@@ -14245,12 +14248,17 @@ Example:
                             }
                             html += '</td>';
                             if (showLineProfitDetails) {
-                                var profitQuantity = parseFloat(item.quantity) || 1;
-                                var lineMaterialCost = (parseFloat(item.materialCost) || 0) * profitQuantity;
-                                var lineProfit = displayTotal - lineMaterialCost;
-                                var lineMargin = displayTotal > 0 ? (lineProfit / displayTotal * 100) : 0;
-                                var lineProfitText = qdFormatMoney(lineProfit);
-                                html += '<td class="quote-item-profit-cell"><strong class="' + (lineProfit >= 0 ? 'text-success' : 'text-danger') + '">' + lineProfitText + '</strong><div class="small text-muted">' + lineMargin.toFixed(0) + '% margin</div></td>';
+                                if (!quoteOptionalItemIncludedByDefault(item)) {
+                                    html += '<td class="quote-item-profit-cell text-muted"><span class="small">Not included</span></td>';
+                                } else {
+                                    var profitQuantity = parseFloat(item.quantity);
+                                    if (!isFinite(profitQuantity)) profitQuantity = 1;
+                                    var lineMaterialCost = (parseFloat(item.materialCost) || 0) * profitQuantity;
+                                    var lineProfit = displayTotal - lineMaterialCost;
+                                    var lineMargin = displayTotal > 0 ? (lineProfit / displayTotal * 100) : 0;
+                                    var lineProfitText = qdFormatMoney(lineProfit);
+                                    html += '<td class="quote-item-profit-cell"><strong class="' + (lineProfit >= 0 ? 'text-success' : 'text-danger') + '">' + lineProfitText + '</strong><div class="small text-muted">' + lineMargin.toFixed(0) + '% margin</div></td>';
+                                }
                             }
                             let upgradeBtn = '';
                             if (item.upgrade && item.upgrade.name && !hasUpgradeGroups && !hasChoiceGroup) {
@@ -17039,6 +17047,19 @@ Example:
             return window.confirm(message);
         }
 
+        async function confirmQuotePortalZeroPricedItems(quoteData) {
+            if (!window.QuoteDrPortalReadiness || typeof window.QuoteDrPortalReadiness.confirmZeroPricedItems !== 'function') {
+                var unavailableMessage = 'The zero-price safety check is unavailable. Refresh QuoteDr and try again before adding this quote to the portal.';
+                if (typeof qdAlert === 'function') await qdAlert(unavailableMessage, { title: 'Safety Check Unavailable', type: 'warning' });
+                else window.alert(unavailableMessage);
+                return false;
+            }
+            return window.QuoteDrPortalReadiness.confirmZeroPricedItems(quoteData, function(message, options) {
+                if (typeof qdConfirm === 'function') return qdConfirm(message, options);
+                return window.confirm(message);
+            });
+        }
+
         function redirectPortalLockedQuoteBuilderToDashboard() {
             if (!window._quoteLockedAfterPortalPublish || window._quotePortalRedirectInProgress) return;
             window._quotePortalRedirectInProgress = true;
@@ -17226,6 +17247,8 @@ Example:
             if (!portal || !portal.id) throw new Error('Choose which client portal this quote belongs in.');
             var quoteWillBecomePortalLocked = quoteData.portal_visible !== true;
             if (quoteWillBecomePortalLocked) {
+                var pricingConfirmed = await confirmQuotePortalZeroPricedItems(quoteData);
+                if (!pricingConfirmed) throw new Error('Review the zero-priced items before adding this quote to the portal.');
                 var confirmed = await confirmQuotePortalLockBeforePublish(quoteData);
                 if (!confirmed) throw new Error('Quote was not added to the portal.');
             }

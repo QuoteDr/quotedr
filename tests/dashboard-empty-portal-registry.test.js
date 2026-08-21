@@ -176,6 +176,7 @@ const legacyPlaceholder = {
     async finishPendingDashboardPortalAction(quoteId) { finishedPortalActions.push(quoteId); },
     renderPortalAssignmentList() {},
     async loadDashboardFullQuote(quote) { return quote; },
+    async confirmDashboardPortalZeroPricedItems() { return true; },
     stampPortalAddedAt(data) { data.portal_added_at = 'now'; },
     async qdDurableQuoteRowUpdate(id, values) { quoteUpdates.push({ id, values }); return { error: null }; },
     qdAlert(message) { throw new Error(message); },
