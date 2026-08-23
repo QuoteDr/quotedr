@@ -67,9 +67,10 @@ const productionContext = {
 };
 vm.createContext(productionContext);
 vm.runInContext(
-  sourceFunction(dashboard, 'shortPortalUrlForDashboard', '        ') + '\n' +
+    sourceFunction(dashboard, 'shortPortalUrlForDashboard', '        ') + '\n' +
     sourceFunction(dashboard, 'portalUrlForDashboard', '        ') + '\n' +
     sourceFunction(dashboard, 'getClientPortalBaseUrl', '        ') + '\n' +
+    sourceFunction(dashboard, 'getAdminPortalBaseUrl', '        ') + '\n' +
     'this.makePortalUrl = portalUrlForDashboard;',
   productionContext
 );
@@ -93,11 +94,47 @@ const legacyUrl = productionContext.makePortalUrl({
 }, '');
 
 assert.strictEqual(clientUrl, 'https://quotedr.io/p/abc_DEF-123', 'Client-facing portal URL should use the clean path');
-assert(adminUrl.includes('/client-portal.html?') && adminUrl.includes('admin=1'), 'Admin preview should retain its explicit context URL');
+assert(adminUrl.startsWith('https://quotedr.io/client-portal.html?') && adminUrl.includes('admin=1'), 'Admin preview should stay on the authenticated QuoteDr origin');
 assert(
   legacyUrl.includes('email=client%40example.com') && legacyUrl.includes('contractor=contractor-id') && legacyUrl.includes('portal=portal-id'),
   'Legacy portals without a secure token should retain their existing URL format'
 );
+
+const brandedProductionContext = {
+  window: {
+    location: { hostname: 'quotedr.io', origin: 'https://quotedr.io' },
+    QuoteDrPortalLinks: {
+      shortUrl: token => 'https://myprojectview.ca/p/example-contractor/' + token,
+      portalBaseUrl: () => 'https://myprojectview.ca/client-portal.html'
+    }
+  },
+  encodeURIComponent,
+  String
+};
+vm.createContext(brandedProductionContext);
+vm.runInContext(
+  sourceFunction(dashboard, 'shortPortalUrlForDashboard', '        ') + '\n' +
+    sourceFunction(dashboard, 'portalUrlForDashboard', '        ') + '\n' +
+    sourceFunction(dashboard, 'getClientPortalBaseUrl', '        ') + '\n' +
+    sourceFunction(dashboard, 'getAdminPortalBaseUrl', '        ') + '\n' +
+    'this.makePortalUrl = portalUrlForDashboard;',
+  brandedProductionContext
+);
+const brandedClientUrl = brandedProductionContext.makePortalUrl({
+  secureToken: 'client-token',
+  secureAnchorId: 'anchor-id',
+  contractorId: 'contractor-id',
+  id: 'portal-id'
+}, 'quote-id');
+const authenticatedAdminUrl = brandedProductionContext.makePortalUrl({
+  secureToken: 'client-token',
+  secureAnchorId: 'anchor-id',
+  contractorId: 'contractor-id',
+  id: 'portal-id'
+}, 'quote-id', { admin: true });
+assert.strictEqual(brandedClientUrl, 'https://myprojectview.ca/p/example-contractor/client-token', 'Client links should remain on the branded portal domain');
+assert(authenticatedAdminUrl.startsWith('https://quotedr.io/client-portal.html?'), 'Admin links should remain on the signed-in app origin');
+assert(authenticatedAdminUrl.includes('token=client-token') && authenticatedAdminUrl.includes('admin=1'), 'Admin links should retain secure portal context');
 
 const localContext = {
   window: { location: { hostname: '127.0.0.1', origin: 'http://127.0.0.1:8767' } },
@@ -106,9 +143,10 @@ const localContext = {
 };
 vm.createContext(localContext);
 vm.runInContext(
-  sourceFunction(dashboard, 'shortPortalUrlForDashboard', '        ') + '\n' +
+    sourceFunction(dashboard, 'shortPortalUrlForDashboard', '        ') + '\n' +
     sourceFunction(dashboard, 'portalUrlForDashboard', '        ') + '\n' +
     sourceFunction(dashboard, 'getClientPortalBaseUrl', '        ') + '\n' +
+    sourceFunction(dashboard, 'getAdminPortalBaseUrl', '        ') + '\n' +
     'this.makePortalUrl = portalUrlForDashboard;',
   localContext
 );

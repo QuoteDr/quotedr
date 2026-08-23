@@ -53,7 +53,7 @@ const clipboardWrites = [];
 const copyButton = { innerHTML: 'Copy', closest: () => copyButton };
 const context = {
   window: {
-    _currentPortalAdminUrl: 'https://myprojectview.ca/client-portal.html?admin=1',
+    _currentPortalAdminUrl: 'https://quotedr.io/client-portal.html?admin=1',
     _currentPortalQuoteId: 'quote-123',
     location: { href: '' }
   },
@@ -108,7 +108,7 @@ const previewEvent = makeEvent();
 context.openPortalAdminUrl(previewEvent);
 assert.strictEqual(
   context.window.location.href,
-  'https://myprojectview.ca/client-portal.html?admin=1',
+  'https://quotedr.io/client-portal.html?admin=1',
   'Admin View should still open the private admin URL'
 );
 assert.strictEqual(clipboardWrites.length, 2, 'Opening Admin View must not copy its URL');
@@ -118,7 +118,7 @@ const activityEvent = makeEvent();
 context.openPortalActivityUrl(activityEvent);
 assert.strictEqual(
   context.window.location.href,
-  'https://myprojectview.ca/client-portal.html?admin=1&activity=quote-123',
+  'https://quotedr.io/client-portal.html?admin=1&activity=quote-123',
   'See Activity should deep-link to the selected document in authenticated admin view'
 );
 assert.strictEqual(clipboardWrites.length, 2, 'Opening activity must not copy an admin URL');
