@@ -54,6 +54,9 @@ assert(portalSource.includes('loadPortalDocumentActivity'), 'client portal shoul
 assert(portalSource.includes('renderPortalDocumentActivityPanel'), 'client portal should render activity panels');
 assert(portalSource.includes('portalDocumentActivitySummary'), 'client portal should summarize activity');
 assert(portalSource.includes('portalDocumentActivityTimeline'), 'client portal should combine heartbeat durations into viewing sessions');
+assert(portalSource.includes("const requestedActivityDocumentId = urlParams.get('activity') || '';"), 'client portal should accept an admin activity deep link');
+assert(portalSource.includes('function openRequestedPortalActivity()'), 'client portal should automatically open deep-linked document activity');
+assert(portalSource.includes('togglePortalDocumentActivity(null, requestedActivityDocumentId)'), 'activity deep links should reuse the authorized activity loader');
 assert(portalSource.includes('view.duration_seconds +='), 'viewing sessions should accumulate duration heartbeat seconds');
 assert(portalSource.includes('For security and service quality, document access may be logged.'), 'client portal should show the client logging notice');
 assert(portalSource.includes('pdf_opened'), 'portal PDF sharing flow should log PDF opens');

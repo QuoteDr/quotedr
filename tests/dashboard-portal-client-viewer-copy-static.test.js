@@ -35,6 +35,10 @@ assert(
   'Admin view should remain available as an open-only button'
 );
 assert(
+  shareModal.includes('onclick="openPortalActivityUrl(event)"') && shareModal.includes('>See Activity</button>'),
+  'Portal share modal should offer a direct document activity shortcut'
+);
+assert(
   shareModal.includes('onclick="copyPortalUrl(event)"') &&
     shareModal.includes('onclick="copyPortalUrl(event, true)"') &&
     shareModal.includes('Copy Client Viewer Link'),
@@ -50,6 +54,7 @@ const copyButton = { innerHTML: 'Copy', closest: () => copyButton };
 const context = {
   window: {
     _currentPortalAdminUrl: 'https://myprojectview.ca/client-portal.html?admin=1',
+    _currentPortalQuoteId: 'quote-123',
     location: { href: '' }
   },
   document: {
@@ -66,12 +71,13 @@ const context = {
       }
     }
   },
+  URL,
   setTimeout(callback) { callback(); },
   console
 };
 vm.createContext(context);
 vm.runInContext(
-  sourceFunction('copyPortalUrl') + '\n' + sourceFunction('openPortalAdminUrl'),
+  sourceFunction('copyPortalUrl') + '\n' + sourceFunction('openPortalAdminUrl') + '\n' + sourceFunction('openPortalActivityUrl'),
   context
 );
 
@@ -107,5 +113,15 @@ assert.strictEqual(
 );
 assert.strictEqual(clipboardWrites.length, 2, 'Opening Admin View must not copy its URL');
 assert(previewEvent.prevented && previewEvent.stopped, 'Admin View should isolate its click event');
+
+const activityEvent = makeEvent();
+context.openPortalActivityUrl(activityEvent);
+assert.strictEqual(
+  context.window.location.href,
+  'https://myprojectview.ca/client-portal.html?admin=1&activity=quote-123',
+  'See Activity should deep-link to the selected document in authenticated admin view'
+);
+assert.strictEqual(clipboardWrites.length, 2, 'Opening activity must not copy an admin URL');
+assert(activityEvent.prevented && activityEvent.stopped, 'See Activity should isolate its click event');
 
 console.log('dashboard portal client viewer copy static test passed');

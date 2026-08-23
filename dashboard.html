@@ -3677,6 +3677,23 @@
             }
         }
 
+        function openPortalActivityUrl(openEvent) {
+            if (openEvent) {
+                openEvent.preventDefault();
+                openEvent.stopPropagation();
+            }
+            var adminUrl = window._currentPortalAdminUrl || '';
+            var quoteId = window._currentPortalQuoteId || '';
+            if (!adminUrl || !quoteId) return;
+            try {
+                var url = new URL(adminUrl, window.location.origin);
+                url.searchParams.set('activity', quoteId);
+                window.location.href = url.toString();
+            } catch (error) {
+                qdAlert('Could not open portal activity. Refresh and try again.');
+            }
+        }
+
         async function resetPortalPin() {
             var clientName = window._currentPortalClient;
             var quoteId = window._currentPortalQuoteId || '';
@@ -5947,7 +5964,10 @@ function renderBusinessInsights(quotes) {
         </div>
         <div class="d-grid text-start mb-3">
           <label class="form-label fw-bold small mb-1" style="color:#1a2940;">ADMIN VIEW</label>
-          <button type="button" class="btn btn-outline-primary" onclick="openPortalAdminUrl(event)" title="Open admin view" aria-label="Open admin view"><i class="fas fa-eye me-1"></i>Admin View</button>
+          <div class="d-grid gap-2">
+            <button type="button" class="btn btn-outline-primary" onclick="openPortalAdminUrl(event)" title="Open admin view" aria-label="Open admin view"><i class="fas fa-eye me-1"></i>Admin View</button>
+            <button type="button" class="btn btn-outline-primary" onclick="openPortalActivityUrl(event)" title="See activity for this document" aria-label="See activity for this document"><i class="fas fa-chart-line me-1"></i>See Activity</button>
+          </div>
           <div class="form-text">For you only. Opens the portal in admin mode without exposing a shareable link.</div>
         </div>
         <div class="mb-3">
