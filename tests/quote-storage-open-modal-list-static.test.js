@@ -35,3 +35,11 @@ assert(
     storage.includes('quoteStorageJsAttr(q.id)'),
   'Open Quote modal should escape rendered cloud quote content and ids'
 );
+
+assert(
+  storage.includes('var portalLocked = quoteDataIsPortalLockedForBuilder(data);') &&
+    storage.includes('title="Locked in client portal"') &&
+    storage.includes('fa-lock me-1') &&
+    storage.includes('In portal'),
+  'Open Quote modal should mark portal-locked quotes before the user clicks them'
+);

@@ -1810,6 +1810,7 @@ async function saveQuote() {
                 }
                 listEl.innerHTML = quotes.map(function(q) {
                     var data = quoteStorageData(q);
+                    var portalLocked = quoteDataIsPortalLockedForBuilder(data);
                     var quoteTitle = String(data.quoteTitle || data.invoiceTitle || data.title || '').trim();
                     var clientName = quoteStorageClientName(q);
                     var displayTitle = quoteStorageDisplayTitle(q);
@@ -1826,7 +1827,12 @@ async function saveQuote() {
                     return '<div class="p-2 mb-1 rounded" style="border:1px solid #dee2e6; cursor:pointer;" ' +
                         'onclick="loadCloudQuote(' + quoteStorageJsAttr(q.id) + ')" ' +
                         'onmouseover="this.style.background=\'#e8f0fe\'" onmouseout="this.style.background=\'\'">' +
-                        '<div class="fw-bold">' + quoteStorageEscapeHtml(displayTitle) + '</div>' +
+                        '<div class="fw-bold d-flex align-items-center gap-2">' +
+                            '<span>' + quoteStorageEscapeHtml(displayTitle) + '</span>' +
+                            (portalLocked
+                                ? '<span class="badge rounded-pill text-bg-success" title="Locked in client portal"><i class="fas fa-lock me-1" aria-hidden="true"></i>In portal</span>'
+                                : '') +
+                        '</div>' +
                         '<div class="text-muted small">' + details.map(quoteStorageEscapeHtml).join(' &middot; ') + '</div>' +
                         '</div>';
                 }).join('');
