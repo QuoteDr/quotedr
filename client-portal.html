@@ -2650,7 +2650,6 @@
     const clientName = urlParams.get('client'); // backward compat
     let contractorId = urlParams.get('contractor');
     const portalQuoteId = urlParams.get('quote') || urlParams.get('id');
-    const requestedActivityDocumentId = urlParams.get('activity') || '';
     const portalToken = urlParams.get('token') || portalShortToken || '';
     let portalAnchorId = urlParams.get('portal_anchor') || portalQuoteId || '';
     let portalId = urlParams.get('portal');
@@ -3498,7 +3497,6 @@
           updateSummaryCards(quotes);
           updatePortalAttention(quotes);
           updatePortalActivity(quotes);
-          openRequestedPortalActivity();
           return;
         }
 
@@ -3576,7 +3574,6 @@
         // Update summary cards
         updateSummaryCards(quotes);
         updatePortalAttention(quotes);
-        openRequestedPortalActivity();
       } catch (error) {
         console.error('Error loading quotes:', error);
         noQuotesEl.classList.remove('d-none');
@@ -4861,18 +4858,6 @@
       } catch (error) {
         panel.innerHTML = '<div class="alert alert-warning small mb-0">Could not load activity: ' + escapeHtml(error.message || String(error)) + '</div>';
       }
-    }
-
-    function openRequestedPortalActivity() {
-      if (!portalIsAdminView || !requestedActivityDocumentId || window._requestedPortalActivityOpened) return;
-      window.requestAnimationFrame(function() {
-        const panel = document.getElementById('portalActivityPanel-' + requestedActivityDocumentId);
-        if (!panel) return;
-        window._requestedPortalActivityOpened = true;
-        const card = panel.closest('.quote-card');
-        if (card && typeof card.scrollIntoView === 'function') card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        togglePortalDocumentActivity(null, requestedActivityDocumentId);
-      });
     }
 
     function updatePortalAttention(quotes) {

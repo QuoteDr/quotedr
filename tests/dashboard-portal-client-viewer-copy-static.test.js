@@ -35,8 +35,10 @@ assert(
   'Admin view should remain available as an open-only button'
 );
 assert(
-  shareModal.includes('onclick="openPortalActivityUrl(event)"') && shareModal.includes('>See Activity</button>'),
-  'Portal share modal should offer a direct document activity shortcut'
+  shareModal.includes('onclick="togglePortalShareActivity(event)"') &&
+    shareModal.includes('id="portalShareActivityPanel"') &&
+    shareModal.includes('>See Activity</button>'),
+  'Portal share modal should offer an inline document activity shortcut'
 );
 assert(
   shareModal.includes('onclick="copyPortalUrl(event)"') &&
@@ -54,7 +56,6 @@ const copyButton = { innerHTML: 'Copy', closest: () => copyButton };
 const context = {
   window: {
     _currentPortalAdminUrl: 'https://quotedr.io/client-portal.html?admin=1',
-    _currentPortalQuoteId: 'quote-123',
     location: { href: '' }
   },
   document: {
@@ -76,10 +77,7 @@ const context = {
   console
 };
 vm.createContext(context);
-vm.runInContext(
-  sourceFunction('copyPortalUrl') + '\n' + sourceFunction('openPortalAdminUrl') + '\n' + sourceFunction('openPortalActivityUrl'),
-  context
-);
+vm.runInContext(sourceFunction('copyPortalUrl') + '\n' + sourceFunction('openPortalAdminUrl'), context);
 
 function makeEvent() {
   return {
@@ -114,14 +112,23 @@ assert.strictEqual(
 assert.strictEqual(clipboardWrites.length, 2, 'Opening Admin View must not copy its URL');
 assert(previewEvent.prevented && previewEvent.stopped, 'Admin View should isolate its click event');
 
-const activityEvent = makeEvent();
-context.openPortalActivityUrl(activityEvent);
-assert.strictEqual(
-  context.window.location.href,
-  'https://quotedr.io/client-portal.html?admin=1&activity=quote-123',
-  'See Activity should deep-link to the selected document in authenticated admin view'
+assert(sourceFunction('togglePortalShareActivity').includes('loadSecureClientDocumentActivity(quoteId)'), 'See Activity should use the authenticated activity loader inside the dashboard');
+assert(sourceFunction('renderPortalShareActivity').includes('Total opens'), 'Inline activity should summarize document opens');
+assert(sourceFunction('renderPortalShareActivity').includes('Viewing time'), 'Inline activity should summarize active viewing time');
+
+vm.runInContext(
+  sourceFunction('dashboardPortalActivityDuration') + '\n' + sourceFunction('dashboardPortalActivityTimeline'),
+  context
 );
-assert.strictEqual(clipboardWrites.length, 2, 'Opening activity must not copy an admin URL');
-assert(activityEvent.prevented && activityEvent.stopped, 'See Activity should isolate its click event');
+const activityTimeline = context.dashboardPortalActivityTimeline([
+  { id: 'open-1', event_type: 'document_opened', session_id: 'session-1', created_at: '2026-08-20T10:00:00Z' },
+  { id: 'beat-1', event_type: 'document_view_duration', session_id: 'session-1', duration_seconds: 45, created_at: '2026-08-20T10:00:45Z' },
+  { id: 'beat-2', event_type: 'document_view_duration', session_id: 'session-1', duration_seconds: 30, created_at: '2026-08-20T10:01:15Z' },
+  { id: 'pdf-1', event_type: 'pdf_opened', session_id: 'session-1', created_at: '2026-08-20T10:02:00Z' }
+]);
+const combinedView = activityTimeline.find(event => event.event_type === 'document_view_duration');
+assert(combinedView, 'Dashboard activity should retain a combined viewing session');
+assert.strictEqual(combinedView.duration_seconds, 75, 'Dashboard activity should combine heartbeat duration for the same viewing session');
+assert.strictEqual(context.dashboardPortalActivityDuration(75), '1m 15s', 'Dashboard activity should format combined viewing time clearly');
 
 console.log('dashboard portal client viewer copy static test passed');

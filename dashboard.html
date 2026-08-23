@@ -3489,6 +3489,13 @@
             if (nameEl) nameEl.textContent = clientName;
             if (urlEl) urlEl.value = 'Loading...';
             if (pinEl) pinEl.textContent = '...';
+            var activityPanel = document.getElementById('portalShareActivityPanel');
+            var activityButton = document.getElementById('portalShareActivityBtn');
+            if (activityPanel) {
+                activityPanel.classList.add('d-none');
+                activityPanel.innerHTML = '';
+            }
+            if (activityButton) activityButton.setAttribute('aria-expanded', 'false');
             window._currentPortalClient = clientName;
             window._currentPortalQuoteId = quoteId || '';
             window._currentPortalClientEmail = savedEmail || '';
@@ -3683,21 +3690,138 @@
             }
         }
 
-        function openPortalActivityUrl(openEvent) {
-            if (openEvent) {
-                openEvent.preventDefault();
-                openEvent.stopPropagation();
+        function dashboardPortalActivityDuration(seconds) {
+            seconds = Math.max(0, parseInt(seconds || 0, 10) || 0);
+            var minutes = Math.floor(seconds / 60);
+            var remainder = seconds % 60;
+            if (minutes < 1) return seconds + 's';
+            if (minutes < 60) return minutes + 'm ' + remainder + 's';
+            return Math.floor(minutes / 60) + 'h ' + (minutes % 60) + 'm';
+        }
+
+        function dashboardPortalActivityDate(value) {
+            if (!value) return 'Never';
+            var date = new Date(value);
+            if (Number.isNaN(date.getTime())) return 'Unknown';
+            return date.toLocaleString('en-CA', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+        }
+
+        function dashboardPortalActivityTimeline(events) {
+            var chronological = (Array.isArray(events) ? events : []).map(function(activityEvent, index) {
+                return { event: activityEvent, index: index };
+            }).sort(function(a, b) {
+                var aTime = new Date(a.event && a.event.created_at || 0).getTime() || 0;
+                var bTime = new Date(b.event && b.event.created_at || 0).getTime() || 0;
+                if (aTime !== bTime) return aTime - bTime;
+                return a.index - b.index;
+            });
+            var timeline = [];
+            var activeViews = {};
+            chronological.forEach(function(entry) {
+                var activityEvent = entry.event || {};
+                var sessionKey = String(activityEvent.session_id || '').trim() || ('event-' + (activityEvent.id || entry.index));
+                if (activityEvent.event_type === 'document_opened') {
+                    var view = Object.assign({}, activityEvent, { _dashboardActivityView: true, duration_seconds: 0 });
+                    activeViews[sessionKey] = view;
+                    timeline.push(view);
+                    return;
+                }
+                if (activityEvent.event_type === 'document_view_duration') {
+                    var existing = activeViews[sessionKey];
+                    if (!existing) {
+                        existing = Object.assign({}, activityEvent, { _dashboardActivityView: true, duration_seconds: 0 });
+                        activeViews[sessionKey] = existing;
+                        timeline.push(existing);
+                    }
+                    existing.duration_seconds += Math.max(0, parseInt(activityEvent.duration_seconds || 0, 10) || 0);
+                    return;
+                }
+                timeline.push(activityEvent);
+            });
+            timeline.forEach(function(activityEvent) {
+                if (activityEvent._dashboardActivityView) {
+                    activityEvent.event_type = activityEvent.duration_seconds > 0 ? 'document_view_duration' : 'document_opened';
+                }
+            });
+            return timeline.sort(function(a, b) {
+                return (new Date(b.created_at || 0).getTime() || 0) - (new Date(a.created_at || 0).getTime() || 0);
+            });
+        }
+
+        function dashboardPortalActivityLabel(activityEvent) {
+            var duration = parseInt(activityEvent && activityEvent.duration_seconds || 0, 10) || 0;
+            var labels = {
+                document_opened: 'Opened the document',
+                document_view_duration: duration ? 'Viewed for ' + dashboardPortalActivityDuration(duration) : 'Viewed the document',
+                pdf_opened: 'Opened Print / Save PDF',
+                payment_clicked: 'Clicked a payment button',
+                signature_started: 'Started signing',
+                document_signed: 'Signed the document',
+                document_rejected: 'Rejected or declined the document'
+            };
+            var eventType = activityEvent && activityEvent.event_type || '';
+            return labels[eventType] || eventType.replace(/_/g, ' ');
+        }
+
+        function dashboardPortalActivityIcon(activityEvent) {
+            var icons = {
+                document_opened: 'fa-eye',
+                document_view_duration: 'fa-clock',
+                pdf_opened: 'fa-file-pdf',
+                payment_clicked: 'fa-credit-card',
+                signature_started: 'fa-signature',
+                document_signed: 'fa-circle-check',
+                document_rejected: 'fa-circle-xmark'
+            };
+            return icons[activityEvent && activityEvent.event_type] || 'fa-circle-info';
+        }
+
+        function renderPortalShareActivity(events) {
+            var panel = document.getElementById('portalShareActivityPanel');
+            if (!panel) return;
+            events = Array.isArray(events) ? events : [];
+            var opened = events.filter(function(activityEvent) { return activityEvent.event_type === 'document_opened'; });
+            var pdfEvents = events.filter(function(activityEvent) { return activityEvent.event_type === 'pdf_opened'; });
+            var totalSeconds = events.reduce(function(total, activityEvent) {
+                return total + (activityEvent.event_type === 'document_view_duration' ? (parseInt(activityEvent.duration_seconds || 0, 10) || 0) : 0);
+            }, 0);
+            var timeline = dashboardPortalActivityTimeline(events).slice(0, 20).map(function(activityEvent) {
+                return '<div class="d-flex gap-2 py-2 border-top"><i class="fas ' + dashboardPortalActivityIcon(activityEvent) + ' text-primary mt-1" aria-hidden="true"></i><div><strong class="small">' + escapeHtml(dashboardPortalActivityLabel(activityEvent)) + '</strong><div class="text-muted small">' + escapeHtml(dashboardPortalActivityDate(activityEvent.created_at)) + '</div></div></div>';
+            }).join('');
+            panel.innerHTML = '<div class="row g-2 text-center mb-2">' +
+                '<div class="col-6"><div class="border rounded p-2 h-100"><strong class="d-block">' + escapeHtml(dashboardPortalActivityDate(opened[0] && opened[0].created_at)) + '</strong><span class="text-muted small">Last opened</span></div></div>' +
+                '<div class="col-6"><div class="border rounded p-2 h-100"><strong class="d-block">' + opened.length + '</strong><span class="text-muted small">Total opens</span></div></div>' +
+                '<div class="col-6"><div class="border rounded p-2 h-100"><strong class="d-block">' + escapeHtml(dashboardPortalActivityDuration(totalSeconds)) + '</strong><span class="text-muted small">Viewing time</span></div></div>' +
+                '<div class="col-6"><div class="border rounded p-2 h-100"><strong class="d-block">' + escapeHtml(dashboardPortalActivityDate(pdfEvents[0] && pdfEvents[0].created_at)) + '</strong><span class="text-muted small">Last PDF action</span></div></div>' +
+                '</div>' +
+                (timeline || '<div class="text-muted small text-center py-2"><i class="fas fa-circle-info me-1"></i>No client activity has been logged for this document yet.</div>');
+        }
+
+        async function togglePortalShareActivity(activityEvent) {
+            if (activityEvent) {
+                activityEvent.preventDefault();
+                activityEvent.stopPropagation();
             }
-            var adminUrl = window._currentPortalAdminUrl || '';
+            var panel = document.getElementById('portalShareActivityPanel');
+            var button = document.getElementById('portalShareActivityBtn');
+            if (!panel) return;
+            var shouldOpen = panel.classList.contains('d-none');
+            panel.classList.toggle('d-none', !shouldOpen);
+            if (button) button.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+            if (!shouldOpen) return;
             var quoteId = window._currentPortalQuoteId || '';
-            if (!adminUrl || !quoteId) return;
-            try {
-                var url = new URL(adminUrl, window.location.origin);
-                url.searchParams.set('activity', quoteId);
-                window.location.href = url.toString();
-            } catch (error) {
-                qdAlert('Could not open portal activity. Refresh and try again.');
+            if (!quoteId || typeof loadSecureClientDocumentActivity !== 'function') {
+                panel.innerHTML = '<div class="alert alert-warning small mb-0">Activity is unavailable. Refresh QuoteDr and try again.</div>';
+                return;
             }
+            panel.innerHTML = '<div class="text-muted small text-center py-2"><span class="spinner-border spinner-border-sm me-1"></span>Loading activity...</div>';
+            var result = await loadSecureClientDocumentActivity(quoteId);
+            if (quoteId !== (window._currentPortalQuoteId || '')) return;
+            if (result && result.error) {
+                panel.innerHTML = '<div class="alert alert-warning small mb-0">Could not load activity. Refresh and try again.</div>';
+                return;
+            }
+            renderPortalShareActivity(result && result.data || []);
         }
 
         async function resetPortalPin() {
@@ -5951,7 +6075,7 @@ function renderBusinessInsights(quotes) {
 </div>
 
 <div class="modal fade" id="portalShareModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header" style="background:#1a2940; color:white;">
         <h5 class="modal-title"><i class="fas fa-folder-tree me-2"></i>Share via Client Portal</h5>
@@ -5969,13 +6093,14 @@ function renderBusinessInsights(quotes) {
           <div class="form-text">Client-facing link that requires the PIN below.</div>
         </div>
         <div class="d-grid text-start mb-3">
-          <label class="form-label fw-bold small mb-1" style="color:#1a2940;">ADMIN VIEW</label>
+          <label class="form-label fw-bold small mb-1" style="color:#1a2940;">ADMIN TOOLS</label>
           <div class="d-grid gap-2">
             <button type="button" class="btn btn-outline-primary" onclick="openPortalAdminUrl(event)" title="Open admin view" aria-label="Open admin view"><i class="fas fa-eye me-1"></i>Admin View</button>
-            <button type="button" class="btn btn-outline-primary" onclick="openPortalActivityUrl(event)" title="See activity for this document" aria-label="See activity for this document"><i class="fas fa-chart-line me-1"></i>See Activity</button>
+            <button type="button" class="btn btn-outline-primary" id="portalShareActivityBtn" onclick="togglePortalShareActivity(event)" title="See activity for this document" aria-label="See activity for this document" aria-expanded="false" aria-controls="portalShareActivityPanel"><i class="fas fa-chart-line me-1"></i>See Activity</button>
           </div>
-          <div class="form-text">For you only. Opens the portal in admin mode without exposing a shareable link.</div>
+          <div class="form-text">For you only. Open the portal in admin mode or review this document's activity here.</div>
         </div>
+        <div class="border rounded p-3 mb-3 text-start d-none" id="portalShareActivityPanel" aria-live="polite"></div>
         <div class="mb-3">
           <div class="text-muted small mb-1">Client PIN (they need this to log in):</div>
           <div id="portalPinDisplay" style="font-size:2.5rem; font-weight:bold; letter-spacing:0.5rem; color:#1a2940; background:#f8f9fa; border-radius:8px; padding:12px 24px; display:inline-block;"></div>
