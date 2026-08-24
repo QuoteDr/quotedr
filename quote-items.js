@@ -1262,7 +1262,7 @@
                         '<div class="w-100 manage-upgrade-pricing-row-break"></div>' +
                         '<div class="col-md-11"><label class="form-label small mb-1">Supplier URL</label><input type="url" class="form-control form-control-sm upgrade-supplier-url" value="' + manageItemsAttr(option.supplierUrl || '') + '" placeholder="https://..."></div>' +
                         '<div class="col-md-1 d-flex align-items-end"><button type="button" class="btn btn-sm btn-outline-danger w-100" data-upgrade-wizard-action="remove-option" title="Remove option"><i class="fas fa-trash"></i></button></div>' +
-                        '<div class="col-12"><label class="form-label small mb-1">Upgrade Description</label><input type="text" class="form-control form-control-sm upgrade-desc" value="' + manageItemsAttr(option.description || '') + '" placeholder="Optional client-facing description"></div>' +
+                        '<div class="col-12 description-refine-scope"><div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-1"><label class="form-label small mb-0">Upgrade Description</label><div class="d-flex align-items-center gap-1"><button type="button" class="btn btn-sm btn-outline-secondary undo-refine-desc-btn" onclick="toggleRefinedDescription(this)" title="Undo AI refined description" style="display:none;font-size:0.75rem;padding:2px 7px;"><i class="fas fa-undo"></i></button><button type="button" class="btn btn-sm btn-outline-primary refine-desc-btn" style="font-size:0.75rem;padding:2px 8px;"><i class="fas fa-wand-magic-sparkles me-1"></i>AI Refine</button></div></div><textarea class="form-control form-control-sm upgrade-desc item-description-textarea" rows="3" placeholder="Optional client-facing description" spellcheck="true">' + manageItemsEscape(option.description || '') + '</textarea><div class="form-text">Refine what you wrote, or explain the job and let AI create the description.</div></div>' +
                         renderManageUpgradeQuantityControls(option, state.baseUnitType) +
                         '</div>' +
                         '</div>';
@@ -1653,6 +1653,13 @@
         }
 
         document.addEventListener('click', function(event) {
+            const wizardRefineBtn = event.target.closest('#manageUpgradeWizardModal .refine-desc-btn');
+            if (wizardRefineBtn) {
+                const descScope = wizardRefineBtn.closest('.description-refine-scope');
+                const textarea = descScope ? descScope.querySelector('.item-description-textarea') : null;
+                if (typeof refineDescription === 'function') refineDescription(textarea, wizardRefineBtn);
+                return;
+            }
             const wizardButton = event.target.closest('[data-upgrade-wizard-action]');
             if (!wizardButton) return;
             handleManageUpgradeWizardAction(wizardButton);

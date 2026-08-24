@@ -92,6 +92,16 @@ assert(builder.includes("delete undoBtn._aiDescriptionMode;"), 'Add Line Item re
 assert(builder.includes('brand-theme.css?v=2026073101'), 'builder should load the updated choice contrast styles');
 assert(/quote-items\.js\?v=\d+/.test(builder), 'builder should cache-bust the Add Line Item AI Refine client');
 
+const wizardOptionsStart = items.indexOf('function renderManageUpgradeWizardOptionsStep');
+const wizardRulesStart = items.indexOf('function renderManageUpgradeWizardRulesStep');
+assert(wizardOptionsStart >= 0 && wizardRulesStart > wizardOptionsStart, 'Upgrade Wizard option markup should be discoverable');
+const wizardOptionsMarkup = items.slice(wizardOptionsStart, wizardRulesStart);
+assert(wizardOptionsMarkup.includes('description-refine-scope'), 'Upgrade Wizard descriptions should use the shared refine scope');
+assert(wizardOptionsMarkup.includes('upgrade-desc item-description-textarea'), 'Upgrade Wizard should expose its description through the shared textarea hook');
+assert(wizardOptionsMarkup.includes('refine-desc-btn'), 'Upgrade Wizard should expose AI Refine for every upgrade option');
+assert(wizardOptionsMarkup.includes('undo-refine-desc-btn'), 'Upgrade Wizard should expose shared AI undo and redo behavior');
+assert(wizardOptionsMarkup.includes('Refine what you wrote, or explain the job and let AI create the description.'), 'Upgrade Wizard should make both AI modes discoverable');
+
 assert(brandTheme.includes('#aiDescriptionModeModal .ai-description-mode-choice:hover'), 'choice hover styling should be scoped to the AI mode modal');
 assert(brandTheme.includes('#aiDescriptionModeModal .ai-description-mode-choice:focus-visible'), 'choice keyboard focus should share the accessible high-contrast state');
 assert(brandTheme.includes('background: #eaf3ff !important;'), 'choice hover and focus should use a light blue background');

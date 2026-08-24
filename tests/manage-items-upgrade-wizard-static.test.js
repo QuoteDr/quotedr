@@ -86,6 +86,12 @@ assert(items.includes("renderManageUnitSelect(option.unitType || baseUnitType ||
 assert(items.includes('<option value="">Select Existing Item</option>'), 'Saved-item selectors should clearly prompt users to select an existing item');
 assert(!items.includes('Type custom upgrade'), 'Saved-item selectors should not imply that custom upgrades are entered in the dropdown');
 assert(items.includes('Select an existing saved item or create a new upgrade.'), 'Upgrade Wizard helper text should explain the two available paths');
+assert(items.includes('#manageUpgradeWizardModal .refine-desc-btn'), 'Upgrade Wizard should delegate AI Refine clicks from its dynamic modal');
+assert(items.includes('Refine what you wrote, or explain the job and let AI create the description.'), 'Upgrade Wizard should explain both AI description paths');
+assert(items.includes('upgrade-desc item-description-textarea'), 'Upgrade Wizard descriptions should use the shared AI description field hook');
+assert(items.includes('wizardRefineBtn.closest(\'.description-refine-scope\')'), 'Upgrade Wizard AI Refine should target only the selected upgrade description');
+assert(items.includes('refineDescription(textarea, wizardRefineBtn)'), 'Upgrade Wizard should reuse the canonical dual-flow AI Refine implementation');
+assert(items.includes('onclick="toggleRefinedDescription(this)"'), 'Upgrade Wizard should provide shared undo and redo behavior for AI descriptions');
 assert((items.match(/manage-upgrade-choice-divider/g) || []).length >= 2, 'Wizard and manual upgrade editors should show a clear OR divider between existing and new items');
 assert((items.match(/Create New Upgrade Name/g) || []).length >= 2, 'Wizard and manual upgrade editors should label the new-upgrade field clearly');
 assert((items.match(/manage-upgrade-primary-row-break/g) || []).length >= 2, 'Wizard and manual upgrade editors should reserve the first row for selecting or naming an upgrade');
