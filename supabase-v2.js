@@ -3438,7 +3438,7 @@ async function loadSubscriptionStatus() {
 async function getCurrentPlan() {
     const sub = await loadSubscriptionStatus();
     if (subscriptionAllowsAccess(sub) && normalizePlanName(sub.plan || 'basic') === 'pro') return 'pro';
-    if (await qdBirthdayProPassIsActive()) return 'pro';
+    if (await qdTemporaryProAccessIsActive()) return 'pro';
     return 'basic';
 }
 
@@ -3474,9 +3474,49 @@ async function qdBirthdayProPassIsActive() {
 window.qdBirthdayRewardStatus = qdBirthdayRewardStatus;
 window.qdBirthdayProPassIsActive = qdBirthdayProPassIsActive;
 
+let qdPromotionRewardStatusPromise = null;
+['quotedr-account-changed', 'quotedr-account-ready', 'quotedr-entitlements-changed'].forEach(function(eventName) {
+    window.addEventListener(eventName, function() { qdPromotionRewardStatusPromise = null; });
+});
+
+async function qdPromotionRewardStatus(forceRefresh) {
+    if (forceRefresh) qdPromotionRewardStatusPromise = null;
+    if (!qdPromotionRewardStatusPromise) {
+        qdPromotionRewardStatusPromise = (async function() {
+            try {
+                var body = { action: 'active_entitlement' };
+                var accountId = qdActiveAccountId();
+                if (accountId) body.accountId = accountId;
+                var result = await _supabase.functions.invoke('promotion-rewards', { body: body });
+                if (result.error || !result.data || result.data.error) return null;
+                return result.data.data || null;
+            } catch (error) {
+                console.warn('Promotion entitlement status unavailable:', error);
+                return null;
+            }
+        })();
+    }
+    return qdPromotionRewardStatusPromise;
+}
+
+async function qdPromotionProPassIsActive() {
+    var state = await qdPromotionRewardStatus(false);
+    return !!(state && state.active);
+}
+
+async function qdTemporaryProAccessIsActive() {
+    var states = await Promise.all([qdBirthdayProPassIsActive(), qdPromotionProPassIsActive()]);
+    return states.some(Boolean);
+}
+
+window.qdPromotionRewardStatus = qdPromotionRewardStatus;
+window.qdPromotionProPassIsActive = qdPromotionProPassIsActive;
+window.qdTemporaryProAccessIsActive = qdTemporaryProAccessIsActive;
+
 let qdTeamEntitlementsPromise = null;
 window.addEventListener('quotedr-account-changed', function() { qdTeamEntitlementsPromise = null; });
 window.addEventListener('quotedr-account-ready', function() { qdTeamEntitlementsPromise = null; });
+window.addEventListener('quotedr-entitlements-changed', function() { qdTeamEntitlementsPromise = null; });
 
 async function qdTeamHasFeature(feature) {
     if (!qdTeamEntitlementsPromise) {
@@ -3499,7 +3539,7 @@ async function isCurrentUserPro() {
     if (await qdUsesTeamAccountApi()) return qdTeamHasFeature('ai_voice_quote');
     const sub = await loadSubscriptionStatus();
     if (subscriptionAllowsAccess(sub) && normalizePlanName(sub.plan || 'basic') === 'pro') return true;
-    return qdBirthdayProPassIsActive();
+    return qdTemporaryProAccessIsActive();
 }
 
 async function loadProTrialUsage() {

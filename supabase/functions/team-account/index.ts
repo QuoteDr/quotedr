@@ -666,19 +666,31 @@ async function getEntitlements(req: Request, accountId: unknown) {
   if (result.error) throw result.error;
   const subscription = result.data && result.data.value as Record<string, unknown> | null;
   const active = subscription && ['active', 'trialing'].includes(String(subscription.status || '').toLowerCase());
-  const passResult = await admin
-    .from('birthday_reward_claims')
-    .select('id')
-    .eq('user_id', auth.ownerUserId)
-    .eq('reward_type', 'standard_pro_week')
-    .eq('status', 'active')
-    .lte('benefit_starts_at', new Date().toISOString())
-    .gt('benefit_ends_at', new Date().toISOString())
-    .limit(1)
-    .maybeSingle();
-  if (passResult.error) throw passResult.error;
-  const birthdayProPass = !!passResult.data;
-  const plan = (active && String(subscription && subscription.plan || '').toLowerCase() === 'pro') || birthdayProPass ? 'pro' : 'basic';
+  const nowIso = new Date().toISOString();
+  const [birthdayPassResult, promotionPassResult] = await Promise.all([
+    admin.from('birthday_reward_claims')
+      .select('id')
+      .eq('user_id', auth.ownerUserId)
+      .eq('reward_type', 'standard_pro_week')
+      .eq('status', 'active')
+      .lte('benefit_starts_at', nowIso)
+      .gt('benefit_ends_at', nowIso)
+      .limit(1)
+      .maybeSingle(),
+    admin.from('promotion_claims')
+      .select('id')
+      .eq('user_id', auth.ownerUserId)
+      .eq('reward_type', 'pro_access_days')
+      .eq('status', 'active')
+      .lte('benefit_starts_at', nowIso)
+      .gt('benefit_ends_at', nowIso)
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  if (birthdayPassResult.error) throw birthdayPassResult.error;
+  if (promotionPassResult.error) throw promotionPassResult.error;
+  const temporaryProPass = !!birthdayPassResult.data || !!promotionPassResult.data;
+  const plan = (active && String(subscription && subscription.plan || '').toLowerCase() === 'pro') || temporaryProPass ? 'pro' : 'basic';
   const features = new Set(accountPlanFeatures[plan] || accountPlanFeatures.basic);
   if (!await hasPermission(auth, ACCOUNT_PERMISSION.QUOTES_PRICING_READ)) features.delete('profit_tracking');
   if (!await hasPermission(auth, ACCOUNT_PERMISSION.PAYMENTS_READ)) {

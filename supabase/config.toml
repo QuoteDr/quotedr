@@ -17,6 +17,9 @@ verify_jwt = true
 [functions.birthday-rewards]
 verify_jwt = true
 
+[functions.promotion-rewards]
+verify_jwt = true
+
 [functions.stripe-deposit]
 verify_jwt = false
 

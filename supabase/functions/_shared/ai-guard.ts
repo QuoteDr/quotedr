@@ -97,6 +97,37 @@ function trialAllowsFeatureAccess(value: any, feature: string, now = new Date())
   return now.getTime() <= expiresAt.getTime() + PRO_TRIAL_GRACE_MS;
 }
 
+async function temporaryProAccessIsActive(supabaseAdmin: any, userId: string, now = new Date()) {
+  const nowIso = now.toISOString();
+  const [birthdayResult, promotionResult] = await Promise.all([
+    supabaseAdmin.from("birthday_reward_claims")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("reward_type", "standard_pro_week")
+      .eq("status", "active")
+      .lte("benefit_starts_at", nowIso)
+      .gt("benefit_ends_at", nowIso)
+      .limit(1)
+      .maybeSingle(),
+    supabaseAdmin.from("promotion_claims")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("reward_type", "pro_access_days")
+      .eq("status", "active")
+      .lte("benefit_starts_at", nowIso)
+      .gt("benefit_ends_at", nowIso)
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  if (birthdayResult.error || promotionResult.error) {
+    throw new AiGuardError("Temporary Pro entitlement check failed.", 500, {
+      error: "Temporary Pro entitlement check failed",
+      code: "ai_temporary_entitlement_check_failed",
+    });
+  }
+  return !!birthdayResult.data || !!promotionResult.data;
+}
+
 async function assertAiProAccess(supabaseAdmin: any, userId: string, feature: string) {
   const { data, error } = await supabaseAdmin
     .from("user_data")
@@ -113,6 +144,7 @@ async function assertAiProAccess(supabaseAdmin: any, userId: string, feature: st
   const subscription = rows.find((row: any) => row?.key === "subscription_status")?.value;
   const trialUsage = rows.find((row: any) => row?.key === "pro_trial_usage")?.value;
   if (subscriptionAllowsProAccess(subscription) || trialAllowsFeatureAccess(trialUsage, feature)) return;
+  if (await temporaryProAccessIsActive(supabaseAdmin, userId)) return;
   throw new AiGuardError("AI Quote Copilot requires QuoteDr Pro or active Play For a Day access.", 403, {
     error: "AI Quote Copilot requires QuoteDr Pro or active Play For a Day access.",
     code: "ai_pro_required",

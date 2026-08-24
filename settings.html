@@ -1835,11 +1835,11 @@ Sarah Jones, 905-555-5678"></textarea>
 									<textarea id="broadcastBody" class="form-control" rows="5" placeholder="Write the message users should see..."></textarea>
 								</div>
 								<div class="row g-2">
-									<div class="col-md-6">
+									<div class="col-md-6" id="broadcastCtaLabelWrap">
 										<label class="form-label fw-bold" for="broadcastCtaLabel">Button label <span class="text-muted fw-normal">(optional)</span></label>
 										<input type="text" id="broadcastCtaLabel" class="form-control" placeholder="View update">
 									</div>
-									<div class="col-md-6">
+									<div class="col-md-6" id="broadcastCtaUrlWrap">
 										<label class="form-label fw-bold" for="broadcastCtaUrl">Button link <span class="text-muted fw-normal">(optional)</span></label>
 										<input type="text" id="broadcastCtaUrl" class="form-control" placeholder="settings.html or https://...">
 									</div>
@@ -1849,7 +1849,7 @@ Sarah Jones, 905-555-5678"></textarea>
 								<div class="row g-2">
 									<div class="col-md-6">
 										<label class="form-label fw-bold" for="broadcastMessageType">Type</label>
-										<select id="broadcastMessageType" class="form-select">
+										<select id="broadcastMessageType" class="form-select" onchange="toggleBroadcastPromotionFields()">
 											<option value="info">Update</option>
 											<option value="maintenance">Maintenance</option>
 											<option value="promo">Promo / Free Pro</option>
@@ -1883,6 +1883,38 @@ Sarah Jones, 905-555-5678"></textarea>
 											<option value="until_date">Until the stop date</option>
 											<option value="until_off">Until I turn it off</option>
 										</select>
+									</div>
+									<div class="col-12" id="broadcastPromotionFields" style="display:none;">
+										<div class="border rounded-3 p-3 mt-2" style="background:#f2fbf6;border-color:#b7e4c7 !important;">
+											<div class="fw-bold text-success mb-1"><i class="fas fa-gift me-1"></i>Promotion action</div>
+											<div class="small text-muted mb-3">Choose announcement-only, or let eligible Standard account owners explicitly activate temporary Pro access.</div>
+											<div class="row g-2">
+												<div class="col-md-6">
+													<label class="form-label fw-bold" for="broadcastPromotionReward">Reward</label>
+													<select id="broadcastPromotionReward" class="form-select" onchange="toggleBroadcastPromotionFields()">
+														<option value="none">Announcement only</option>
+														<option value="pro_access_days">Free Pro access</option>
+													</select>
+												</div>
+												<div class="col-md-6">
+													<label class="form-label fw-bold" for="broadcastTargetAudience">Audience</label>
+													<select id="broadcastTargetAudience" class="form-select">
+														<option value="all">All signed-in users</option>
+														<option value="standard">Standard subscribers</option>
+														<option value="pro">Pro subscribers</option>
+													</select>
+												</div>
+												<div class="col-md-6 broadcast-reward-only" style="display:none;">
+													<label class="form-label fw-bold" for="broadcastPromotionDays">Pro access days</label>
+													<input type="number" id="broadcastPromotionDays" class="form-control" min="1" max="90" step="1" value="7">
+												</div>
+												<div class="col-md-6 broadcast-reward-only" style="display:none;">
+													<label class="form-label fw-bold" for="broadcastPromotionMaxClaims">Activation limit <span class="text-muted fw-normal">(optional)</span></label>
+													<input type="number" id="broadcastPromotionMaxClaims" class="form-control" min="1" step="1" placeholder="Unlimited">
+												</div>
+											</div>
+											<div id="broadcastPromotionHelp" class="small text-muted mt-2"></div>
+										</div>
 									</div>
 								</div>
 								<div class="alert alert-light border small mt-3 mb-0">
@@ -3622,6 +3654,9 @@ Sarah Jones, 905-555-5678"></textarea>
 		}
 
 		function getBroadcastFormMessage() {
+			var reward = (document.getElementById('broadcastPromotionReward') || {}).value || 'none';
+			var days = parseInt((document.getElementById('broadcastPromotionDays') || {}).value, 10);
+			var maxClaims = parseInt((document.getElementById('broadcastPromotionMaxClaims') || {}).value, 10);
 			return {
 				title: (document.getElementById('broadcastTitle') || {}).value || '',
 				body: (document.getElementById('broadcastBody') || {}).value || '',
@@ -3631,8 +3666,38 @@ Sarah Jones, 905-555-5678"></textarea>
 				ends_at: broadcastInputToIso('broadcastEndsAt'),
 				show_mode: (document.getElementById('broadcastShowMode') || {}).value || 'once',
 				cta_label: (document.getElementById('broadcastCtaLabel') || {}).value || '',
-				cta_url: (document.getElementById('broadcastCtaUrl') || {}).value || ''
+				cta_url: (document.getElementById('broadcastCtaUrl') || {}).value || '',
+				target_audience: (document.getElementById('broadcastTargetAudience') || {}).value || 'all',
+				promotion_reward_type: reward,
+				promotion_duration_days: reward === 'pro_access_days' && Number.isInteger(days) ? days : null,
+				promotion_max_claims: reward === 'pro_access_days' && Number.isInteger(maxClaims) ? maxClaims : null
 			};
+		}
+
+		function toggleBroadcastPromotionFields() {
+			var type = (document.getElementById('broadcastMessageType') || {}).value || 'info';
+			var panel = document.getElementById('broadcastPromotionFields');
+			var rewardEl = document.getElementById('broadcastPromotionReward');
+			var audienceEl = document.getElementById('broadcastTargetAudience');
+			var reward = rewardEl ? rewardEl.value : 'none';
+			var isPromo = type === 'promo';
+			var isReward = isPromo && reward === 'pro_access_days';
+			if (panel) panel.style.display = isPromo ? '' : 'none';
+			document.querySelectorAll('.broadcast-reward-only').forEach(function(el) { el.style.display = isReward ? '' : 'none'; });
+			if (audienceEl) {
+				if (isReward) audienceEl.value = 'standard';
+				audienceEl.disabled = isReward;
+			}
+			var urlWrap = document.getElementById('broadcastCtaUrlWrap');
+			if (urlWrap) urlWrap.style.display = isReward ? 'none' : '';
+			var label = document.querySelector('label[for="broadcastCtaLabel"]');
+			if (label) label.innerHTML = isReward
+				? 'Activation button label <span class="text-muted fw-normal">(optional)</span>'
+				: 'Button label <span class="text-muted fw-normal">(optional)</span>';
+			var help = document.getElementById('broadcastPromotionHelp');
+			if (help) help.textContent = isReward
+				? 'Starts when the eligible Standard account owner activates it. One activation per account; existing Pro billing dates and charges are untouched.'
+				: 'Audience targeting controls who sees this announcement. No account access or billing is changed.';
 		}
 
 		function resetBroadcastForm() {
@@ -3646,6 +3711,15 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (typeEl) typeEl.value = 'info';
 			if (statusEl) statusEl.value = 'active';
 			if (modeEl) modeEl.value = 'once';
+			var rewardEl = document.getElementById('broadcastPromotionReward');
+			var audienceEl = document.getElementById('broadcastTargetAudience');
+			var daysEl = document.getElementById('broadcastPromotionDays');
+			var maxEl = document.getElementById('broadcastPromotionMaxClaims');
+			if (rewardEl) rewardEl.value = 'none';
+			if (audienceEl) audienceEl.value = 'all';
+			if (daysEl) daysEl.value = '7';
+			if (maxEl) maxEl.value = '';
+			toggleBroadcastPromotionFields();
 			var status = document.getElementById('broadcastSaveStatus');
 			if (status) status.textContent = '';
 		}
@@ -3682,6 +3756,22 @@ Sarah Jones, 905-555-5678"></textarea>
 			payload.body = payload.body.trim();
 			payload.cta_label = payload.cta_label.trim();
 			payload.cta_url = payload.cta_url.trim();
+			if (payload.message_type !== 'promo') {
+				payload.target_audience = 'all';
+				payload.promotion_reward_type = 'none';
+				payload.promotion_duration_days = null;
+				payload.promotion_max_claims = null;
+			}
+			if (payload.promotion_reward_type === 'pro_access_days') {
+				payload.target_audience = 'standard';
+				payload.cta_url = '';
+				if (!Number.isInteger(payload.promotion_duration_days) || payload.promotion_duration_days < 1 || payload.promotion_duration_days > 90) {
+					qdAlert('Choose between 1 and 90 days of Pro access.'); return;
+				}
+				if (payload.promotion_max_claims !== null && (!Number.isInteger(payload.promotion_max_claims) || payload.promotion_max_claims < 1)) {
+					qdAlert('Activation limit must be blank or at least 1.'); return;
+				}
+			}
 			payload.updated_at = new Date().toISOString();
 			if (!payload.title) { qdAlert('Add a message title first.'); return; }
 			if (!payload.body) { qdAlert('Add message body text first.'); return; }
@@ -3733,6 +3823,11 @@ Sarah Jones, 905-555-5678"></textarea>
 			document.getElementById('broadcastShowMode').value = message.show_mode || 'once';
 			document.getElementById('broadcastCtaLabel').value = message.cta_label || '';
 			document.getElementById('broadcastCtaUrl').value = message.cta_url || '';
+			document.getElementById('broadcastPromotionReward').value = message.promotion_reward_type || 'none';
+			document.getElementById('broadcastTargetAudience').value = message.target_audience || 'all';
+			document.getElementById('broadcastPromotionDays').value = message.promotion_duration_days || 7;
+			document.getElementById('broadcastPromotionMaxClaims').value = message.promotion_max_claims || '';
+			toggleBroadcastPromotionFields();
 			setBroadcastSaveStatus('Editing saved message.', 'muted');
 			document.getElementById('broadcastTitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
 		}
@@ -3756,7 +3851,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			}
 		}
 
-		function renderBroadcastAdminMessages(messages, receipts) {
+		function renderBroadcastAdminMessages(messages, receipts, promotionStats) {
 			var listEl = document.getElementById('broadcastMessagesList');
 			if (!listEl) return;
 			window._broadcastAdminMessages = messages || [];
@@ -3765,6 +3860,8 @@ Sarah Jones, 905-555-5678"></textarea>
 				return;
 			}
 			var receiptCounts = {};
+			var promotionCounts = {};
+			(promotionStats || []).forEach(function(stat) { promotionCounts[stat.promotionId] = stat; });
 			(receipts || []).forEach(function(receipt) {
 				if (!receiptCounts[receipt.message_id]) receiptCounts[receipt.message_id] = { shown: 0, dismissed: 0 };
 				receiptCounts[receipt.message_id].shown += Number(receipt.shown_count || 0);
@@ -3772,9 +3869,13 @@ Sarah Jones, 905-555-5678"></textarea>
 			});
 			listEl.innerHTML = messages.map(function(message) {
 				var counts = receiptCounts[message.id] || { shown: 0, dismissed: 0 };
+				var promo = promotionCounts[message.id] || { claimed: 0, active: 0 };
 				var start = message.starts_at ? new Date(message.starts_at).toLocaleString() : 'Next refresh';
 				var end = message.ends_at ? new Date(message.ends_at).toLocaleString() : (message.show_mode === 'until_off' ? 'Until turned off' : 'No end date');
 				var badge = message.status === 'active' ? 'bg-success' : message.status === 'paused' ? 'bg-warning text-dark' : message.status === 'archived' ? 'bg-secondary' : 'bg-light text-dark border';
+				var rewardSummary = message.promotion_reward_type === 'pro_access_days'
+					? ' | Reward: ' + Number(message.promotion_duration_days || 0) + ' Pro days | Activated: ' + Number(promo.claimed || 0) + (message.promotion_max_claims ? '/' + Number(message.promotion_max_claims) : '') + ' | Active now: ' + Number(promo.active || 0)
+					: (message.message_type === 'promo' ? ' | Audience: ' + escapeAnalyticsHtml(message.target_audience || 'all') : '');
 				return '<div class="border rounded p-3 mb-2 bg-white">' +
 					'<div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">' +
 						'<div class="flex-grow-1">' +
@@ -3784,7 +3885,7 @@ Sarah Jones, 905-555-5678"></textarea>
 								'<span class="badge text-bg-light border">' + escapeAnalyticsHtml(message.message_type || 'info') + '</span>' +
 							'</div>' +
 							'<div class="text-muted" style="white-space:pre-wrap;">' + escapeAnalyticsHtml(message.body || '') + '</div>' +
-							'<div class="small text-muted mt-2">Start: ' + escapeAnalyticsHtml(start) + ' | End: ' + escapeAnalyticsHtml(end) + ' | Shown: ' + counts.shown + ' | Dismissed: ' + counts.dismissed + '</div>' +
+							'<div class="small text-muted mt-2">Start: ' + escapeAnalyticsHtml(start) + ' | End: ' + escapeAnalyticsHtml(end) + ' | Shown: ' + counts.shown + ' | Dismissed: ' + counts.dismissed + rewardSummary + '</div>' +
 						'</div>' +
 						'<div class="d-flex gap-1 flex-wrap justify-content-end">' +
 							'<button type="button" class="btn btn-outline-primary btn-sm" onclick="editBroadcastMessage(\'' + message.id + '\')"><i class="fas fa-pen me-1"></i>Edit</button>' +
@@ -3810,14 +3911,20 @@ Sarah Jones, 905-555-5678"></textarea>
 				if (messagesResult.error) throw messagesResult.error;
 				var messages = messagesResult.data || [];
 				var receipts = [];
+				var promotionStats = [];
 				if (messages.length) {
 					var receiptResult = await _supabase
 						.from('app_broadcast_receipts')
 						.select('message_id, shown_count, dismissed_at')
 						.in('message_id', messages.map(function(message) { return message.id; }));
 					if (!receiptResult.error) receipts = receiptResult.data || [];
+					var promotionIds = messages.filter(function(message) { return message.promotion_reward_type === 'pro_access_days'; }).map(function(message) { return message.id; });
+					if (promotionIds.length) {
+						var statsResult = await _supabase.functions.invoke('promotion-rewards', { body: { action: 'admin_stats', promotionIds: promotionIds } });
+						if (!statsResult.error && statsResult.data && !statsResult.data.error) promotionStats = statsResult.data.data || [];
+					}
 				}
-				renderBroadcastAdminMessages(messages, receipts);
+				renderBroadcastAdminMessages(messages, receipts, promotionStats);
 			} catch(e) {
 				console.error('Broadcast load failed:', e);
 				listEl.innerHTML = '<div class="alert alert-warning mb-0"><strong>User Messages are not ready yet.</strong><br><span class="small">' + escapeAnalyticsHtml(e.message || e) + '</span><br><span class="small text-muted">Apply the Supabase broadcast migration, then refresh Settings.</span></div>';

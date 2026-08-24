@@ -43,6 +43,37 @@
     return result && result.data ? result.data.session : null;
   }
 
+  async function promotionCall(action, payload) {
+    if (!window._supabase || !_supabase.functions) return { error: 'Promotions are unavailable.' };
+    var body = Object.assign({ action: action }, payload || {});
+    if (typeof window.qdActiveAccountId === 'function') {
+      var accountId = window.qdActiveAccountId();
+      if (accountId) body.accountId = accountId;
+    }
+    try {
+      var result = await _supabase.functions.invoke('promotion-rewards', { body: body });
+      if (result.error || !result.data || result.data.error) {
+        return { error: (result.data && result.data.error) || (result.error && result.error.message) || 'Promotions are unavailable.' };
+      }
+      return { data: result.data.data };
+    } catch (error) {
+      return { error: error && error.message || 'Promotions are unavailable.' };
+    }
+  }
+
+  async function loadPromotionStates(messages) {
+    var targeted = (messages || []).filter(function(message) {
+      return (message.target_audience && message.target_audience !== 'all') || message.promotion_reward_type === 'pro_access_days';
+    });
+    if (!targeted.length) return {};
+    var result = await promotionCall('status', { promotionIds: targeted.map(function(message) { return message.id; }) });
+    var states = {};
+    if (!result.error && Array.isArray(result.data)) {
+      result.data.forEach(function(state) { states[state.promotionId] = state; });
+    }
+    return states;
+  }
+
   async function recordShown(message, receipt, userId) {
     if (!window._supabase || !message || !userId) return;
     var payload = {
@@ -100,6 +131,7 @@
                 '<div id="quoteDrBroadcastIcon" class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:48px;height:48px;background:#eef4fb;color:#1a56a0;font-size:1.35rem;"></div>' +
                 '<div class="flex-grow-1">' +
                   '<div id="quoteDrBroadcastBody" style="white-space:pre-wrap;color:#263442;line-height:1.5;"></div>' +
+                  '<div id="quoteDrBroadcastPromotionStatus" class="small mt-3" style="display:none;"></div>' +
                 '</div>' +
               '</div>' +
             '</div>' +
@@ -122,6 +154,8 @@
     var icon = document.getElementById('quoteDrBroadcastIcon');
     var cta = document.getElementById('quoteDrBroadcastCta');
     var ok = document.getElementById('quoteDrBroadcastOkBtn');
+    var promotionStatus = document.getElementById('quoteDrBroadcastPromotionStatus');
+    var promotionState = message._promotionState || null;
     header.style.background = meta.accent;
     icon.style.background = meta.accent + '18';
     icon.style.color = meta.accent;
@@ -131,7 +165,66 @@
     document.getElementById('quoteDrBroadcastBody').textContent = message.body || '';
     ok.style.background = meta.accent;
     ok.style.borderColor = meta.accent;
-    if (message.cta_label && message.cta_url) {
+    cta.onclick = null;
+    cta.classList.remove('disabled');
+    cta.removeAttribute('aria-disabled');
+    promotionStatus.style.display = 'none';
+    promotionStatus.textContent = '';
+    promotionStatus.className = 'small mt-3';
+    if (message.promotion_reward_type === 'pro_access_days') {
+      var durationDays = Number(message.promotion_duration_days || (promotionState && promotionState.durationDays) || 0);
+      cta.style.display = '';
+      cta.removeAttribute('href');
+      cta.target = '_self';
+      if (promotionState && promotionState.claimed) {
+        cta.textContent = 'Pro access activated';
+        cta.classList.add('disabled');
+        cta.setAttribute('aria-disabled', 'true');
+        promotionStatus.style.display = '';
+        promotionStatus.classList.add('text-success', 'fw-semibold');
+        promotionStatus.textContent = promotionState.benefitEndsAt
+          ? 'Your promotional Pro access is active until ' + new Date(promotionState.benefitEndsAt).toLocaleString() + '.'
+          : 'Your promotional Pro access is active.';
+      } else if (options.preview || (promotionState && promotionState.claimable)) {
+        cta.textContent = message.cta_label || ('Activate ' + durationDays + ' free Pro day' + (durationDays === 1 ? '' : 's'));
+        cta.onclick = async function(event) {
+          event.preventDefault();
+          if (options.preview) {
+            promotionStatus.style.display = '';
+            promotionStatus.className = 'small mt-3 text-muted';
+            promotionStatus.textContent = 'Preview only — no Pro access was activated.';
+            return;
+          }
+          cta.classList.add('disabled');
+          cta.setAttribute('aria-disabled', 'true');
+          cta.textContent = 'Activating...';
+          promotionStatus.style.display = '';
+          promotionStatus.className = 'small mt-3 text-muted';
+          promotionStatus.textContent = 'Securely checking this account and activating the offer...';
+          var result = await promotionCall('claim', { promotionId: message.id });
+          if (result.error) {
+            cta.classList.remove('disabled');
+            cta.removeAttribute('aria-disabled');
+            cta.textContent = message.cta_label || ('Activate ' + durationDays + ' free Pro day' + (durationDays === 1 ? '' : 's'));
+            promotionStatus.className = 'small mt-3 text-danger';
+            promotionStatus.textContent = result.error;
+            return;
+          }
+          var claim = result.data || {};
+          cta.textContent = 'Pro access activated';
+          promotionStatus.className = 'small mt-3 text-success fw-semibold';
+          promotionStatus.textContent = claim.benefitEndsAt
+            ? 'Success — Pro access is active until ' + new Date(claim.benefitEndsAt).toLocaleString() + '.'
+            : 'Success — Pro access is now active.';
+          window.dispatchEvent(new CustomEvent('quotedr-entitlements-changed'));
+        };
+      } else {
+        cta.style.display = 'none';
+        promotionStatus.style.display = '';
+        promotionStatus.className = 'small mt-3 text-muted';
+        promotionStatus.textContent = 'This offer is not available for the current account.';
+      }
+    } else if (message.cta_label && message.cta_url) {
       cta.style.display = '';
       cta.textContent = message.cta_label;
       cta.href = message.cta_url;
@@ -166,6 +259,7 @@
         .limit(10);
       if (messagesResult.error || !messagesResult.data || !messagesResult.data.length) return;
       var messages = messagesResult.data;
+      var promotionStates = await loadPromotionStates(messages);
       var ids = messages.map(function(message) { return message.id; });
       var receiptsResult = await _supabase
         .from('app_broadcast_receipts')
@@ -177,7 +271,15 @@
         receiptsResult.data.forEach(function(receipt) { receipts[receipt.message_id] = receipt; });
       }
       var eligible = messages
-        .filter(function(message) { return isEligible(message, receipts[message.id]); })
+        .filter(function(message) {
+          if (!isEligible(message, receipts[message.id])) return false;
+          var needsEligibility = (message.target_audience && message.target_audience !== 'all') || message.promotion_reward_type === 'pro_access_days';
+          if (!needsEligibility) return true;
+          var state = promotionStates[message.id];
+          if (!state || state.visible !== true) return false;
+          message._promotionState = state;
+          return true;
+        })
         .sort(sortMessages);
       if (!eligible.length) return;
       var message = eligible[0];
@@ -192,7 +294,11 @@
   }
 
   function preview(message) {
-    renderMessage(Object.assign({ title: 'QuoteDr update', body: '', message_type: 'info' }, message || {}), {});
+    var previewMessage = Object.assign({ title: 'QuoteDr update', body: '', message_type: 'info' }, message || {});
+    if (previewMessage.promotion_reward_type === 'pro_access_days') {
+      previewMessage._promotionState = { claimable: true, durationDays: previewMessage.promotion_duration_days };
+    }
+    renderMessage(previewMessage, { preview: true });
   }
 
   window.QuoteDrBroadcasts = {
