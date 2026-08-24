@@ -58,6 +58,7 @@ export const publicArtifactConfig = Object.freeze({
     'ai-voice-rule-matcher.js',
     'analytics.js',
     'app-broadcasts.js',
+    'birthday-rewards.js',
     'card-payment-rules.js',
     'change-orders.js',
     'chatbot-feedback-topics.js',

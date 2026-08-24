@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Birthday rewards fixture</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-light">
+  <main class="container py-4" style="max-width:900px">
+    <div id="birthdayRewardDashboard" aria-live="polite"></div>
+    <section class="card shadow-sm mb-4"><div class="card-body">
+      <h2 class="h5"><i class="fas fa-cake-candles me-2 text-warning"></i>Onboarding birthday</h2>
+      <p>Month and day only. We use this to wish you a happy birthday and offer account gifts. We do not ask for your birth year.</p>
+      <div class="row g-2"><div class="col-sm-7"><select class="form-select" id="birthdayMonth"></select></div><div class="col-sm-5"><select class="form-select" id="birthdayDay"></select></div></div>
+      <div id="onboardingBirthdayMessage"></div>
+    </div></section>
+    <section class="card shadow-sm"><div class="card-body">
+      <h2 class="h5">Birthday &amp; Annual Gift</h2>
+      <div id="birthdayRewardsSettings"></div>
+    </div></section>
+  </main>
+  <script>
+    window._supabase = { functions: { invoke: async function(name, request) {
+      var action = request.body.action;
+      return { data: { data: {
+        profile: { birthMonth: 8, birthDay: 24, timezone: 'America/Toronto', selfServiceChangeAvailableAt: '2027-08-24T12:00:00.000Z' },
+        latestClaim: null,
+        activeProPass: false,
+        plan: new URLSearchParams(location.search).get('plan') === 'pro' ? 'pro' : 'basic',
+        planLabel: new URLSearchParams(location.search).get('plan') === 'pro' ? 'Pro' : 'Standard',
+        subscriptionStatus: 'active',
+        birthdayWindow: { eligibleNow: true, daysRemaining: 30 },
+        claimCooldown: { blocked: false, nextEligibleAt: null },
+        claimable: true,
+        rewardPreview: {}
+      } } };
+    } } };
+    window.qdBirthdayRewardStatus = async function() { return null; };
+    window.qdConfirm = async function() { return false; };
+  </script>
+  <script src="../birthday-rewards.js?v=fixture"></script>
+</body>
+</html>

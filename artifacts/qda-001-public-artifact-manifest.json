@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 109,
-  "totalBytes": 22811788,
-  "treeSha256": "e0d55a3e17c4c6e84a0ea3823b5af44e063a7a4f9322877574018f0cd128be0a",
+  "fileCount": 110,
+  "totalBytes": 22829104,
+  "treeSha256": "0bc2fb848c3395516011c13c0cb2e644e032e40a4b990df722162bf864256471",
   "files": [
     {
       "path": "404.html",
@@ -91,6 +91,11 @@
       "sha256": "02cf5b6a4e603686ab58b670a432099353cf2d3d3cb99f342c6451804c934b0c"
     },
     {
+      "path": "birthday-rewards.js",
+      "bytes": 13242,
+      "sha256": "61ae9a6686a7cd00e2b7f5a019a5785c4ecb48a6e7c6064c8ad87706e71c2b87"
+    },
+    {
       "path": "blog/how-to-price-upgrades-without-awkward-sales.html",
       "bytes": 4416,
       "sha256": "8ce43e0e7efa216839026b2a8734baf2401cf28a135ba99c73a9894ac7f2ae83"
@@ -162,8 +167,8 @@
     },
     {
       "path": "dashboard.html",
-      "bytes": 390619,
-      "sha256": "69c7d7555240c8338643122e8e9457d3544d107f69e89d061e452d87567b4ae7"
+      "bytes": 390748,
+      "sha256": "c69ac1f547d295fa110009d828ce84386e74d4991026bcfc790c037355997b7f"
     },
     {
       "path": "data/whats-new.json",
@@ -282,8 +287,8 @@
     },
     {
       "path": "onboarding.html",
-      "bytes": 71233,
-      "sha256": "92dee13ca6e5eb1ff861f08702e560d2a29b90905e87027474e82e1901830e0a"
+      "bytes": 72772,
+      "sha256": "b8b8f889dbe53d5ac2cb173d7c5ba29176ee087ef1448128e7bb7efe57967e27"
     },
     {
       "path": "portal-theme-studio.html",
@@ -297,8 +302,8 @@
     },
     {
       "path": "privacy.html",
-      "bytes": 15522,
-      "sha256": "c47243024962ef300db0fe73d04c21d10abdb69545b0660de67a3174e57acb52"
+      "bytes": 16046,
+      "sha256": "db4ac408aed697a137706f5d0c0feea0edc10384dc858114a4f7087f66488d59"
     },
     {
       "path": "property-memory.js",
@@ -442,8 +447,8 @@
     },
     {
       "path": "settings.html",
-      "bytes": 358112,
-      "sha256": "8c9ad28f0b128b92196011f2a9c725ae3d29256ce13600cff9c659dae4b4b4e5"
+      "bytes": 358510,
+      "sha256": "948c47a70dd0b155eb0fb078d37afd420641540dc6070dd32a98d70ac4caa461"
     },
     {
       "path": "signup-gate.css",
@@ -457,8 +462,8 @@
     },
     {
       "path": "supabase-v2.js",
-      "bytes": 186984,
-      "sha256": "41d87c6e64eb19c684042e2e3fcacc711f3961248d9ec0cb5aa1d182b524b9d0"
+      "bytes": 188468,
+      "sha256": "dd777909e9776fb1d5405ab94c7c0ee3c65a0ac7f40d803559dcd3fe14b7eb22"
     },
     {
       "path": "sw.js",

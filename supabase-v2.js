@@ -3437,9 +3437,42 @@ async function loadSubscriptionStatus() {
 
 async function getCurrentPlan() {
     const sub = await loadSubscriptionStatus();
-    if (!subscriptionAllowsAccess(sub)) return 'basic';
-    return normalizePlanName(sub.plan || 'basic');
+    if (subscriptionAllowsAccess(sub) && normalizePlanName(sub.plan || 'basic') === 'pro') return 'pro';
+    if (await qdBirthdayProPassIsActive()) return 'pro';
+    return 'basic';
 }
+
+let qdBirthdayRewardStatusPromise = null;
+window.addEventListener('quotedr-account-changed', function() { qdBirthdayRewardStatusPromise = null; });
+window.addEventListener('quotedr-account-ready', function() { qdBirthdayRewardStatusPromise = null; });
+
+async function qdBirthdayRewardStatus(forceRefresh) {
+    if (forceRefresh) qdBirthdayRewardStatusPromise = null;
+    if (!qdBirthdayRewardStatusPromise) {
+        qdBirthdayRewardStatusPromise = (async function() {
+            try {
+                var body = { action: 'status' };
+                var accountId = qdActiveAccountId();
+                if (accountId) body.accountId = accountId;
+                var result = await _supabase.functions.invoke('birthday-rewards', { body: body });
+                if (result.error || !result.data || result.data.error) return null;
+                return result.data.data || null;
+            } catch (error) {
+                console.warn('Birthday reward status unavailable:', error);
+                return null;
+            }
+        })();
+    }
+    return qdBirthdayRewardStatusPromise;
+}
+
+async function qdBirthdayProPassIsActive() {
+    var state = await qdBirthdayRewardStatus(false);
+    return !!(state && state.activeProPass);
+}
+
+window.qdBirthdayRewardStatus = qdBirthdayRewardStatus;
+window.qdBirthdayProPassIsActive = qdBirthdayProPassIsActive;
 
 let qdTeamEntitlementsPromise = null;
 window.addEventListener('quotedr-account-changed', function() { qdTeamEntitlementsPromise = null; });
@@ -3465,7 +3498,8 @@ async function hasFeature(feature) {
 async function isCurrentUserPro() {
     if (await qdUsesTeamAccountApi()) return qdTeamHasFeature('ai_voice_quote');
     const sub = await loadSubscriptionStatus();
-    return subscriptionAllowsAccess(sub) && normalizePlanName(sub.plan || 'basic') === 'pro';
+    if (subscriptionAllowsAccess(sub) && normalizePlanName(sub.plan || 'basic') === 'pro') return true;
+    return qdBirthdayProPassIsActive();
 }
 
 async function loadProTrialUsage() {
