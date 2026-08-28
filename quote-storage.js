@@ -1040,6 +1040,9 @@
                 changeOrderPriceSummary: window._changeOrderPriceSummary || null,
                 changeOrderNumber: parseInt(window._changeOrderNumber || 0, 10) || null,
                 changeReason: document.getElementById('changeOrderReason')?.value || '',
+                changeOrderScopeAutomatic: window._changeOrderScopeAutomatic !== false,
+                changeOrderScopeAiOwned: window._changeOrderScopeAiOwned === true,
+                changeOrderScopeFingerprint: window._changeOrderScopeFingerprint || '',
                 status: status,
                 quoteTitle:     document.getElementById('quoteTitle')?.value     || '',
                 clientName:     document.getElementById('clientName')?.value     || '',
@@ -1245,6 +1248,15 @@
             window._previousApprovedChangeOrderTotal = window._changeOrderPreviousApprovedTotal;
             window._changeOrderPriceSummary = data.changeOrderPriceSummary || null;
             window._changeOrderNumber = parseInt(data.changeOrderNumber || data.change_order_number || 0, 10) || 0;
+            var changeOrderScopeDefault = typeof getChangeOrderScopePreferences === 'function'
+                ? getChangeOrderScopePreferences().automaticDefault !== false
+                : true;
+            window._changeOrderScopeAutomatic = data.changeOrderScopeAutomatic === undefined
+                ? changeOrderScopeDefault
+                : data.changeOrderScopeAutomatic !== false;
+            window._changeOrderScopeAiOwned = data.changeOrderScopeAiOwned === true;
+            window._changeOrderScopeFingerprint = data.changeOrderScopeFingerprint || '';
+            window._changeOrderScopeLastGeneratedText = window._changeOrderScopeAiOwned ? (data.changeReason || '') : '';
             window._quoteServerUpdatedAt = data._serverUpdatedAt || data.serverUpdatedAt || data.updated_at || null;
             window._quoteLocalEditAt = data._clientEditedAt || data._saveMeta && data._saveMeta.clientEditedAt || data.savedAt || null;
             setTimeout(function() {

@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 110,
-  "totalBytes": 22845593,
-  "treeSha256": "10c2859de9c27eb1000d78daecbae69679b5d0d09552ae7d1861b73ba3e7996d",
+  "fileCount": 111,
+  "totalBytes": 22871380,
+  "treeSha256": "93dc4073bd00e6cbdd17c124392526d5cf24fd9fb8097c594398dd5dc5defd0a",
   "files": [
     {
       "path": "404.html",
@@ -134,6 +134,11 @@
       "path": "card-payment-rules.js",
       "bytes": 5362,
       "sha256": "41ab827652c88b6b3b6362759a3e71cce77af585a7c406cc0456bcf5d36ebe95"
+    },
+    {
+      "path": "change-order-scope.js",
+      "bytes": 7343,
+      "sha256": "6024422a0bddad8abd370f958023796b3149b6c47c4b31c3f32957b25b4ee47d"
     },
     {
       "path": "change-orders.js",
@@ -332,8 +337,8 @@
     },
     {
       "path": "quote-builder.html",
-      "bytes": 1414829,
-      "sha256": "af9d1fc1d385546df420033403c68f4d2b095ada9f4143dd0e93e17a75d9cd32"
+      "bytes": 1432325,
+      "sha256": "d3b71f47011425176f9f4558aafe425e0f5e67020bc275afb5c72dcc8a989904"
     },
     {
       "path": "quote-calculators.js",
@@ -407,8 +412,8 @@
     },
     {
       "path": "quote-storage.js",
-      "bytes": 137236,
-      "sha256": "1d9b847ad2ca09ffb7b65d3ec1c40bbc31007122df17997294ae708e2317b00f"
+      "bytes": 138184,
+      "sha256": "6f38b420255a4903dec3388e3ef04af6fb14148a14156e52efb4716bb094af0a"
     },
     {
       "path": "quote-style.js",

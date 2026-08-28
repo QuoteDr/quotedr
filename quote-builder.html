@@ -560,6 +560,29 @@
             margin-bottom: 12px;
             display: none;
         }
+        .change-order-scope-tools {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.55rem 0.8rem;
+            margin-top: 0.55rem;
+        }
+        .change-order-scope-status {
+            color: #667085;
+            font-size: 0.78rem;
+            min-height: 1.2em;
+        }
+        .change-order-scope-default {
+            border-left: 1px solid rgba(102, 112, 133, 0.28);
+            padding-left: 0.8rem;
+        }
+        @media (max-width: 575.98px) {
+            .change-order-scope-default {
+                border-left: 0;
+                padding-left: 0;
+                width: 100%;
+            }
+        }
         .saved-item-sync-banner {
             display: none;
             border: 1px solid #b6d4fe;
@@ -2676,8 +2699,24 @@ if (location.search.includes('debug')) {
             </div>
             <span class="badge bg-warning text-dark" id="changeOrderStatusBadge">Draft</span>
         </div>
-        <label for="changeOrderReason" class="form-label fw-semibold mt-2 mb-1">Reason / scope change</label>
-        <textarea id="changeOrderReason" class="form-control form-control-sm" rows="2" placeholder="Explain what changed, why it changed, and what this change order adds or credits." oninput="markUnsaved()"></textarea>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-2 mb-1">
+            <label for="changeOrderReason" class="form-label fw-semibold mb-0">Reason / scope change</label>
+            <div class="change-order-scope-tools mt-0">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="changeOrderScopeAutomatic" onchange="setChangeOrderScopeAutomatic(this.checked)">
+                    <label class="form-check-label fw-semibold" for="changeOrderScopeAutomatic">Automatic</label>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="changeOrderAiScopeBtn" onclick="generateChangeOrderScope({ manual: true, button: this })" title="Draft this scope from the changes compared with the original quote">
+                    <i class="fas fa-magic me-1"></i>AI Scope
+                </button>
+                <div class="form-check mb-0 change-order-scope-default">
+                    <input class="form-check-input" type="checkbox" id="changeOrderScopeDefault" onchange="setChangeOrderScopeDefault(this.checked)">
+                    <label class="form-check-label small" for="changeOrderScopeDefault">Default Automatic ON for new change orders</label>
+                </div>
+            </div>
+        </div>
+        <textarea id="changeOrderReason" class="form-control form-control-sm" rows="3" placeholder="Explain what changed, why it changed, and what this change order adds or credits." oninput="handleChangeOrderScopeInput()"></textarea>
+        <div class="change-order-scope-status mt-1" id="changeOrderScopeStatus"></div>
         <div class="small text-muted mt-1">Only add the changed work here. Approved change orders stay linked to the original quote forever.</div>
     </div>
 
@@ -4139,6 +4178,7 @@ Example:
     <script src="quote-discounts.js?v=2026081602"></script>
     <script src="quote-payable-total.js?v=2026081801"></script>
     <script src="quote-portal-readiness.js?v=2026082001"></script>
+    <script src="change-order-scope.js?v=2026082701"></script>
     <script src="app-broadcasts.js?v=1779131000"></script>
     <script src="quote-template-files.js?v=1778012600"></script>
     <script src="community-starter-templates.js?v=1785751200"></script>
@@ -12150,6 +12190,9 @@ Example:
             if (depositAmtEl) depositAmtEl.textContent = qdFormatMoney(depositAmt, '').trim();
             if (remainingEl) remainingEl.textContent = qdFormatMoney(remaining, '').trim();
             updateProfitReport();
+            if (window._quoteDocumentType === 'change_order' && typeof scheduleAutomaticChangeOrderScope === 'function') {
+                scheduleAutomaticChangeOrderScope();
+            }
         }
 
         function qdFormatMoney(value, symbol, options) {
@@ -17591,6 +17634,231 @@ Example:
             return shareCurrentQuotePortal('copy');
         }
 
+        var CHANGE_ORDER_SCOPE_PREFERENCE_KEY = 'ald_change_order_scope_preferences';
+        var _changeOrderScopeTimer = null;
+        var _changeOrderScopeGenerating = false;
+        var _changeOrderScopeLastAttemptFingerprint = '';
+        var _changeOrderScopePreferenceRestored = false;
+        window._changeOrderScopeAutomatic = window._changeOrderScopeAutomatic !== false;
+        window._changeOrderScopeAiOwned = window._changeOrderScopeAiOwned === true;
+        window._changeOrderScopeFingerprint = window._changeOrderScopeFingerprint || '';
+        window._changeOrderScopeLastGeneratedText = window._changeOrderScopeLastGeneratedText || '';
+
+        function getChangeOrderScopePreferences() {
+            var stored = {};
+            try { stored = JSON.parse(localStorage.getItem(CHANGE_ORDER_SCOPE_PREFERENCE_KEY) || '{}'); } catch (error) { stored = {}; }
+            return { automaticDefault: stored.automaticDefault !== false };
+        }
+
+        function writeChangeOrderScopePreferences(preferences) {
+            var normalized = { automaticDefault: !preferences || preferences.automaticDefault !== false };
+            localStorage.setItem(CHANGE_ORDER_SCOPE_PREFERENCE_KEY, JSON.stringify(normalized));
+            return normalized;
+        }
+
+        async function restoreChangeOrderScopePreferences() {
+            if (_changeOrderScopePreferenceRestored) return getChangeOrderScopePreferences();
+            _changeOrderScopePreferenceRestored = true;
+            try {
+                if (!_supabase || !_supabase.auth) return getChangeOrderScopePreferences();
+                var userResult = await _supabase.auth.getUser();
+                var user = userResult && userResult.data && userResult.data.user;
+                if (!user) return getChangeOrderScopePreferences();
+                var result = await _supabase.from('user_data').select('value').eq('user_id', user.id).eq('key', 'change_order_scope_preferences').maybeSingle();
+                if (!result.error && result.data && result.data.value) {
+                    writeChangeOrderScopePreferences(result.data.value);
+                    updateChangeOrderScopeControls();
+                }
+            } catch (error) {
+                console.warn('Change order scope preference restore failed:', error);
+            }
+            return getChangeOrderScopePreferences();
+        }
+
+        function setChangeOrderScopeDefault(enabled) {
+            var preferences = writeChangeOrderScopePreferences({ automaticDefault: enabled !== false });
+            updateChangeOrderScopeControls();
+            if (typeof saveUserDataValue === 'function') {
+                saveUserDataValue('change_order_scope_preferences', preferences, {
+                    entityType: 'quote_preferences',
+                    entityLabel: 'Change order scope preferences',
+                    localStorageKey: CHANGE_ORDER_SCOPE_PREFERENCE_KEY,
+                    background: true
+                }).catch(function(error) { console.warn('Change order scope preference save failed:', error); });
+            }
+        }
+
+        function getChangeOrderScopeDiff() {
+            if (!window.QuoteDrChangeOrderScope) return [];
+            return QuoteDrChangeOrderScope.buildDiff(rooms || [], {
+                includeItem: function(item) {
+                    return typeof quoteOptionalItemIncludedByDefault !== 'function' || quoteOptionalItemIncludedByDefault(item);
+                }
+            });
+        }
+
+        function currentChangeOrderScopeFingerprint() {
+            if (!window.QuoteDrChangeOrderScope) return '';
+            return QuoteDrChangeOrderScope.fingerprint(getChangeOrderScopeDiff());
+        }
+
+        function setChangeOrderScopeStatus(message, tone) {
+            var status = document.getElementById('changeOrderScopeStatus');
+            if (!status) return;
+            var icon = tone === 'success' ? 'fa-circle-check text-success'
+                : tone === 'warning' ? 'fa-triangle-exclamation text-warning'
+                : tone === 'danger' ? 'fa-circle-exclamation text-danger'
+                : 'fa-circle-info text-muted';
+            status.innerHTML = message ? '<i class="fas ' + icon + ' me-1"></i>' + qdTemplateEscapeHtml(message) : '';
+        }
+
+        function updateChangeOrderScopeControls() {
+            var automatic = document.getElementById('changeOrderScopeAutomatic');
+            var preference = document.getElementById('changeOrderScopeDefault');
+            if (automatic) automatic.checked = window._changeOrderScopeAutomatic !== false;
+            if (preference) preference.checked = getChangeOrderScopePreferences().automaticDefault !== false;
+            if (window._quoteDocumentType !== 'change_order') return;
+            var reason = String(document.getElementById('changeOrderReason')?.value || '').trim();
+            var changes = getChangeOrderScopeDiff();
+            if (_changeOrderScopeGenerating) setChangeOrderScopeStatus('Drafting from the original quote and current changes…', 'info');
+            else if (!window._changeOrderScopeAutomatic) setChangeOrderScopeStatus('Automatic drafting is off for this change order.', 'info');
+            else if (reason && !window._changeOrderScopeAiOwned) setChangeOrderScopeStatus('Your wording is protected. Use AI Scope if you want to replace it.', 'warning');
+            else if (!changes.length) setChangeOrderScopeStatus('Automatic is ready and waiting for changed work.', 'info');
+            else if (window._changeOrderScopeAiOwned && window._changeOrderScopeFingerprint === currentChangeOrderScopeFingerprint()) setChangeOrderScopeStatus('Automatic scope is up to date.', 'success');
+            else setChangeOrderScopeStatus('Automatic will draft from ' + changes.length + ' detected change' + (changes.length === 1 ? '' : 's') + '.', 'info');
+        }
+
+        function handleChangeOrderScopeInput() {
+            var value = String(document.getElementById('changeOrderReason')?.value || '').trim();
+            _changeOrderScopeLastAttemptFingerprint = '';
+            if (value !== String(window._changeOrderScopeLastGeneratedText || '').trim()) {
+                window._changeOrderScopeAiOwned = false;
+                window._changeOrderScopeFingerprint = '';
+            }
+            if (typeof markUnsaved === 'function') markUnsaved();
+            updateChangeOrderScopeControls();
+            if (!value) scheduleAutomaticChangeOrderScope();
+        }
+
+        function setChangeOrderScopeAutomatic(enabled) {
+            window._changeOrderScopeAutomatic = enabled !== false;
+            if (window._changeOrderScopeAutomatic) _changeOrderScopeLastAttemptFingerprint = '';
+            if (typeof markUnsaved === 'function') markUnsaved();
+            updateChangeOrderScopeControls();
+            if (window._changeOrderScopeAutomatic) scheduleAutomaticChangeOrderScope({ immediate: true });
+        }
+
+        async function changeOrderAutomaticAiAllowed() {
+            if (window._quotedrActiveProTrials && window._quotedrActiveProTrials.ai_refine) return true;
+            if (typeof isCurrentUserPro === 'function') return !!(await isCurrentUserPro());
+            return true;
+        }
+
+        function scheduleAutomaticChangeOrderScope(options) {
+            options = options || {};
+            if (window._quoteDocumentType !== 'change_order' || window._changeOrderScopeAutomatic === false) return;
+            clearTimeout(_changeOrderScopeTimer);
+            _changeOrderScopeTimer = setTimeout(function() {
+                generateChangeOrderScope({ automatic: true }).catch(function(error) {
+                    console.warn('Automatic change order scope failed:', error);
+                });
+            }, options.immediate ? 0 : 1100);
+        }
+
+        async function generateChangeOrderScope(options) {
+            options = options || {};
+            var isManual = options.manual === true;
+            if (window._quoteDocumentType !== 'change_order' || _changeOrderScopeGenerating) return false;
+            if (!window.QuoteDrChangeOrderScope) {
+                if (isManual) qdAlert('AI Scope is still loading. Please reload QuoteDr and try again.');
+                return false;
+            }
+            var changes = getChangeOrderScopeDiff();
+            if (!changes.length) {
+                updateChangeOrderScopeControls();
+                if (isManual) qdAlert('Make at least one change from the original quote so AI can draft the scope.');
+                return false;
+            }
+            var fingerprint = QuoteDrChangeOrderScope.fingerprint(changes);
+            var textarea = document.getElementById('changeOrderReason');
+            var current = String(textarea && textarea.value || '').trim();
+            if (!isManual) {
+                if (window._changeOrderScopeAutomatic === false) return false;
+                if (_changeOrderScopeLastAttemptFingerprint === fingerprint) return false;
+                if (current && !window._changeOrderScopeAiOwned) {
+                    updateChangeOrderScopeControls();
+                    return false;
+                }
+                if (window._changeOrderScopeAiOwned && window._changeOrderScopeFingerprint === fingerprint && current) {
+                    updateChangeOrderScopeControls();
+                    return true;
+                }
+                if (!(await changeOrderAutomaticAiAllowed())) {
+                    _changeOrderScopeLastAttemptFingerprint = fingerprint;
+                    setChangeOrderScopeStatus('Automatic AI Scope is available with Pro. Your scope can still be entered manually.', 'info');
+                    return false;
+                }
+            } else {
+                if (typeof requireProFeature === 'function') {
+                    var allowed = await requireProFeature('ai_refine', 'AI Scope');
+                    if (!allowed) return false;
+                }
+                if (current && !window._changeOrderScopeAiOwned) {
+                    var replace = await qdConfirm('Replace your current reason / scope with a new AI draft based on the detected changes?', {
+                        title: 'Replace Current Scope?',
+                        okText: 'Draft New Scope',
+                        okClass: 'btn-primary',
+                        type: 'warning'
+                    });
+                    if (!replace) return false;
+                }
+            }
+
+            var button = options.button || document.getElementById('changeOrderAiScopeBtn');
+            var originalHtml = button ? button.innerHTML : '';
+            _changeOrderScopeGenerating = true;
+            _changeOrderScopeLastAttemptFingerprint = fingerprint;
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Writing…';
+            }
+            updateChangeOrderScopeControls();
+            try {
+                if (typeof getSupabaseFunctionAuthHeaders !== 'function') throw new Error('Please sign in again before using AI Scope.');
+                var response = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/ai-assistant', {
+                    method: 'POST',
+                    headers: await getSupabaseFunctionAuthHeaders(),
+                    body: JSON.stringify({
+                        feature: 'ai_assistant',
+                        messages: [{ role: 'user', content: QuoteDrChangeOrderScope.buildPrompt(changes) }]
+                    })
+                });
+                var data = await response.json();
+                if (!response.ok || data.error) throw new Error(data.error || 'AI Scope failed');
+                var generated = QuoteDrChangeOrderScope.normalizeReply(data.reply || '');
+                if (!generated) throw new Error('AI did not return scope text. Please try again.');
+                if (textarea) textarea.value = generated;
+                window._changeOrderScopeAiOwned = true;
+                window._changeOrderScopeFingerprint = fingerprint;
+                window._changeOrderScopeLastGeneratedText = generated;
+                if (typeof markUnsaved === 'function') markUnsaved();
+                if (isManual && typeof completeProTrialFeature === 'function') completeProTrialFeature('ai_refine', 'AI Scope');
+                return true;
+            } catch (error) {
+                console.error('Change order AI Scope failed:', error);
+                if (isManual) qdAlert(error.message || 'AI Scope failed. Please try again.');
+                else setChangeOrderScopeStatus('Automatic drafting could not finish. Your scope was not changed.', 'danger');
+                return false;
+            } finally {
+                _changeOrderScopeGenerating = false;
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = originalHtml;
+                }
+                updateChangeOrderScopeControls();
+            }
+        }
+
         window._quoteDocumentType = window._quoteDocumentType || 'quote';
         window._parentQuoteId = window._parentQuoteId || '';
         window._parentQuoteNumber = window._parentQuoteNumber || '';
@@ -17632,6 +17900,19 @@ Example:
             }, 0);
         }
 
+        function coSnapshotUpgradeGroups(groups) {
+            return (Array.isArray(groups) ? groups : []).map(function(group) {
+                return {
+                    id: group && group.id || '',
+                    name: group && group.name || '',
+                    selectedOptionIds: Array.isArray(group && group.selectedOptionIds) ? group.selectedOptionIds.slice() : [],
+                    options: (group && group.options || []).map(function(option) {
+                        return { id: option && option.id || '', name: option && option.name || '' };
+                    })
+                };
+            });
+        }
+
         function coSnapshotItem(item) {
             item = item || {};
             return {
@@ -17644,6 +17925,18 @@ Example:
                 materialCost: parseFloat(item.materialCost) || 0,
                 notes: item.notes || '',
                 itemDescription: item.itemDescription || '',
+                optional: item.optional === true,
+                optionalSelectedByDefault: item.optionalSelectedByDefault !== false,
+                upgraded: item.upgraded === true,
+                upgrade: item.upgrade ? { name: item.upgrade.name || '', description: item.upgrade.description || '' } : null,
+                upgradeGroups: coSnapshotUpgradeGroups(item.upgradeGroups),
+                choiceGroup: item.choiceGroup ? {
+                    selectedOptionIds: Array.isArray(item.choiceGroup.selectedOptionIds) ? item.choiceGroup.selectedOptionIds.slice() : [],
+                    options: (item.choiceGroup.options || []).map(function(option) {
+                        return { id: option && option.id || '', name: option && option.name || '' };
+                    }),
+                    enhancementGroups: coSnapshotUpgradeGroups(item.choiceGroup.enhancementGroups)
+                } : null,
                 markup: quoteItemOwnMarkupPercent(item),
                 total: item.total !== undefined ? parseFloat(item.total) || 0 : coLineAmount(item)
             };
@@ -17774,6 +18067,11 @@ Example:
                 var baseStatus = document.getElementById('quoteStatus')?.value || '';
                 coMenu.style.display = (!isCo && window._supabaseQuoteId && ['accepted','invoiced','paid'].includes(baseStatus)) ? '' : 'none';
             }
+            updateChangeOrderScopeControls();
+            if (isCo) {
+                restoreChangeOrderScopePreferences().catch(function(){});
+                scheduleAutomaticChangeOrderScope();
+            }
         }
 
         async function createChangeOrderFromCurrentQuote() {
@@ -17874,6 +18172,11 @@ Example:
             if (document.getElementById('quoteStatus')) document.getElementById('quoteStatus').value = 'draft';
             if (document.getElementById('quoteTitle')) document.getElementById('quoteTitle').value = 'Change Order #' + nextNumber;
             if (document.getElementById('changeOrderReason')) document.getElementById('changeOrderReason').value = '';
+            window._changeOrderScopeAutomatic = getChangeOrderScopePreferences().automaticDefault !== false;
+            window._changeOrderScopeAiOwned = false;
+            window._changeOrderScopeFingerprint = '';
+            window._changeOrderScopeLastGeneratedText = '';
+            _changeOrderScopeLastAttemptFingerprint = '';
             window._changeOrderBaseRooms = JSON.parse(JSON.stringify(parentData.rooms || []));
             rooms = coPrepareRoomsFromParent(parentData.rooms || []);
             if (!rooms.length) {
@@ -18019,6 +18322,7 @@ Example:
         updateMeasurementUnitLabels();
         updateQuoteDividerLabels();
         renderRooms();
+        restoreChangeOrderScopePreferences().catch(function(){});
 
         if (typeof renderTemplateDropdown === 'function') renderTemplateDropdown();
         renderTermsCheckboxes();

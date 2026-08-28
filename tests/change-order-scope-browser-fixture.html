@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Change Order Scope Fixture</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>body { background: #eef4fb; padding: 1rem; } #fixture { max-width: 1100px; margin: 0 auto; }</style>
+</head>
+<body>
+    <main id="fixture"></main>
+    <script>
+        fetch('../quote-builder.html').then(function(response) { return response.text(); }).then(function(source) {
+            var parsed = new DOMParser().parseFromString(source, 'text/html');
+            parsed.querySelectorAll('style').forEach(function(style) { document.head.appendChild(style.cloneNode(true)); });
+            var banner = parsed.getElementById('changeOrderBanner');
+            banner.style.display = 'block';
+            document.getElementById('fixture').appendChild(banner);
+            document.getElementById('changeOrderBannerTitle').textContent = 'Change Order #1';
+            document.getElementById('changeOrderBannerMeta').textContent = 'Linked to Quote #Q-2026-0042 | Original total: $5,950.24';
+            document.getElementById('changeOrderScopeAutomatic').checked = true;
+            document.getElementById('changeOrderScopeDefault').checked = true;
+            document.getElementById('changeOrderScopeStatus').innerHTML = '<i class="fas fa-circle-info text-muted me-1"></i>Automatic is ready and waiting for changed work.';
+        });
+    </script>
+</body>
+</html>

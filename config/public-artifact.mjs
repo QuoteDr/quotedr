@@ -61,6 +61,7 @@ export const publicArtifactConfig = Object.freeze({
     'birthday-rewards.js',
     'card-payment-rules.js',
     'change-orders.js',
+    'change-order-scope.js',
     'chatbot-feedback-topics.js',
     'client-document-decisions.js',
     'community-starter-templates.js',
