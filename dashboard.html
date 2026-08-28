@@ -1216,7 +1216,7 @@
                 if (confirmedAmountCents !== null) payload.confirmedAmountCents = confirmedAmountCents;
                 var result = await callDocumentPaymentFunction(payload, true);
                 if (result && result.payment && result.payment.documentId) delete dashboardFullQuoteRows[result.payment.documentId];
-                if (decision === 'confirmed' && result && result.payment) {
+                if (decision === 'confirmed' && result && result.payment && result.payment.paymentMode !== 'change_order_continue') {
                     await promptDashboardDepositShortfall(result.payment.documentId, result.payment);
                 }
                 if (typeof qdToast === 'function') qdToast({
@@ -1345,7 +1345,8 @@
                 var portalVisible = !!(q.data && q.data.portal_visible);
                 var portalAddedLabel = portalVisible ? formatPortalAddedAt(q.data) : '';
                 var payments = q.data && Array.isArray(q.data.payments) ? q.data.payments : [];
-                var depositPayment = payments.slice().reverse().find(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; });
+                var depositPayment = payments.slice().reverse().find(function(payment) { return ['deposit', 'invoice_deposit', 'change_order_continue'].includes(payment.type) && payment.paid_at; });
+                var changeOrderContinuePayment = !!(depositPayment && depositPayment.type === 'change_order_continue');
                 var receivedSummary = q.data && (q.data.paymentsReceived || q.data.paymentReceived);
                 var depositReceivedCents = Math.max(
                     0,
@@ -1353,19 +1354,26 @@
                     Math.round(Number(depositPayment && depositPayment.amount_cents || 0))
                 );
                 var depositReceived = depositReceivedCents > 0;
-                var depositSecured = !!(q.data && (q.data.deposit_paid === true || q.data.paymentStatus === 'paid'));
+                var depositSecured = changeOrderContinuePayment
+                    ? !!(q.data && q.data.change_order_payment_satisfied === true)
+                    : !!(q.data && (q.data.deposit_paid === true || q.data.paymentStatus === 'paid'));
                 var depositShortfallAccepted = !!(q.data && q.data.deposit_shortfall_accepted === true);
                 var depositDueCents = Math.max(0, Math.round(Number(q.data && q.data.deposit_due_cents || 0)));
                 var depositAmount = depositReceived ? dashboardPaymentMoney(depositReceivedCents) : 'Deposit';
-                var depositStatusText = depositShortfallAccepted
-                    ? 'Lower deposit accepted — project secured'
-                    : (depositSecured ? 'Deposit requirement satisfied' : (dashboardPaymentMoney(depositDueCents) + ' still needed to satisfy deposit'));
+                var continuePaymentDueCents = Math.max(0, Math.round(Number(q.data && q.data.change_order_payment_due_cents || 0)));
+                var depositStatusText = changeOrderContinuePayment
+                    ? (depositSecured ? 'Payment-to-continue requirement satisfied' : (dashboardPaymentMoney(continuePaymentDueCents) + ' still needed before work continues'))
+                    : (depositShortfallAccepted
+                        ? 'Lower deposit accepted — project secured'
+                        : (depositSecured ? 'Deposit requirement satisfied' : (dashboardPaymentMoney(depositDueCents) + ' still needed to satisfy deposit')));
                 var editableManualDeposit = depositPayment && depositPayment.provider === 'manual' && depositPayment.payment_record_id ? depositPayment : null;
                 var depositPaymentEvidence = editableManualDeposit ? (dashboardPaymentEvidenceByRecord[editableManualDeposit.payment_record_id] || []).find(function(evidence) { return evidence.uploadedBy === 'contractor'; }) : null;
                 var manualPaymentReport = dashboardManualPaymentReports[q.id] || null;
                 var manualPaymentEvidence = manualPaymentReport ? (dashboardPaymentEvidenceByRecord[manualPaymentReport.id] || []).find(function(evidence) { return evidence.uploadedBy === 'contractor'; }) : null;
                 var manualPaymentAmount = manualPaymentReport ? '$' + (Number(manualPaymentReport.amount_cents || 0) / 100).toFixed(2) : '';
-                var manualPaymentPurpose = manualPaymentReport && manualPaymentReport.payment_type === 'invoice_full' ? 'invoice payment' : 'deposit';
+                var manualPaymentPurpose = manualPaymentReport && manualPaymentReport.payment_type === 'invoice_full'
+                    ? 'invoice payment'
+                    : (manualPaymentReport && manualPaymentReport.payment_type === 'change_order_continue' ? 'payment required to continue work' : 'deposit');
                 var reviewReady = !isInvalid && dashboardIsPaidForReviewRequest(q);
                 var reviewSentAt = q.data && q.data.review_request_sent_at;
                 var reviewNudge = shouldShowReviewNudge(q);
@@ -1412,7 +1420,7 @@
                     ${isInvalid ? `<div class="alert alert-danger py-2 px-2 mt-2 mb-0 small"><i class="fas fa-ban me-1"></i><strong>No longer valid.</strong> This invoice remains in the client portal for reference only and cannot be paid.</div>` : ''}
                     ${status === 'accepted' && q.data && q.data.client_upgraded ? `<div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing - <a href="interactive-quote-viewer.html?id=${encodeURIComponent(q.id)}&preview=1&admin_preview=1" class="alert-link">review quote</a></div>` : ''}
                     ${portalVisible ? `<div class="portal-locked-note mt-2"><i class="fas fa-shield-halved me-1"></i>This document is locked while it is in the client portal. Remove from portal or duplicate as a revision to edit.</div>` : ''}
-                    ${depositReceived ? `<div class="alert ${depositSecured ? 'alert-success' : 'alert-warning'} py-2 px-2 mt-2 mb-0 small"><div><i class="fas fa-credit-card me-1"></i><strong>${escapeHtml(depositAmount)} received</strong>${depositPayment && depositPayment.paid_at ? ' on ' + escapeHtml(formatDate(depositPayment.paid_at)) : ''}</div><div class="mt-1">${escapeHtml(depositStatusText)}</div><div class="d-flex gap-2 flex-wrap mt-1">${editableManualDeposit ? `<button class="btn btn-link btn-sm p-0" onclick="event.stopPropagation();decideDashboardManualPayment(${jsAttr(editableManualDeposit.payment_record_id)}, 'confirmed', ${Number(editableManualDeposit.amount_cents || 0)}, true)"><i class="fas fa-pencil-alt me-1"></i>Edit received amount</button>${!depositPaymentEvidence ? `<button data-account-permission="payments.manage" class="btn btn-link btn-sm p-0" onclick="event.stopPropagation();addDashboardPaymentEvidence(${jsAttr(editableManualDeposit.payment_record_id)})"><i class="fas fa-paperclip me-1"></i>Add payment proof</button>` : ''}` : ''}${(!depositSecured || depositShortfallAccepted) ? `<button class="btn btn-link btn-sm p-0" onclick="event.stopPropagation();reviewDashboardDepositDecision(${jsAttr(q.id)})"><i class="fas fa-scale-balanced me-1"></i>Review deposit decision</button>` : ''}</div>${editableManualDeposit ? dashboardPaymentEvidenceMarkup(editableManualDeposit.payment_record_id) : ''}</div>` : ''}
+                    ${depositReceived ? `<div class="alert ${depositSecured ? 'alert-success' : 'alert-warning'} py-2 px-2 mt-2 mb-0 small"><div><i class="fas fa-credit-card me-1"></i><strong>${escapeHtml(depositAmount)} received</strong>${depositPayment && depositPayment.paid_at ? ' on ' + escapeHtml(formatDate(depositPayment.paid_at)) : ''}</div><div class="mt-1">${escapeHtml(depositStatusText)}</div><div class="d-flex gap-2 flex-wrap mt-1">${editableManualDeposit ? `<button class="btn btn-link btn-sm p-0" onclick="event.stopPropagation();decideDashboardManualPayment(${jsAttr(editableManualDeposit.payment_record_id)}, 'confirmed', ${Number(editableManualDeposit.amount_cents || 0)}, true)"><i class="fas fa-pencil-alt me-1"></i>Edit received amount</button>${!depositPaymentEvidence ? `<button data-account-permission="payments.manage" class="btn btn-link btn-sm p-0" onclick="event.stopPropagation();addDashboardPaymentEvidence(${jsAttr(editableManualDeposit.payment_record_id)})"><i class="fas fa-paperclip me-1"></i>Add payment proof</button>` : ''}` : ''}${!changeOrderContinuePayment && (!depositSecured || depositShortfallAccepted) ? `<button class="btn btn-link btn-sm p-0" onclick="event.stopPropagation();reviewDashboardDepositDecision(${jsAttr(q.id)})"><i class="fas fa-scale-balanced me-1"></i>Review deposit decision</button>` : ''}</div>${editableManualDeposit ? dashboardPaymentEvidenceMarkup(editableManualDeposit.payment_record_id) : ''}</div>` : ''}
                     ${manualPaymentReport ? `<div class="alert alert-warning py-2 px-2 mt-2 mb-0 small"><div><i class="fas fa-clock me-1"></i><strong>Client reports sending a ${escapeHtml(manualPaymentPurpose)} by ${escapeHtml(dashboardManualPaymentLabel(manualPaymentReport))}.</strong> Requested amount: ${escapeHtml(manualPaymentAmount)}. Enter the amount that actually arrived.</div><div class="d-flex gap-1 mt-2 flex-wrap"><button class="btn btn-success btn-sm" onclick="event.stopPropagation();decideDashboardManualPayment(${jsAttr(manualPaymentReport.id)}, 'confirmed', ${Number(manualPaymentReport.amount_cents || 0)}, false)"><i class="fas fa-keyboard me-1"></i>Enter amount received</button><button class="btn btn-outline-danger btn-sm" onclick="event.stopPropagation();decideDashboardManualPayment(${jsAttr(manualPaymentReport.id)}, 'rejected')"><i class="fas fa-xmark me-1"></i>Not received</button>${!manualPaymentEvidence ? `<button data-account-permission="payments.manage" class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation();addDashboardPaymentEvidence(${jsAttr(manualPaymentReport.id)})"><i class="fas fa-paperclip me-1"></i>Add payment proof</button>` : ''}</div>${dashboardPaymentEvidenceMarkup(manualPaymentReport.id)}</div>` : ''}
                     ${reviewSentAt ? `<div class="alert alert-success py-1 px-2 mt-2 mb-0 small"><i class="fab fa-google me-1"></i><strong>Review requested</strong> on ${escapeHtml(formatDate(reviewSentAt))}</div>` : ''}
                     ${reviewNudge ? `<div class="alert alert-warning py-2 px-2 mt-2 mb-0 small d-flex justify-content-between align-items-center gap-2 flex-wrap"><span><i class="fas fa-star me-1"></i>You haven't asked ${escapeHtml(clientName)} for a Google review yet. Click while the job is still fresh in their mind.</span><span class="d-flex gap-1"><button class="btn btn-sm btn-warning" onclick="sendGoogleReviewRequest(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fab fa-google me-1"></i>Request now</button><button class="btn btn-sm btn-outline-secondary" onclick="dismissGoogleReviewNudge(${jsAttr(q.id)})">Never show again</button></span></div>` : ''}
@@ -2755,6 +2763,56 @@
             await shareClientPortal(quoteId, pending.clientName, pending.clientEmail, { autoCopy: true });
         }
 
+        function dashboardChangeOrderContinuePaymentConfig(quote) {
+            var data = quote && quote.data || {};
+            var raw = data.changeOrderContinuePayment || data.change_order_continue_payment;
+            if (!raw || typeof raw !== 'object' || Number(raw.version || 0) < 1) return null;
+            var amountCents = Math.max(0, Math.round(Number(raw.amount_cents || raw.amountCents || 0)));
+            return { version: 1, required: raw.required === true && amountCents > 0, amount_cents: amountCents };
+        }
+
+        async function configureDashboardChangeOrderContinuePayment(quote) {
+            if (!dashboardDocumentIsChangeOrder(quote)) return true;
+            if (dashboardChangeOrderContinuePaymentConfig(quote)) return true;
+            var choice = await qdConfirm(
+                'Do you require a payment before continuing work on this change order? If yes, the client can pay by card when enabled or report a direct payment for you to confirm.',
+                {
+                    title: 'Payment to Continue Work',
+                    okText: 'Require payment',
+                    okClass: 'btn-primary',
+                    secondaryText: 'No payment required',
+                    secondaryValue: 'no_payment_required',
+                    secondaryClass: 'btn-outline-secondary',
+                    cancelText: 'Cancel',
+                    type: 'info'
+                }
+            );
+            if (choice !== true && choice !== 'no_payment_required') return false;
+            var config = { version: 1, required: false, amount_cents: 0, configured_at: new Date().toISOString() };
+            if (choice === true) {
+                var entered = await qdPrompt(
+                    'Enter the fixed amount the client must pay after approving this change order before work continues.',
+                    '',
+                    { title: 'Amount Due to Continue Work', okText: 'Use this amount', okClass: 'btn-primary' }
+                );
+                if (entered === null) return false;
+                var amountCents = dashboardPaymentAmountToCents(entered);
+                if (!amountCents) {
+                    await qdAlert('Enter a valid amount greater than $0, with no more than two decimal places.', { title: 'Check Payment Amount', type: 'warning' });
+                    return false;
+                }
+                config.required = true;
+                config.amount_cents = amountCents;
+            }
+            var nextData = Object.assign({}, quote.data || {}, { changeOrderContinuePayment: config });
+            await qdDurableQuoteRowUpdate(quote.id, { data: nextData }, 'Save change-order payment requirement');
+            quote.data = nextData;
+            var summary = (allQuotes || []).find(function(row) { return row.id === quote.id; });
+            if (summary) summary.data = Object.assign({}, summary.data || {}, { changeOrderContinuePayment: config });
+            delete dashboardFullQuoteRows[quote.id];
+            return true;
+        }
+
         async function shareDocumentThroughPortal(quoteId, clientName, clientEmail) {
             var quote = (allQuotes || []).find(function(row) { return row.id === quoteId; });
             if (!quote) { qdAlert('Could not find that document. Please refresh and try again.'); return; }
@@ -2765,6 +2823,7 @@
                 qdAlert(error && error.message ? error.message : String(error), { title: 'Portal Destination Locked', type: 'warning' });
                 return;
             }
+            if (!await configureDashboardChangeOrderContinuePayment(quote)) return;
             if (quote.data && quote.data.portal_visible === true) {
                 await shareClientPortal(quoteId, clientName, clientEmail, { autoCopy: true });
                 return;

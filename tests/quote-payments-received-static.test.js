@@ -32,8 +32,8 @@ assert(
 );
 
 assert(
-  storage.includes('paymentsReceived: getQuotePaymentsReceived()') &&
-  storage.includes('setQuotePaymentsReceived(data.paymentsReceived || data.paymentReceived || null);'),
+  storage.includes("paymentsReceived: isChangeOrder ? { name: 'Deposit paid', amount: 0 } : getQuotePaymentsReceived()") &&
+  storage.includes("setQuotePaymentsReceived(loadedDocumentType === 'change_order' ? null : (data.paymentsReceived || data.paymentReceived || null));"),
   'Quote storage should persist and hydrate payments received'
 );
 

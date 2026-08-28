@@ -1038,6 +1038,7 @@
                 changeOrderBaseRooms: window._changeOrderBaseRooms || [],
                 changeOrderPreviousApprovedTotal: parseFloat(window._changeOrderPreviousApprovedTotal || window._previousApprovedChangeOrderTotal || 0) || 0,
                 changeOrderPriceSummary: window._changeOrderPriceSummary || null,
+                changeOrderContinuePayment: window._changeOrderContinuePayment || loadedData.changeOrderContinuePayment || loadedData.change_order_continue_payment || null,
                 changeOrderNumber: parseInt(window._changeOrderNumber || 0, 10) || null,
                 changeReason: document.getElementById('changeOrderReason')?.value || '',
                 changeOrderScopeAutomatic: window._changeOrderScopeAutomatic !== false,
@@ -1249,6 +1250,7 @@
             window._changeOrderPreviousApprovedTotal = parseFloat(data.changeOrderPreviousApprovedTotal || data.previousApprovedChangeOrderTotal || 0) || 0;
             window._previousApprovedChangeOrderTotal = window._changeOrderPreviousApprovedTotal;
             window._changeOrderPriceSummary = data.changeOrderPriceSummary || null;
+            window._changeOrderContinuePayment = data.changeOrderContinuePayment || data.change_order_continue_payment || null;
             window._changeOrderNumber = parseInt(data.changeOrderNumber || data.change_order_number || 0, 10) || 0;
             var changeOrderScopeDefault = typeof getChangeOrderScopePreferences === 'function'
                 ? getChangeOrderScopePreferences().automaticDefault !== false

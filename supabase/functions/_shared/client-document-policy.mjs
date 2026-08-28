@@ -17,7 +17,7 @@ const ROOT_SAFE_KEYS = new Set([
   'validUntilDate', 'fullResolutionPhotosEnabled', 'parentQuoteId', 'parent_quote_id',
   'parentQuoteNumber', 'parentQuoteTotal', 'changeOrderNumber', 'change_order_number',
   'changeOrderPreviousApprovedTotal', 'changeOrderPriceSummary', 'changeReason',
-  'changeOrderHighlightLegend',
+  'changeOrderHighlightLegend', 'changeOrderContinuePayment',
   'document_validity', 'documentValidity', 'invalidated_at', 'invalidatedAt',
   'invalidated_reason', 'invalidatedReason', 'voided_at', 'voidedAt',
   'portal_id', 'portal_visible', 'portal_added_at', 'portal_client_name',
@@ -26,6 +26,8 @@ const ROOT_SAFE_KEYS = new Set([
   'manual_payment_reported_at', 'accepted_total_cents', 'deposit_due_cents',
   'balance_due_cents', 'deposit_shortfall_accepted', 'deposit_shortfall_accepted_at',
   'deposit_shortfall_accepted_paid_cents', 'deposit_shortfall_required_cents',
+  'change_order_payment_paid_cents', 'change_order_payment_due_cents',
+  'change_order_payment_satisfied',
   'quoted_total_cents', 'accepted_at', 'accepted_by', 'approved_at', 'approved_by',
   'signed_at', 'signed_by', 'signature_method', 'signature_text', 'signature_url',
   'signature_data_url', 'terms_accepted', 'terms_accepted_at', 'terms_accepted_snapshot',
@@ -34,7 +36,7 @@ const ROOT_SAFE_KEYS = new Set([
 ]);
 
 const ROOT_COMPLEX_KEYS = new Set([
-  'quoteDividerLabels', 'terms', 'changeOrderPriceSummary', 'changeOrderHighlightLegend', '_roomNotes',
+  'quoteDividerLabels', 'terms', 'changeOrderPriceSummary', 'changeOrderHighlightLegend', 'changeOrderContinuePayment', '_roomNotes',
   'terms_accepted_snapshot'
 ]);
 
@@ -688,6 +690,16 @@ function sanitizeQuoteAdjustment(data, totals) {
   };
 }
 
+function sanitizeChangeOrderContinuePayment(value) {
+  if (!isRecord(value) || finiteNumber(value.version, 0) < 1) return null;
+  const amountCents = Math.max(0, Math.round(finiteNumber(value.amount_cents ?? value.amountCents, 0)));
+  return {
+    version: 1,
+    required: value.required === true && amountCents > 0,
+    amount_cents: value.required === true ? amountCents : 0,
+  };
+}
+
 function sanitizeChangeOrderHighlightLegend(value) {
   if (!isRecord(value)) return {};
   const output = {};
@@ -805,6 +817,9 @@ export function projectClientDocumentData(data, options = {}) {
   else delete output.changeOrderPriceSummary;
   if (isRecord(source.changeOrderHighlightLegend)) output.changeOrderHighlightLegend = sanitizeChangeOrderHighlightLegend(source.changeOrderHighlightLegend);
   else delete output.changeOrderHighlightLegend;
+  const changeOrderContinuePayment = sanitizeChangeOrderContinuePayment(source.changeOrderContinuePayment || source.change_order_continue_payment);
+  if (changeOrderContinuePayment) output.changeOrderContinuePayment = changeOrderContinuePayment;
+  else delete output.changeOrderContinuePayment;
   if (isRecord(source.quoteDividerLabels)) {
     output.quoteDividerLabels = {
       singular: cleanString(source.quoteDividerLabels.singular, 80),

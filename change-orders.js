@@ -36,6 +36,13 @@
         return isFinite(total) ? total : 0;
     }
 
+    function rowPaidCents(row) {
+        var data = coData(row);
+        var received = data.paymentsReceived || data.paymentReceived || {};
+        var amount = Number(received.amount || received.value || 0);
+        return Number.isFinite(amount) ? Math.max(0, Math.round(amount * 100)) : 0;
+    }
+
     function status(rowOrData) {
         var data = coData(rowOrData);
         return rowOrData?.status || data.status || 'draft';
@@ -77,7 +84,10 @@
             siblings: siblings,
             parentTotal: rowTotal(parentRes.data),
             previousApprovedTotal: approvedChangeOrderTotal(previousApproved),
-            allApprovedTotal: approvedChangeOrderTotal(siblings, currentRow.id)
+            allApprovedTotal: approvedChangeOrderTotal(siblings, currentRow.id),
+            projectPaidCents: rowPaidCents(parentRes.data) + siblings.reduce(function(sum, row) {
+                return sum + rowPaidCents(row);
+            }, 0)
         };
     }
 
@@ -114,6 +124,7 @@
         number: changeOrderNumber,
         quoteTotal: quoteTotal,
         rowTotal: rowTotal,
+        rowPaidCents: rowPaidCents,
         status: status,
         approvedChangeOrders: approvedChangeOrders,
         approvedChangeOrderTotal: approvedChangeOrderTotal,

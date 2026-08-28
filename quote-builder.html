@@ -17256,6 +17256,83 @@ Example:
             });
         }
 
+        function changeOrderContinuePaymentConfig(quoteData) {
+            var config = quoteData && (quoteData.changeOrderContinuePayment || quoteData.change_order_continue_payment) || window._changeOrderContinuePayment;
+            if (!config || typeof config !== 'object' || Number(config.version || 0) < 1) return null;
+            var amountCents = Math.max(0, Math.round(Number(config.amount_cents || config.amountCents || 0)));
+            return {
+                version: 1,
+                required: config.required === true && amountCents > 0,
+                amount_cents: config.required === true ? amountCents : 0,
+                configured_at: config.configured_at || config.configuredAt || ''
+            };
+        }
+
+        async function configureChangeOrderContinuePayment(quoteData) {
+            if (!quotePortalDocumentIsChangeOrder(quoteData) || quoteData.portal_visible === true) return quoteData;
+            var existing = changeOrderContinuePaymentConfig(quoteData);
+            if (existing) {
+                quoteData.changeOrderContinuePayment = existing;
+                return quoteData;
+            }
+            var decision = typeof qdConfirm === 'function'
+                ? await qdConfirm('Do you require a payment before continuing work on this change order? This is separate from the original quote deposit.', {
+                    title: 'Payment to Continue Work',
+                    okText: 'Require payment',
+                    okClass: 'btn-primary',
+                    secondaryText: 'No payment required',
+                    secondaryValue: 'not_required',
+                    secondaryClass: 'btn-outline-secondary',
+                    cancelText: 'Cancel',
+                    type: 'info'
+                })
+                : (window.confirm('Require a payment before continuing work on this change order?') ? true : 'not_required');
+            if (decision !== true && decision !== 'not_required') throw new Error('Quote was not added to the portal.');
+
+            var config = { version: 1, required: false, amount_cents: 0, configured_at: new Date().toISOString() };
+            if (decision === true) {
+                var coSummary = quoteData.changeOrderPriceSummary || window._changeOrderPriceSummary || {};
+                var suggested = Math.max(0, Number(coSummary.netChange || quoteData.grandTotal || quoteData.total || 0));
+                var context = null;
+                try {
+                    if (window.QuoteDrChangeOrders && typeof QuoteDrChangeOrders.fetchContext === 'function') {
+                        context = await QuoteDrChangeOrders.fetchContext(window._supabaseClient || window._supabase, {
+                            id: quoteData.supabaseId || window._supabaseQuoteId || '',
+                            type: 'change_order',
+                            parent_quote_id: quotePortalParentId(quoteData),
+                            change_order_number: quoteData.changeOrderNumber || window._changeOrderNumber || 0,
+                            total: quoteData.grandTotal || quoteData.total || 0,
+                            data: quoteData
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Could not calculate the live project balance before portal sharing:', error);
+                }
+                var updatedTotal = Number(coSummary.updatedTotal || 0);
+                if (!updatedTotal && context) updatedTotal = Number(context.parentTotal || 0) + Number(context.previousApprovedTotal || 0) + Number(quoteData.grandTotal || quoteData.total || 0);
+                var outstanding = updatedTotal > 0 ? Math.max(0, updatedTotal - Number(context && context.projectPaidCents || 0) / 100) : 0;
+                if (outstanding > 0) suggested = Math.min(suggested > 0 ? suggested : outstanding, outstanding);
+                var entered = await qdPrompt('Enter the amount the client must pay before work continues. The client will see this separately from the full outstanding project balance.', suggested.toFixed(2), {
+                    title: 'Amount Due to Continue Work',
+                    okText: 'Use this amount',
+                    okClass: 'btn-primary'
+                });
+                if (entered === null) throw new Error('Quote was not added to the portal.');
+                var normalized = String(entered).trim().replace(/[$,\s]/g, '');
+                if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) throw new Error('Enter a valid payment amount with no more than two decimal places.');
+                var amountCents = Math.round(Number(normalized) * 100);
+                if (!Number.isSafeInteger(amountCents) || amountCents <= 0) throw new Error('The payment required to continue must be greater than $0.');
+                if (outstanding > 0 && amountCents > Math.round(outstanding * 100)) throw new Error('The payment required to continue cannot exceed the current outstanding project balance of $' + outstanding.toFixed(2) + '.');
+                config.required = true;
+                config.amount_cents = amountCents;
+            }
+            quoteData.changeOrderContinuePayment = config;
+            window._changeOrderContinuePayment = config;
+            window._currentQuoteData = Object.assign({}, window._currentQuoteData || {}, { changeOrderContinuePayment: config });
+            window._loadedQuoteData = Object.assign({}, window._loadedQuoteData || {}, { changeOrderContinuePayment: config });
+            return quoteData;
+        }
+
         async function confirmChangeOrderHighlightLegend(quoteData) {
             if (!quoteData || quoteData.documentType !== 'change_order') return true;
             var legend = quoteData.changeOrderHighlightLegend || {};
@@ -17683,6 +17760,7 @@ Example:
             if (!portal || !portal.id) throw new Error('Choose which client portal this quote belongs in.');
             var quoteWillBecomePortalLocked = quoteData.portal_visible !== true;
             if (quoteWillBecomePortalLocked) {
+                quoteData = await configureChangeOrderContinuePayment(quoteData);
                 var highlightsConfirmed = await confirmChangeOrderHighlightLegend(quoteData);
                 if (!highlightsConfirmed) throw new Error('Explain the manual Change Order highlights before adding this document to the portal.');
                 var pricingConfirmed = await confirmQuotePortalZeroPricedItems(quoteData);
@@ -18592,6 +18670,7 @@ Example:
             if (document.getElementById('changeOrderReason')) document.getElementById('changeOrderReason').value = '';
             setQuotePaymentsReceived(null);
             window._changeOrderHighlightLegend = {};
+            window._changeOrderContinuePayment = null;
             window._changeOrderScopeAutomatic = getChangeOrderScopePreferences().automaticDefault !== false;
             window._changeOrderScopeAiOwned = false;
             window._changeOrderScopeFingerprint = '';

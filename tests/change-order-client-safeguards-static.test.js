@@ -31,9 +31,10 @@ assert(
 assert(
   viewer.includes('function getViewerPaymentsReceived()') &&
     viewer.includes("if (co && co.isChangeOrder(quoteData))") &&
-    viewer.includes("return { name: 'Deposit paid', amount: 0 }") &&
-    viewer.includes('if (co && co.isChangeOrder(quoteData)) return 0;'),
-  'the client viewer must ignore stale payments already present in older Change Order snapshots'
+    viewer.includes("return { name: 'Amount paid already', amount: viewerChangeOrderProjectPaidCents() / 100 }") &&
+    viewer.includes('_documentPaymentState.projectPaidCents') &&
+    viewer.includes('quoteData.change_order_payment_paid_cents'),
+  'the client viewer must ignore stale inherited deposits while using authoritative project and Change Order payments'
 );
 
 assert(

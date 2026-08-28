@@ -94,7 +94,7 @@ test('payment-proof callers request the same current shared-client bundle', () =
   const viewer = read('interactive-quote-viewer.html');
   const dashboardVersion = dashboard.match(/supabase-v2\.js\?v=(\d+)/)?.[1];
   const viewerVersion = viewer.match(/supabase-v2\.js\?v=(\d+)/)?.[1];
-  assert.equal(dashboardVersion, '2026081901');
+  assert.equal(dashboardVersion, '2026082401');
   assert.equal(viewerVersion, dashboardVersion);
   assert.notEqual(dashboardVersion, '2026081801', 'a stale client bundle leaves payment-proof helpers undefined');
 });

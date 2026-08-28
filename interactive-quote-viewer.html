@@ -1621,6 +1621,7 @@ if (location.search.includes('debug')) {
                 <span id="quoteTaxLabel">HST (13%)</span>
                 <strong id="quoteTaxDisplay">$0.00</strong>
             </div>
+            <div class="total-row" id="quoteUpdatedProjectTotalDisplay" style="display:none;"></div>
             <div class="total-row" id="quotePaymentTotalDisplay" style="display:none;"></div>
             <div class="alert alert-warning py-2 px-3 small mt-2 mb-0" id="quoteTbdDisplay" style="display:none;"></div>
             <div class="deposit-summary" id="depositSummary">
@@ -1628,7 +1629,7 @@ if (location.search.includes('debug')) {
                     <span id="depositLabel">Deposit</span>
                     <strong id="depositAmountDisplay">$0.00</strong>
                 </div>
-                <div class="total-row py-0 mt-1">
+                <div class="total-row py-0 mt-1" id="remainingBalanceRow">
                     <span>Remaining balance</span>
                     <strong id="remainingBalanceDisplay">$0.00</strong>
                 </div>
@@ -1919,7 +1920,7 @@ if (location.search.includes('debug')) {
     <script src="typed-signature.js?v=2026080301"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="card-payment-rules.js?v=2026080301"></script>
-    <script src="supabase-v2.js?v=2026081901"></script>
+    <script src="supabase-v2.js?v=2026082401"></script>
     <script src="save-coordinator.js?v=2026081801"></script>
     <script src="change-orders.js?v=1778152100"></script>
 
@@ -2332,14 +2333,24 @@ if (location.search.includes('debug')) {
             if (!payment) return false;
             _documentPaymentState = payment;
             var paidCents = Math.max(0, Math.round(Number(payment.paidCents || 0)));
-            quoteData.paymentStatus = payment.fullPaid ? 'paid' : (paidCents > 0 ? 'partially_paid' : 'unpaid');
-            quoteData.deposit_paid = payment.depositSecured === true;
-            if (payment.depositSecured) quoteData.deposit_paid_at = quoteData.deposit_paid_at || new Date().toISOString();
+            var changeOrderPayment = viewerIsChangeOrder();
+            quoteData.paymentStatus = changeOrderPayment
+                ? (payment.continueWorkSecured ? 'paid' : (paidCents > 0 ? 'partially_paid' : 'unpaid'))
+                : (payment.fullPaid ? 'paid' : (paidCents > 0 ? 'partially_paid' : 'unpaid'));
+            quoteData.deposit_paid = changeOrderPayment ? false : payment.depositSecured === true;
+            if (!changeOrderPayment && payment.depositSecured) quoteData.deposit_paid_at = quoteData.deposit_paid_at || new Date().toISOString();
             else quoteData.deposit_paid_at = null;
             quoteData.paymentsReceived = {
-                name: quoteData.paymentsReceived && quoteData.paymentsReceived.name || 'Deposit paid',
+                name: changeOrderPayment ? 'Change-order payment received' : (quoteData.paymentsReceived && quoteData.paymentsReceived.name || 'Deposit paid'),
                 amount: paidCents / 100
             };
+            if (changeOrderPayment) {
+                quoteData.change_order_payment_paid_cents = paidCents;
+                quoteData.change_order_payment_due_cents = Math.max(0, Math.round(Number(payment.continueWorkDueCents || 0)));
+                quoteData.change_order_payment_satisfied = payment.continueWorkSecured === true;
+                quoteData.change_order_project_paid_cents = Math.max(0, Math.round(Number(payment.projectPaidCents || 0)));
+                quoteData.change_order_project_balance_due_cents = Math.max(0, Math.round(Number(payment.projectBalanceDueCents || 0)));
+            }
             if (Number.isFinite(Number(payment.balanceDueCents))) quoteData.balance_due_cents = Math.max(0, Math.round(Number(payment.balanceDueCents)));
             if (Number.isFinite(Number(payment.requiredDepositCents))) quoteData.deposit_shortfall_required_cents = Math.max(0, Math.round(Number(payment.requiredDepositCents)));
             if (Number.isFinite(Number(payment.depositDueCents))) quoteData.deposit_due_cents = Math.max(0, Math.round(Number(payment.depositDueCents)));
@@ -2357,7 +2368,9 @@ if (location.search.includes('debug')) {
                 quoteData.manual_payment_method = '';
                 quoteData.manual_payment_reported_at = '';
             }
-            return payment.depositSecured === true || payment.fullPaid === true;
+            return changeOrderPayment
+                ? (payment.continueWorkSecured === true || payment.fullPaid === true)
+                : (payment.depositSecured === true || payment.fullPaid === true);
         }
 
         function secureDocumentPaymentPayload(action, extra) {
@@ -2380,6 +2393,7 @@ if (location.search.includes('debug')) {
             try {
                 var result = await callDocumentPaymentFunction(secureDocumentPaymentPayload('verify_checkout', { sessionId: sessionId }), false);
                 var secured = applyClientDocumentPaymentState(result.payment);
+                updateTotal();
                 if (typeof renderDepositPaymentSection === 'function') renderDepositPaymentSection();
                 applyQuoteCompletionState();
                 if (!secured && notice) notice.innerHTML = '<div class="alert alert-warning"><strong>Stripe is still confirming this payment.</strong> Refresh in a moment before trying again.</div>';
@@ -2411,7 +2425,7 @@ if (location.search.includes('debug')) {
 
             initPortalDocumentActivityTracking(quoteId, shareToken, portalAnchorId);
             var quoteTotal = quoteData.grandTotal || quoteData.total || 0;
-            if (quoteTotal) {
+            if (quoteTotal || (viewerIsChangeOrder() && viewerChangeOrderContinuePayment().required)) {
                 initPaymentSection(quoteTotal);
             }
 
@@ -4068,10 +4082,36 @@ if (location.search.includes('debug')) {
             return adjustment.type === 'discount' ? -amount : amount;
         }
 
+        function viewerIsChangeOrder() {
+            var co = window.QuoteDrChangeOrders;
+            return !!(co && co.isChangeOrder(quoteData));
+        }
+
+        function viewerChangeOrderContinuePayment() {
+            var raw = quoteData && (quoteData.changeOrderContinuePayment || quoteData.change_order_continue_payment) || {};
+            var amountCents = Math.max(0, Math.round(Number(raw.amount_cents || raw.amountCents || 0)));
+            return {
+                required: raw.required === true && amountCents > 0,
+                amountCents: amountCents
+            };
+        }
+
+        function viewerChangeOrderProjectPaidCents() {
+            if (_documentPaymentState && Number.isFinite(Number(_documentPaymentState.projectPaidCents))) {
+                return Math.max(0, Math.round(Number(_documentPaymentState.projectPaidCents)));
+            }
+            var ctx = quoteData.changeOrderContext || {};
+            return Math.max(0, Math.round(Number(
+                quoteData.change_order_project_paid_cents
+                || ctx.projectPaidCents
+                || 0
+            )));
+        }
+
         function getViewerPaymentsReceived() {
             var co = window.QuoteDrChangeOrders;
             if (co && co.isChangeOrder(quoteData)) {
-                return { name: 'Deposit paid', amount: 0 };
+                return { name: 'Amount paid already', amount: viewerChangeOrderProjectPaidCents() / 100 };
             }
             var payment = quoteData && (quoteData.paymentsReceived || quoteData.paymentReceived);
             payment = payment || {};
@@ -5149,6 +5189,84 @@ if (location.search.includes('debug')) {
             if (totalEl) totalEl.textContent = paymentAmount > 0 ? viewerMoney(balanceDue) : viewerMoney(total);
         }
 
+        function updateViewerChangeOrderTotalBreakdown(coTotals) {
+            var projectBeforeChange = coTotals.originalTotal + coTotals.previousApprovedTotal;
+            var serverUpdatedCents = _documentPaymentState && Math.round(Number(_documentPaymentState.updatedProjectTotalCents || 0));
+            var updatedProjectTotal = serverUpdatedCents > 0 ? serverUpdatedCents / 100 : coTotals.updatedTotal;
+            var projectPaid = Math.min(updatedProjectTotal, viewerChangeOrderProjectPaidCents() / 100);
+            var serverBalanceCents = _documentPaymentState && Math.round(Number(_documentPaymentState.projectBalanceDueCents));
+            var outstandingTotal = Number.isFinite(serverBalanceCents)
+                ? Math.max(0, serverBalanceCents / 100)
+                : Math.max(0, updatedProjectTotal - projectPaid);
+            var continueConfig = viewerChangeOrderContinuePayment();
+            var continueRequiredCents = _documentPaymentState && Number.isFinite(Number(_documentPaymentState.continueWorkRequiredCents))
+                ? Math.max(0, Math.round(Number(_documentPaymentState.continueWorkRequiredCents)))
+                : continueConfig.amountCents;
+            var continueDueCents = _documentPaymentState && Number.isFinite(Number(_documentPaymentState.continueWorkDueCents))
+                ? Math.max(0, Math.round(Number(_documentPaymentState.continueWorkDueCents)))
+                : Math.max(0, continueRequiredCents - Math.max(0, Math.round(Number(quoteData.change_order_payment_paid_cents || 0))));
+
+            var subtotalEl = document.getElementById('quoteSubtotalDisplay');
+            var upgradesEl = document.getElementById('upgradesTotalDisplay');
+            var adjustmentEl = document.getElementById('quoteAdjustmentTotalDisplay');
+            var taxEl = document.getElementById('quoteTaxDisplay');
+            var taxLabelEl = document.getElementById('quoteTaxLabel');
+            var updatedEl = document.getElementById('quoteUpdatedProjectTotalDisplay');
+            var paymentEl = document.getElementById('quotePaymentTotalDisplay');
+            var remainingBalanceRow = document.getElementById('remainingBalanceRow');
+            var depositSummary = document.getElementById('depositSummary');
+            var remainingRow = document.getElementById('remainingBalanceRow');
+            var finalLabelEl = document.getElementById('viewerTotalFinalLabel');
+            var finalSubLabelEl = document.getElementById('viewerTotalFinalSubLabel');
+            var totalEl = document.getElementById('newGrandTotal');
+            var rateLabel = (coTotals.taxRate * 100).toFixed(1).replace(/\.0$/, '');
+            var totalTitle = document.querySelector('.total-section .total-title');
+            var totalStatus = document.querySelector('.total-section .total-status');
+
+            if (totalTitle) totalTitle.innerHTML = '<i class="fas fa-calculator me-2"></i>Change Order &amp; Project Total';
+            if (totalStatus) totalStatus.textContent = 'Project balance if approved';
+            if (subtotalEl) subtotalEl.textContent = viewerMoney(projectBeforeChange);
+            if (upgradesEl) {
+                upgradesEl.style.display = 'flex';
+                upgradesEl.innerHTML = `<span>Current adjustments</span><strong>${viewerMoney(coTotals.netSubtotal, { forceSign: true })}</strong>`;
+            }
+            if (adjustmentEl) {
+                adjustmentEl.style.display = 'none';
+                adjustmentEl.innerHTML = '';
+            }
+            if (taxEl) taxEl.textContent = viewerMoney(coTotals.tax, { forceSign: coTotals.tax !== 0 });
+            if (taxLabelEl) taxLabelEl.textContent = coTotals.taxEnabled === false
+                ? (coTotals.taxLabel || 'HST') + ' not applied'
+                : (coTotals.taxLabel || 'HST') + ' (' + rateLabel + '%)';
+            if (updatedEl) {
+                updatedEl.style.display = 'flex';
+                updatedEl.innerHTML = `<span>Updated job total</span><strong>${viewerMoney(updatedProjectTotal)}</strong>`;
+            }
+            if (paymentEl) {
+                paymentEl.style.display = 'flex';
+                paymentEl.innerHTML = `<span>Amount paid already</span><strong>${viewerMoney(-projectPaid, { forceSign: projectPaid > 0 })}</strong>`;
+            }
+            if (remainingBalanceRow) remainingBalanceRow.style.display = 'flex';
+            if (depositSummary) {
+                var showContinuePayment = continueRequiredCents > 0;
+                depositSummary.style.display = showContinuePayment ? 'block' : 'none';
+                if (showContinuePayment) {
+                    var labelEl = document.getElementById('depositLabel');
+                    var amountEl = document.getElementById('depositAmountDisplay');
+                    if (labelEl) labelEl.textContent = 'Amount due to continue work';
+                    if (amountEl) amountEl.textContent = viewerMoney(continueDueCents / 100);
+                }
+            }
+            if (remainingRow) remainingRow.style.display = 'none';
+            if (finalLabelEl) finalLabelEl.textContent = 'Outstanding total';
+            if (finalSubLabelEl) finalSubLabelEl.textContent = 'After confirmed payments';
+            if (totalEl) totalEl.textContent = viewerMoney(outstandingTotal);
+
+            _quoteTotal = updatedProjectTotal;
+            _quoteTotalCents = Math.round(updatedProjectTotal * 100);
+            return { updatedProjectTotal: updatedProjectTotal, projectPaid: projectPaid, outstandingTotal: outstandingTotal };
+        }
+
         function viewerLockedTaxableCents(totalCents, taxRate, taxEnabled) {
             if (taxEnabled === false || !taxRate) return totalCents;
             var estimate = Math.max(0, Math.round(totalCents / (1 + taxRate)));
@@ -5338,32 +5456,16 @@ if (location.search.includes('debug')) {
                     if (remainingEl) remainingEl.textContent = viewerMoney(remaining);
                 }
             }
-            if (_paymentOptions) renderDepositPaymentSection();
             if (isChangeOrder) {
                 var coTotals = computeViewerChangeOrderTotals();
-                var upgradesElCo = document.getElementById('upgradesTotalDisplay');
-                if (upgradesElCo) {
-                    upgradesElCo.style.display = 'flex';
-                    upgradesElCo.innerHTML = `<span>Current adjustments</span><strong>${viewerMoney(coTotals.netChange, { forceSign: true })}</strong>`;
-                }
                 quoteData.changeOrderPriceSummary = Object.assign({}, quoteData.changeOrderPriceSummary || {}, coTotals);
-                updateQuoteTotalBreakdown(
-                    coTotals.originalTotal + coTotals.previousApprovedTotal + coTotals.netSubtotal,
-                    coTotals.tax,
-                    coTotals.updatedTotal,
-                    coTotals.taxLabel,
-                    coTotals.taxRate,
-                    paymentReceivedAmount,
-                    coTotals.taxEnabled
-                );
-                var finalLabelElCo = document.getElementById('viewerTotalFinalLabel');
-                var finalSubLabelElCo = document.getElementById('viewerTotalFinalSubLabel');
-                if (finalLabelElCo) finalLabelElCo.textContent = 'Updated Project Total';
-                if (finalSubLabelElCo) finalSubLabelElCo.textContent = 'Includes this change order if approved';
+                updateViewerChangeOrderTotalBreakdown(coTotals);
                 var heroTotal = document.getElementById('heroGrandTotal');
                 if (heroTotal) heroTotal.textContent = viewerMoney(coTotals.netChange, { forceSign: true });
+                if (_paymentOptions) renderDepositPaymentSection();
                 return;
             }
+            if (_paymentOptions) renderDepositPaymentSection();
             var heroTotal = document.getElementById('heroGrandTotal');
             if (heroTotal) heroTotal.textContent = viewerMoney(balanceDue);
         }
@@ -5505,6 +5607,10 @@ if (location.search.includes('debug')) {
         }
 
         function quoteDepositIsPaid() {
+            if (viewerIsChangeOrder()) {
+                if (_documentPaymentState) return _documentPaymentState.continueWorkSecured === true || _documentPaymentState.fullPaid === true;
+                return quoteData.change_order_payment_satisfied === true;
+            }
             if (_documentPaymentState) return !!(_documentPaymentState.depositSecured || _documentPaymentState.fullPaid);
             return quoteData.deposit_paid === true
                 || String(quoteData.paymentStatus || '').toLowerCase() === 'paid';
@@ -5516,8 +5622,12 @@ if (location.search.includes('debug')) {
         }
 
         function quotePaidAmountCents() {
-            var co = window.QuoteDrChangeOrders;
-            if (co && co.isChangeOrder(quoteData)) return 0;
+            if (viewerIsChangeOrder()) {
+                if (_documentPaymentState && Number.isFinite(Number(_documentPaymentState.paidCents))) {
+                    return Math.max(0, Math.round(Number(_documentPaymentState.paidCents)));
+                }
+                return Math.max(0, Math.round(Number(quoteData.change_order_payment_paid_cents || 0)));
+            }
             if (_documentPaymentState && Number.isFinite(Number(_documentPaymentState.paidCents))) {
                 return Math.max(0, Math.round(Number(_documentPaymentState.paidCents)));
             }
@@ -6084,6 +6194,9 @@ if (location.search.includes('debug')) {
         }
 
         function resolveQuoteDepositTerms() {
+            if (viewerIsChangeOrder()) {
+                return { deposit_required: false, kind: 'none', percent: 0, fixed_cents: 0 };
+            }
             var explicit = quoteData.payment_terms || quoteData.paymentTerms;
             if (explicit && Number(explicit.version || 0) >= 2) {
                 var explicitRequired = explicit.deposit_required !== false && explicit.kind !== 'none';
@@ -6122,6 +6235,13 @@ if (location.search.includes('debug')) {
         }
 
         function currentDepositAmountCents() {
+            if (viewerIsChangeOrder()) {
+                if (_documentPaymentState && Number.isFinite(Number(_documentPaymentState.continueWorkDueCents))) {
+                    return Math.max(0, Math.round(Number(_documentPaymentState.continueWorkDueCents)));
+                }
+                var config = viewerChangeOrderContinuePayment();
+                return Math.max(0, config.amountCents - quotePaidAmountCents());
+            }
             var liveTotalCents = Math.max(0, Math.round(Number(_quoteTotalCents || _quoteTotal * 100 || 0)));
             if (
                 quoteIsAccepted() &&
@@ -6233,8 +6353,11 @@ if (location.search.includes('debug')) {
         function renderDepositPaymentSection() {
             var section = document.getElementById('stripeDepositSection');
             if (!section) return;
+            var changeOrderPayment = viewerIsChangeOrder();
+            var continueConfig = viewerChangeOrderContinuePayment();
             _depositTerms = resolveQuoteDepositTerms();
-            if (!_depositTerms.deposit_required || !quoteIsAccepted()) {
+            var paymentRequired = changeOrderPayment ? continueConfig.required : _depositTerms.deposit_required;
+            if (!paymentRequired || !quoteIsAccepted()) {
                 section.style.display = 'none';
                 return;
             }
@@ -6249,15 +6372,19 @@ if (location.search.includes('debug')) {
             if (!title || !prompt || !status || !stripeActions || !manualMethods) return;
 
             if (quoteDepositIsPaid()) {
-                title.textContent = 'Project Secured';
+                title.textContent = changeOrderPayment ? 'Work Can Continue' : 'Project Secured';
                 var paymentEvidenceMarkup = clientPaymentEvidenceUploadMarkup(_documentPaymentState && _documentPaymentState.evidencePaymentRecordId || '');
-                if (quoteDepositShortfallAccepted()) {
+                if (!changeOrderPayment && quoteDepositShortfallAccepted()) {
                     var acceptedCents = quotePaidAmountCents();
                     prompt.textContent = 'Your contractor accepted the ' + viewerMoney(acceptedCents / 100) + ' received as the deposit for this project.';
                     status.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-1"></i><strong>Lower deposit accepted.</strong> No additional deposit is required before scheduling. Your remaining project balance is unchanged.</div>' + paymentEvidenceMarkup;
                 } else {
-                    prompt.textContent = 'Your deposit has been received and confirmed.';
-                    status.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-1"></i><strong>Deposit received.</strong> Your contractor can now move ahead with scheduling.</div>' + paymentEvidenceMarkup;
+                    prompt.textContent = changeOrderPayment
+                        ? 'The required change-order payment has been received and confirmed.'
+                        : 'Your deposit has been received and confirmed.';
+                    status.innerHTML = changeOrderPayment
+                        ? '<div class="alert alert-success"><i class="fas fa-check-circle me-1"></i><strong>Payment received.</strong> Your contractor can continue with this approved change.</div>' + paymentEvidenceMarkup
+                        : '<div class="alert alert-success"><i class="fas fa-check-circle me-1"></i><strong>Deposit received.</strong> Your contractor can now move ahead with scheduling.</div>' + paymentEvidenceMarkup;
                 }
                 stripeActions.innerHTML = '';
                 manualMethods.innerHTML = '';
@@ -6266,12 +6393,18 @@ if (location.search.includes('debug')) {
 
             var paidCents = quotePaidAmountCents();
             if (paidCents > 0 && amountCents > 0) {
-                title.textContent = 'Deposit Balance Remaining';
-                prompt.textContent = viewerMoney(paidCents / 100) + ' has been received. ' + amountText + ' is still needed to secure your project.';
-                status.innerHTML = '<div class="alert alert-warning"><i class="fas fa-clock me-1"></i><strong>Partial deposit received.</strong> Pay the remaining ' + escapeHtml(amountText) + ' to satisfy the deposit requirement.</div>';
+                title.textContent = changeOrderPayment ? 'Payment Remaining to Continue Work' : 'Deposit Balance Remaining';
+                prompt.textContent = changeOrderPayment
+                    ? viewerMoney(paidCents / 100) + ' has been received toward this change order. ' + amountText + ' is still required before work continues.'
+                    : viewerMoney(paidCents / 100) + ' has been received. ' + amountText + ' is still needed to secure your project.';
+                status.innerHTML = changeOrderPayment
+                    ? '<div class="alert alert-warning"><i class="fas fa-clock me-1"></i><strong>Partial payment received.</strong> Pay the remaining ' + escapeHtml(amountText) + ' to satisfy the continue-work requirement.</div>'
+                    : '<div class="alert alert-warning"><i class="fas fa-clock me-1"></i><strong>Partial deposit received.</strong> Pay the remaining ' + escapeHtml(amountText) + ' to satisfy the deposit requirement.</div>';
             } else {
-                title.textContent = 'Secure Your Project';
-                prompt.textContent = 'Send the ' + amountText + ' deposit to lock in this accepted quote.';
+                title.textContent = changeOrderPayment ? 'Payment Required to Continue Work' : 'Secure Your Project';
+                prompt.textContent = changeOrderPayment
+                    ? 'Send ' + amountText + ' after approving this change order so work can continue.'
+                    : 'Send the ' + amountText + ' deposit to lock in this accepted quote.';
                 status.innerHTML = '';
             }
             if (_documentPaymentState && _documentPaymentState.status === 'client_reported') {
@@ -6284,7 +6417,10 @@ if (location.search.includes('debug')) {
             var card = _paymentOptions && (_paymentOptions.card || _paymentOptions.stripe) ? (_paymentOptions.card || _paymentOptions.stripe) : {};
             var cardAvailable = card.available === true || card.ready === true;
             if (cardAvailable) {
-                stripeActions.innerHTML = '<button id="payDepositBtn" class="btn btn-warning btn-lg w-100 mb-3" onclick="handleDepositPayment()"><i class="fas fa-credit-card me-2"></i><span id="depositBtnLabel">Pay ' + escapeHtml(amountText) + ' securely by card</span></button><div class="small text-muted mb-3"><i class="fab fa-stripe me-1"></i>Secure checkout powered by Stripe. The amount shown is the deposit due.</div>';
+                var cardAmountCopy = changeOrderPayment
+                    ? 'The amount shown is required to continue work.'
+                    : 'The amount shown is the deposit due.';
+                stripeActions.innerHTML = '<button id="payDepositBtn" class="btn btn-warning btn-lg w-100 mb-3" onclick="handleDepositPayment()"><i class="fas fa-credit-card me-2"></i><span id="depositBtnLabel">Pay ' + escapeHtml(amountText) + ' securely by card</span></button><div class="small text-muted mb-3"><i class="fab fa-stripe me-1"></i>Secure checkout powered by Stripe. ' + cardAmountCopy + '</div>';
             } else {
                 stripeActions.innerHTML = card.enabled
                     ? '<div class="alert alert-light border small text-start"><i class="fas fa-credit-card me-1"></i>Card payment is temporarily unavailable. You can still use any method below.</div>'
@@ -6307,12 +6443,12 @@ if (location.search.includes('debug')) {
             var instructions = String(manual.instructions || '').trim();
             manualMethods.innerHTML = methods.length
                 ? '<div class="small fw-semibold text-muted mb-2">Or pay directly</div><div class="deposit-method-list">' + methods.join('') + '</div>' + (instructions ? '<div class="small text-muted text-start mt-3"><strong>Payment instructions:</strong> ' + escapeHtml(instructions).replace(/\n/g, '<br>') + '</div>' : '') + clientPaymentEvidenceUploadMarkup('')
-                : '<div class="alert alert-light border mb-0">Contact your contractor to arrange the deposit.</div>';
+                : '<div class="alert alert-light border mb-0">Contact your contractor to arrange ' + (changeOrderPayment ? 'this payment.' : 'the deposit.') + '</div>';
         }
 
         async function initPaymentSection(total) {
             _quoteTotal = Number(total || 0);
-            if (!_quoteTotal) return;
+            if (!_quoteTotal && !viewerIsChangeOrder()) return;
             _paymentOptions = await loadContractorPaymentSettings();
             _paymentSettings = _paymentOptions;
             _depositTerms = resolveQuoteDepositTerms();
@@ -6326,11 +6462,12 @@ if (location.search.includes('debug')) {
                 return;
             }
             if (typeof callDocumentPaymentFunction !== 'function' || !quoteIsAccepted()) return;
-            logPortalDocumentActivity('payment_clicked', { metadata: { payment_type: 'deposit', method: 'card' } });
+            var paymentType = viewerIsChangeOrder() ? 'change_order_continue' : 'deposit';
+            logPortalDocumentActivity('payment_clicked', { metadata: { payment_type: paymentType, method: 'card' } });
             var params = new URLSearchParams(window.location.search);
             var quoteId = params.get('id') || '';
             var amountCents = currentDepositAmountCents();
-            var operationEntity = quoteId + ':deposit:' + amountCents;
+            var operationEntity = quoteId + ':' + paymentType + ':' + amountCents;
             var btn = document.getElementById('payDepositBtn');
             if (btn) {
                 btn.disabled = true;
@@ -6338,7 +6475,7 @@ if (location.search.includes('debug')) {
             }
             try {
                 var result = await callDocumentPaymentFunction(secureDocumentPaymentPayload('create_checkout', {
-                    paymentType: 'deposit',
+                    paymentType: paymentType,
                     returnUrl: window.location.href,
                     idempotencyKey: qdGetExternalOperationId('stripe_checkout', operationEntity)
                 }), false);
@@ -6369,22 +6506,27 @@ if (location.search.includes('debug')) {
                 }
             }
             var label = method === 'etransfer' ? 'e-transfer' : method;
+            var changeOrderPayment = viewerIsChangeOrder();
+            var paymentType = changeOrderPayment ? 'change_order_continue' : 'deposit';
             var confirmed = typeof qdConfirm === 'function'
-                ? await qdConfirm('Report that you have sent or arranged this ' + label + ' deposit? Your contractor will verify it before the project is marked secured.', { title: 'Report Deposit', okText: 'Report payment', okClass: 'btn-primary' })
-                : window.confirm('Report this deposit to your contractor?');
+                ? await qdConfirm(changeOrderPayment
+                    ? 'Report that you have sent or arranged this ' + label + ' payment? Your contractor will verify it before work continues.'
+                    : 'Report that you have sent or arranged this ' + label + ' deposit? Your contractor will verify it before the project is marked secured.', { title: changeOrderPayment ? 'Report Payment' : 'Report Deposit', okText: 'Report payment', okClass: 'btn-primary' })
+                : window.confirm(changeOrderPayment ? 'Report this payment to your contractor?' : 'Report this deposit to your contractor?');
             if (!confirmed) return;
             var params = new URLSearchParams(window.location.search);
             var quoteId = params.get('id') || '';
-            var operationEntity = quoteId + ':deposit:' + method + ':' + currentDepositAmountCents();
+            var operationEntity = quoteId + ':' + paymentType + ':' + method + ':' + currentDepositAmountCents();
             try {
                 var result = await callDocumentPaymentFunction(secureDocumentPaymentPayload('report_manual', {
-                    paymentType: 'deposit',
+                    paymentType: paymentType,
                     method: method,
                     idempotencyKey: qdGetExternalOperationId('manual_payment_report', operationEntity)
                 }), false);
                 applyClientDocumentPaymentState(result.payment);
+                updateTotal();
                 qdCompleteExternalOperation('manual_payment_report', operationEntity);
-                logPortalDocumentActivity('payment_reported', { metadata: { payment_type: 'deposit', method: method } });
+                logPortalDocumentActivity('payment_reported', { metadata: { payment_type: paymentType, method: method } });
                 if (evidenceFile && result.payment && result.payment.report && result.payment.report.id) {
                     try {
                         await uploadPaymentEvidence({
@@ -6403,7 +6545,7 @@ if (location.search.includes('debug')) {
                 }
                 renderDepositPaymentSection();
             } catch(error) {
-                qdAlert('Could not report the deposit: ' + (error.message || 'Please try again.'));
+                qdAlert('Could not report the ' + (changeOrderPayment ? 'payment' : 'deposit') + ': ' + (error.message || 'Please try again.'));
             }
         }
 

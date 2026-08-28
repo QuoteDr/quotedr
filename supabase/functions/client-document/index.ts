@@ -16,6 +16,7 @@ import {
   sanitizeClientDocumentStyle,
 } from "../_shared/client-document-policy.mjs";
 import { isProductionClientPortalUrl } from "../_shared/client-portal-url.mjs";
+import { legacyUnlinkedPaidCents } from "../_shared/document-payment-accounting.mjs";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://axmoffknvblluibuitrq.supabase.co";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso";
@@ -576,6 +577,17 @@ async function loadPaymentOptions(row: QuoteRow) {
 
 function normalizedDocumentPaymentTerms(row: QuoteRow, settings: Record<string, unknown>) {
   const data = rowData(row);
+  if (documentTypeLabel(row) === "change order") {
+    return {
+      version: 2,
+      deposit_required: false,
+      kind: "none",
+      percent: null,
+      fixed_cents: null,
+      currency: String(data.currency || "CAD").toUpperCase(),
+      due: "after_acceptance",
+    };
+  }
   const explicit = data.payment_terms || data.paymentTerms;
   if (explicit && typeof explicit === "object" && Number((explicit as Record<string, unknown>).version || 0) >= 2) {
     const terms = explicit as Record<string, unknown>;
@@ -913,15 +925,29 @@ async function loadAuthoritativeChangeOrderContext(row: QuoteRow) {
   const previousApprovedTotal = previousApproved.reduce((sum, candidate) => sum + authoritativeRowTotal(candidate), 0);
   const allApprovedTotal = approved.filter((candidate) => candidate.id !== row.id).reduce((sum, candidate) => sum + authoritativeRowTotal(candidate), 0);
   const parentStyle = parent ? sanitizeClientDocumentStyle(rowData(parent).style) : {};
+  const projectRows = [parent, ...siblings].filter(Boolean) as QuoteRow[];
+  const projectDocumentIds = projectRows.map((candidate) => candidate.id);
+  let projectPaidCents = projectRows.reduce((sum, candidate) => sum + legacyUnlinkedPaidCents(candidate), 0);
+  if (projectDocumentIds.length) {
+    const { data: paymentRows, error: paymentError } = await supabase
+      .from("payment_records")
+      .select("amount_cents")
+      .in("quote_id", projectDocumentIds)
+      .in("status", ["paid", "confirmed"]);
+    if (paymentError) throw paymentError;
+    projectPaidCents += (paymentRows || []).reduce((sum, payment) => sum + Math.max(0, Math.round(Number(payment.amount_cents || 0))), 0);
+  }
   return {
     parentTotal,
     previousApprovedTotal,
     allApprovedTotal,
+    projectPaidCents,
     publicContext: {
       parent: parent ? { id: parent.id, data: { style: parentStyle } } : null,
       parentTotal,
       previousApprovedTotal,
       allApprovedTotal,
+      projectPaidCents,
     },
   };
 }

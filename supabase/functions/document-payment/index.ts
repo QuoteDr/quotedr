@@ -46,6 +46,8 @@ type QuoteRow = {
   grand_total?: number | string | null;
   data?: Record<string, any> | null;
   public_share_token_hash?: string | null;
+  parent_quote_id?: string | null;
+  change_order_number?: number | null;
 };
 
 class PaymentError extends Error {
@@ -195,6 +197,71 @@ function isInvoice(row: QuoteRow) {
   return type.includes("invoice") || ["invoiced", "paid", "voided"].includes(String(row.status || "").toLowerCase());
 }
 
+function isChangeOrder(row: QuoteRow) {
+  const data = rowData(row);
+  const type = String(row.type || data.documentType || data.type || "").toLowerCase();
+  return type === "change_order" || type === "change order";
+}
+
+function changeOrderParentId(row: QuoteRow) {
+  const data = rowData(row);
+  return normalizeId(row.parent_quote_id || data.parentQuoteId || data.parent_quote_id);
+}
+
+function changeOrderContinuePayment(row: QuoteRow) {
+  const data = rowData(row);
+  const raw = data.changeOrderContinuePayment || data.change_order_continue_payment;
+  if (!raw || typeof raw !== "object" || Number(raw.version || 0) < 1) {
+    return { version: 1, required: false, amountCents: 0 };
+  }
+  const amountCents = Math.max(0, Math.round(Number(raw.amount_cents || raw.amountCents || 0)));
+  return { version: 1, required: raw.required === true && amountCents > 0, amountCents };
+}
+
+function rowSequence(row: QuoteRow) {
+  const data = rowData(row);
+  return Number(row.change_order_number ?? data.changeOrderNumber ?? data.change_order_number ?? 0) || 0;
+}
+
+async function changeOrderProjectPaymentContext(admin: any, row: QuoteRow) {
+  const parentId = changeOrderParentId(row);
+  if (!parentId) {
+    return { updatedProjectTotalCents: documentTotalCents(row), projectPaidCents: 0, projectBalanceDueCents: documentTotalCents(row) };
+  }
+  const [parentResult, siblingResult] = await Promise.all([
+    admin.from("quotes").select("*").eq("id", parentId).eq("user_id", row.user_id).maybeSingle(),
+    admin.from("quotes").select("*").eq("parent_quote_id", parentId).eq("user_id", row.user_id),
+  ]);
+  if (parentResult.error) throw parentResult.error;
+  if (siblingResult.error) throw siblingResult.error;
+  const parent = parentResult.data as QuoteRow | null;
+  const siblings = (siblingResult.data as QuoteRow[] || []).filter(isChangeOrder);
+  const currentSequence = rowSequence(row) || Number.MAX_SAFE_INTEGER;
+  const previousApproved = siblings.filter((candidate) => candidate.id !== row.id
+    && String(candidate.status || rowData(candidate).status || "").toLowerCase() === "approved"
+    && rowSequence(candidate) < currentSequence);
+  const updatedProjectTotalCents = documentTotalCents(parent || row)
+    + previousApproved.reduce((sum, candidate) => sum + documentTotalCents(candidate), 0)
+    + documentTotalCents(row);
+  const projectRows = [parent, ...siblings].filter(Boolean) as QuoteRow[];
+  const projectIds = projectRows.map((candidate) => candidate.id);
+  let projectPaidCents = projectRows.reduce((sum, candidate) => sum + legacyUnlinkedPaidCents(candidate), 0);
+  if (projectIds.length) {
+    const { data: records, error } = await admin
+      .from("payment_records")
+      .select("amount_cents")
+      .in("quote_id", projectIds)
+      .in("status", ["paid", "confirmed"]);
+    if (error) throw error;
+    projectPaidCents += (records || []).reduce((sum, record) => sum + Math.max(0, Math.round(Number(record.amount_cents || 0))), 0);
+  }
+  return {
+    updatedProjectTotalCents,
+    projectPaidCents,
+    projectBalanceDueCents: Math.max(0, updatedProjectTotalCents - projectPaidCents),
+  };
+}
+
 function isInvalid(row: QuoteRow) {
   const data = rowData(row);
   const status = String(row.status || data.status || "").toLowerCase();
@@ -263,6 +330,7 @@ function depositAmountCents(totalCents: number, terms: any) {
 
 function paymentType(body: Record<string, any>, row: QuoteRow) {
   const raw = String(body.paymentType || body.purpose || "").toLowerCase();
+  if (isChangeOrder(row)) return "change_order_continue";
   if (raw === "invoice_full") return "invoice_full";
   if (raw === "invoice_deposit") return "invoice_deposit";
   if (isInvoice(row) && raw === "deposit") return "invoice_deposit";
@@ -304,6 +372,45 @@ async function documentPaymentState(admin: any, row: QuoteRow, settings: Record<
     evidenceForDocument(admin, row.id),
   ]);
   const terms = resolveDepositTerms(row, settings);
+  if (isChangeOrder(row)) {
+    const required = changeOrderContinuePayment(row);
+    const secured = records.filter((record: any) => ["paid", "confirmed"].includes(record?.status));
+    const paidCents = secured.reduce((sum: number, record: any) => sum + Math.max(0, Math.round(Number(record.amount_cents || 0))), 0)
+      + legacyUnlinkedPaidCents(row);
+    const project = await changeOrderProjectPaymentContext(admin, row);
+    const maximumRequirementCents = project.projectBalanceDueCents + paidCents;
+    const continueWorkRequiredCents = required.required ? Math.min(required.amountCents, maximumRequirementCents) : 0;
+    const continueWorkDueCents = Math.max(0, continueWorkRequiredCents - paidCents);
+    const reported = records.find((record: any) => record.status === "client_reported");
+    const evidencePaymentRecord = records.find((record: any) => record.provider === "manual" && ["client_reported", "confirmed"].includes(record.status));
+    return {
+      records,
+      totalCents: documentTotalCents(row),
+      paidCents,
+      balanceDueCents: Math.max(0, documentTotalCents(row) - paidCents),
+      terms: { version: 2, deposit_required: false, kind: "none", percent: null, fixed_cents: null, due: "after_acceptance", source: "change_order" },
+      requiredDepositCents: 0,
+      depositDueCents: 0,
+      depositSecured: false,
+      depositShortfallAccepted: false,
+      acceptedDepositCents: 0,
+      continueWorkRequiredCents,
+      continueWorkDueCents,
+      continueWorkSecured: continueWorkRequiredCents > 0 && continueWorkDueCents === 0,
+      paymentMode: "change_order_continue",
+      fullPaid: project.updatedProjectTotalCents > 0 && project.projectPaidCents >= project.updatedProjectTotalCents,
+      ...project,
+      evidence,
+      evidencePaymentRecordId: evidencePaymentRecord?.id || null,
+      reported: reported ? {
+        id: reported.id,
+        method: reported.method,
+        amountCents: reported.amount_cents,
+        reportedAt: reported.reported_at || reported.created_at,
+        status: reported.status,
+      } : null,
+    };
+  }
   const requestedDepositCents = depositAmountCents(documentTotalCents(row), terms);
   const paymentState = calculateRecordedPaymentState(row, records, requestedDepositCents);
   const {
@@ -347,6 +454,7 @@ async function documentPaymentState(admin: any, row: QuoteRow, settings: Record<
 function publicStatus(row: QuoteRow, state: any) {
   let status = "unpaid";
   if (state.fullPaid) status = "paid";
+  else if (state.continueWorkSecured) status = "secured";
   else if (state.depositSecured) status = "secured";
   else if (state.reported) status = "client_reported";
   else if (state.paidCents > 0) status = "partially_paid";
@@ -363,6 +471,13 @@ function publicStatus(row: QuoteRow, state: any) {
     depositShortfallAccepted: state.depositShortfallAccepted,
     acceptedDepositCents: state.acceptedDepositCents,
     fullPaid: state.fullPaid,
+    paymentMode: state.paymentMode || "deposit",
+    continueWorkRequiredCents: Math.max(0, Math.round(Number(state.continueWorkRequiredCents || 0))),
+    continueWorkDueCents: Math.max(0, Math.round(Number(state.continueWorkDueCents || 0))),
+    continueWorkSecured: state.continueWorkSecured === true,
+    updatedProjectTotalCents: Math.max(0, Math.round(Number(state.updatedProjectTotalCents || 0))),
+    projectPaidCents: Math.max(0, Math.round(Number(state.projectPaidCents || 0))),
+    projectBalanceDueCents: Math.max(0, Math.round(Number(state.projectBalanceDueCents || 0))),
     report: state.reported,
     evidencePaymentRecordId: state.evidencePaymentRecordId,
     evidence: (state.evidence || [])
@@ -373,14 +488,27 @@ function publicStatus(row: QuoteRow, state: any) {
 
 function dueAmount(paymentTypeValue: string, state: any) {
   if (paymentTypeValue === "invoice_full") return state.balanceDueCents;
+  if (paymentTypeValue === "change_order_continue") return state.continueWorkDueCents;
   return state.depositDueCents;
+}
+
+function paymentUsesQuoteId(type: string) {
+  return ["deposit", "change_order_continue"].includes(type);
+}
+
+function paymentDescription(type: string, row: QuoteRow) {
+  if (type === "change_order_continue") return `Payment to continue work - ${row.quote_number || "change order"}`;
+  if (type === "invoice_full") return `Invoice ${row.quote_number || row.id}`;
+  return `Deposit for quote ${row.quote_number || row.id}`;
 }
 
 function assertPayable(row: QuoteRow, paymentTypeValue: string, state: any) {
   if (isInvalid(row)) throw new PaymentError("This document is no longer valid and cannot accept payment.", 409, "document_invalid");
   if (paymentTypeValue === "invoice_full" && !isInvoice(row)) throw new PaymentError("Full payment is only available for invoices.", 409, "invoice_required");
-  if (paymentTypeValue !== "invoice_full" && !state.terms.deposit_required) throw new PaymentError("This document does not require a deposit.", 409, "deposit_not_required");
-  if (!isAccepted(row) && paymentTypeValue !== "invoice_full") throw new PaymentError("Accept and sign the quote before sending the deposit.", 409, "quote_acceptance_required");
+  if (isChangeOrder(row) && paymentTypeValue !== "change_order_continue") throw new PaymentError("This change order does not accept quote deposits.", 409, "change_order_payment_type_required");
+  if (paymentTypeValue === "change_order_continue" && state.continueWorkRequiredCents <= 0) throw new PaymentError("This change order does not require a payment to continue work.", 409, "change_order_payment_not_required");
+  if (!["invoice_full", "change_order_continue"].includes(paymentTypeValue) && !state.terms.deposit_required) throw new PaymentError("This document does not require a deposit.", 409, "deposit_not_required");
+  if (!isAccepted(row) && paymentTypeValue !== "invoice_full") throw new PaymentError(paymentTypeValue === "change_order_continue" ? "Approve and sign the change order before sending this payment." : "Accept and sign the quote before sending the deposit.", 409, "quote_acceptance_required");
   if (paymentTypeValue === "invoice_full" && !["invoiced", "paid"].includes(String(row.status || "").toLowerCase())) {
     throw new PaymentError("This invoice is not ready for payment.", 409, "invoice_not_payable");
   }
@@ -444,34 +572,49 @@ async function updateQuotePaymentState(admin: any, row: QuoteRow, record: any, p
   const { settings } = await paymentSettings(admin, row.user_id);
   const state = await documentPaymentState(admin, { ...row, data }, settings);
   const nextReceived = state.paidCents / 100;
+  const changeOrderPayment = isChangeOrder(row);
   const nextData: Record<string, any> = {
     ...data,
-    paymentStatus: state.fullPaid ? "paid" : (state.paidCents > 0 ? "partially_paid" : "unpaid"),
-    deposit_paid: state.depositSecured,
-    deposit_paid_at: state.depositSecured ? (data.deposit_paid_at || paidAt) : null,
+    paymentStatus: changeOrderPayment
+      ? (state.continueWorkSecured ? "paid" : (state.paidCents > 0 ? "partially_paid" : "unpaid"))
+      : (state.fullPaid ? "paid" : (state.paidCents > 0 ? "partially_paid" : "unpaid")),
     accepted_total_cents: state.totalCents,
-    deposit_due_cents: state.depositDueCents,
     balance_due_cents: state.balanceDueCents,
     lastPaymentAt: paidAt,
     manual_payment_reported: false,
     paymentsReceived: {
-      name: ["deposit", "invoice_deposit"].includes(record.payment_type) ? "Deposit paid" : "Payment received",
+      name: record.payment_type === "change_order_continue"
+        ? "Change-order payment received"
+        : (["deposit", "invoice_deposit"].includes(record.payment_type) ? "Deposit paid" : "Payment received"),
       amount: Math.round(nextReceived * 100) / 100,
     },
     payments: nextPayments,
   };
-  if (!state.depositShortfallAccepted) {
+  if (changeOrderPayment) {
+    nextData.deposit_paid = false;
+    nextData.deposit_paid_at = null;
+    nextData.deposit_due_cents = 0;
+    nextData.change_order_payment_paid_cents = state.paidCents;
+    nextData.change_order_payment_due_cents = state.continueWorkDueCents;
+    nextData.change_order_payment_satisfied = state.continueWorkSecured === true;
+  } else if (!state.depositShortfallAccepted) {
+    nextData.deposit_paid = state.depositSecured;
+    nextData.deposit_paid_at = state.depositSecured ? (data.deposit_paid_at || paidAt) : null;
+    nextData.deposit_due_cents = state.depositDueCents;
     nextData.deposit_shortfall_accepted = false;
     nextData.deposit_shortfall_accepted_at = null;
     nextData.deposit_shortfall_accepted_paid_cents = 0;
     nextData.deposit_shortfall_required_cents = 0;
     nextData.deposit_shortfall_accepted_by = null;
   } else {
+    nextData.deposit_paid = state.depositSecured;
+    nextData.deposit_paid_at = state.depositSecured ? (data.deposit_paid_at || paidAt) : null;
+    nextData.deposit_due_cents = state.depositDueCents;
     nextData.deposit_shortfall_accepted_paid_cents = state.paidCents;
     nextData.deposit_shortfall_required_cents = state.requiredDepositCents;
   }
   const update: Record<string, any> = { data: nextData, updated_at: paidAt };
-  if (state.fullPaid) update.status = "paid";
+  if (state.fullPaid && !changeOrderPayment) update.status = "paid";
   else if (isInvoice(row) && String(row.status || "").toLowerCase() === "paid") update.status = "invoiced";
   const { error } = await admin.from("quotes").update(update).eq("id", row.id).eq("user_id", row.user_id);
   if (error) throw error;
@@ -511,7 +654,7 @@ async function createCheckout(admin: any, body: Record<string, any>, row: QuoteR
   const existing = await admin.from("payment_records").select("*").eq("idempotency_key", key).maybeSingle();
   if (existing.error) throw existing.error;
   if (existing.data) {
-    if (existing.data.user_id !== row.user_id || existing.data.quote_id !== (type === "deposit" ? row.id : null) || existing.data.invoice_id !== (type === "deposit" ? null : row.id) || existing.data.amount_cents !== amountCents) {
+    if (existing.data.user_id !== row.user_id || existing.data.quote_id !== (paymentUsesQuoteId(type) ? row.id : null) || existing.data.invoice_id !== (paymentUsesQuoteId(type) ? null : row.id) || existing.data.amount_cents !== amountCents) {
       throw new PaymentError("This payment request conflicts with an earlier attempt. Refresh and try again.", 409, "idempotency_conflict");
     }
     if (existing.data.stripe_checkout_session_id) {
@@ -524,8 +667,8 @@ async function createCheckout(admin: any, body: Record<string, any>, row: QuoteR
   if (!record) {
     const inserted = await admin.from("payment_records").insert({
       user_id: row.user_id,
-      quote_id: type === "deposit" ? row.id : null,
-      invoice_id: type === "deposit" ? null : row.id,
+      quote_id: paymentUsesQuoteId(type) ? row.id : null,
+      invoice_id: paymentUsesQuoteId(type) ? null : row.id,
       payment_type: type,
       status: "pending",
       provider: "stripe",
@@ -533,7 +676,7 @@ async function createCheckout(admin: any, body: Record<string, any>, row: QuoteR
       amount_cents: amountCents,
       currency: currencyFor(row),
       client_email: quoteEmail(row),
-      description: type === "invoice_full" ? `Invoice ${row.quote_number || row.id}` : `Deposit for quote ${row.quote_number || row.id}`,
+      description: paymentDescription(type, row),
       connected_account_id: connection.stripe_account_id,
       metadata: { quote_number: row.quote_number || "", document_type: isInvoice(row) ? "invoice" : "quote" },
       idempotency_key: key,
@@ -546,7 +689,9 @@ async function createCheckout(admin: any, body: Record<string, any>, row: QuoteR
   successUrl.searchParams.set("payment", "success");
   successUrl.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
   const successText = successUrl.toString().replace("%7BCHECKOUT_SESSION_ID%7D", "{CHECKOUT_SESSION_ID}");
-  const productName = type === "invoice_full" ? `Invoice ${row.quote_number || "payment"}` : `Project deposit - Quote ${row.quote_number || ""}`;
+  const productName = type === "change_order_continue"
+    ? `Payment to continue work - ${row.quote_number || "change order"}`
+    : (type === "invoice_full" ? `Invoice ${row.quote_number || "payment"}` : `Project deposit - Quote ${row.quote_number || ""}`);
   const params = new URLSearchParams({
     "payment_method_types[]": "card",
     mode: "payment",
@@ -606,8 +751,8 @@ async function reportManual(admin: any, body: Record<string, any>, row: QuoteRow
   const now = new Date().toISOString();
   const inserted = await admin.from("payment_records").insert({
     user_id: row.user_id,
-    quote_id: type === "deposit" ? row.id : null,
-    invoice_id: type === "deposit" ? null : row.id,
+    quote_id: paymentUsesQuoteId(type) ? row.id : null,
+    invoice_id: paymentUsesQuoteId(type) ? null : row.id,
     payment_type: type,
     status: "client_reported",
     provider: "manual",
@@ -615,7 +760,7 @@ async function reportManual(admin: any, body: Record<string, any>, row: QuoteRow
     amount_cents: amountCents,
     currency: currencyFor(row),
     client_email: quoteEmail(row),
-    description: type === "invoice_full" ? "Client-reported invoice payment" : "Client-reported deposit",
+    description: type === "change_order_continue" ? "Client-reported payment to continue work" : (type === "invoice_full" ? "Client-reported invoice payment" : "Client-reported deposit"),
     client_reference: cleanText(body.reference, 120),
     client_note: cleanText(body.note, 500),
     reported_at: now,
@@ -731,9 +876,14 @@ async function confirmManual(req: Request, admin: any, body: Record<string, any>
     .filter((candidate: any) => candidate.id !== record.id && ["paid", "confirmed"].includes(candidate.status))
     .reduce((sum: number, candidate: any) => sum + Math.max(0, Number(candidate.amount_cents || 0)), 0)
     + legacyUnlinkedPaidCents(row);
-  const maximumAmountCents = Math.max(0, documentTotalCents(row) - otherPaidCents);
+  const maximumAmountCents = isChangeOrder(row)
+    ? (await changeOrderProjectPaymentContext(admin, row)).projectBalanceDueCents
+      + (["paid", "confirmed"].includes(record.status) ? Math.max(0, Number(record.amount_cents || 0)) : 0)
+    : Math.max(0, documentTotalCents(row) - otherPaidCents);
   if (confirmedAmountCents > maximumAmountCents) {
-    throw new PaymentError("The confirmed amount cannot exceed the document balance.", 409, "confirmed_amount_exceeds_balance");
+    throw new PaymentError(isChangeOrder(row)
+      ? "The confirmed amount cannot exceed the outstanding project balance."
+      : "The confirmed amount cannot exceed the document balance.", 409, "confirmed_amount_exceeds_balance");
   }
 
   const confirmed = await admin.from("payment_records").update({
@@ -765,6 +915,7 @@ async function resolveDepositShortfall(req: Request, admin: any, body: Record<st
   if (!documentId) throw new PaymentError("Payment document not found", 404, "payment_document_not_found");
   const row = await fetchQuote(admin, documentId);
   if (!row || row.user_id !== user.id) throw new PaymentError("Payment document not found", 404, "payment_document_not_found");
+  if (isChangeOrder(row)) throw new PaymentError("Change orders use their separate payment-to-continue requirement, not deposit shortfall decisions.", 409, "change_order_deposit_not_applicable");
   if (!isAccepted(row)) throw new PaymentError("Accept the quote before resolving its deposit.", 409, "quote_acceptance_required");
 
   const decision = String(body.decision || "").trim().toLowerCase();
@@ -1104,16 +1255,9 @@ Deno.serve(async (req) => {
     }
     if (action === "report_manual") {
       const result = await reportManual(admin, body, target, settings, state);
+      const reportedState = await documentPaymentState(admin, await fetchQuote(admin, target.id) || target, settings);
       return json({
-        payment: {
-          status: "client_reported",
-          report: {
-            id: result.record.id,
-            method: result.record.method,
-            amountCents: result.record.amount_cents,
-            reportedAt: result.record.reported_at || result.record.created_at,
-          },
-        },
+        payment: publicStatus(target, reportedState),
         idempotentReplay: !!result.idempotentReplay,
       });
     }
