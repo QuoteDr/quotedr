@@ -1349,12 +1349,13 @@
                                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
-                                        <div class="alert alert-light border small mb-3">
+                                        <div class="alert alert-light border small mb-3" id="quotePortalShareIntro">
                                             QuoteDr will add this document to the client portal you choose. Clients receive the portal link, while the quote remains available inside that portal.
                                         </div>
-                                        <div class="input-group mb-3">
-                                            <span class="input-group-text"><i class="fas fa-shield-halved"></i></span>
+                                        <div class="input-group mb-3" id="quotePortalDestinationGroup">
+                                            <span class="input-group-text" id="quotePortalDestinationIcon"><i class="fas fa-shield-halved"></i></span>
                                             <input type="text" id="quotePortalLinkInput" class="form-control" value="Choose a client portal to prepare its link" readonly aria-label="Client portal link">
+                                            <button type="button" class="btn btn-outline-primary" id="changeOrderPortalLockHelpBtn" onclick="showChangeOrderPortalLockHelp()" aria-label="Why is this portal locked?" title="Why is this portal locked?" style="display:none; font-weight:800;">?</button>
                                         </div>
                                         <div style="border:1px solid #dee2e6; border-radius:8px; padding:14px; background:#f8f9fa; margin-bottom:12px;">
                                             <div class="fw-bold small mb-2"><i class="fas fa-envelope me-1" style="color:#1a56a0;"></i>Email client portal link</div>
@@ -1399,6 +1400,9 @@
                 // Clear previous result
                 var resultEl = document.getElementById('sendQuoteEmailResult');
                 if (resultEl) resultEl.innerHTML = '';
+                if (typeof prepareQuotePortalShareContext === 'function') {
+                    await prepareQuotePortalShareContext();
+                }
                 var linkModalEl = document.getElementById('interactiveLinkModal');
                 var linkModal = bootstrap.Modal.getInstance(linkModalEl) || new bootstrap.Modal(linkModalEl);
                 linkModal.show();

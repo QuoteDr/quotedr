@@ -69,6 +69,7 @@ function createContext(options = {}) {
       _serverUpdatedAt: v2,
       portal_visible: false
     }),
+    confirmQuotePortalZeroPricedItems: async () => true,
     confirmQuotePortalLockBeforePublish: async () => true,
     findBuilderPortalStableShare: () => ({ token: '', anchorId: '', createdAt: '' }),
     applyBuilderPortalStableShare: (data, share) => {

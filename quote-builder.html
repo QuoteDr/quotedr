@@ -17208,6 +17208,151 @@ Example:
             return share.url;
         }
 
+        function quotePortalDocumentIsChangeOrder(quoteData) {
+            quoteData = quoteData || getCurrentQuoteDataForPortal();
+            return quoteData.type === 'change_order' || quoteData.documentType === 'change_order' || window._quoteDocumentType === 'change_order';
+        }
+
+        function quotePortalParentId(quoteData) {
+            quoteData = quoteData || {};
+            return String(quoteData.parentQuoteId || quoteData.parent_quote_id || window._parentQuoteId || '').trim();
+        }
+
+        function portalFromQuoteSummaryRow(row) {
+            var data = row && row.data || {};
+            if (data.portal_visible !== true) return null;
+            var portalId = String(data.portal_id || invoicePortalRowKey(row) || '').trim();
+            if (!portalId) return null;
+            return {
+                id: portalId,
+                legacy: portalId.startsWith('legacy-'),
+                name: data.portal_name || data.portal_client_name || row.client_name || 'Client Portal',
+                clientName: data.portal_client_name || row.client_name || '',
+                clientEmail: data.portal_client_email || row.client_email || '',
+                pin: data.portal_pin || '',
+                secureToken: data.portal_share_token || '',
+                secureAnchorId: data.portal_share_anchor_id || '',
+                secureCreatedAt: data.portal_share_created_at || '',
+                quoteIds: [row.id],
+                rows: [row],
+                anchorRows: []
+            };
+        }
+
+        async function resolveChangeOrderLockedPortal(quoteData) {
+            quoteData = quoteData || getCurrentQuoteDataForPortal();
+            if (!quotePortalDocumentIsChangeOrder(quoteData)) return null;
+            var parentId = quotePortalParentId(quoteData);
+            if (!parentId) throw new Error('This change order is missing its original quote link. Return to the dashboard and create it again from the original quote.');
+
+            await loadInvoicePortalCandidates();
+            window._quotePortalRegistry = window._invoicePortalRegistry || [];
+            var parentRow = (window._invoicePortalRows || []).find(function(row) {
+                return String(row && row.id || '') === parentId;
+            });
+            if (!parentRow) throw new Error('The original quote could not be found. Return to the dashboard and open the original quote before sharing this change order.');
+
+            var parentPortal = portalFromQuoteSummaryRow(parentRow);
+            if (!parentPortal) throw new Error('The original quote is not currently in a client portal. Add the original quote to its portal before sharing this change order.');
+            var registryPortal = (window._quotePortalRegistry || []).find(function(portal) {
+                return String(portal && portal.id || '') === String(parentPortal.id);
+            });
+            var lockedPortal = Object.assign({}, parentPortal, registryPortal || {});
+            lockedPortal.id = parentPortal.id;
+            lockedPortal.lockedToParentQuote = true;
+            lockedPortal.parentQuoteId = parentId;
+            lockedPortal.parentQuoteNumber = parentRow.quote_number || parentRow.data && parentRow.data.quoteNumber || quoteData.parentQuoteNumber || window._parentQuoteNumber || '';
+
+            if (quoteData.portal_visible === true && quoteData.portal_id && String(quoteData.portal_id) !== String(lockedPortal.id)) {
+                throw new Error('This change order is already assigned to a different portal. QuoteDr stopped the send so the original client portal is not changed silently.');
+            }
+            window._changeOrderLockedPortal = lockedPortal;
+            return lockedPortal;
+        }
+
+        function setQuotePortalShareButtonsDisabled(disabled) {
+            ['sendQuoteEmailBtn', 'copyQuotePortalLinkBtn', 'openQuotePortalBtn'].forEach(function(id) {
+                var button = document.getElementById(id);
+                if (button) button.disabled = disabled === true;
+            });
+        }
+
+        function renderQuotePortalShareContext(quoteData, portal, error) {
+            var isChangeOrder = quotePortalDocumentIsChangeOrder(quoteData);
+            var intro = document.getElementById('quotePortalShareIntro');
+            var icon = document.getElementById('quotePortalDestinationIcon');
+            var input = document.getElementById('quotePortalLinkInput');
+            var help = document.getElementById('changeOrderPortalLockHelpBtn');
+            var copyButton = document.getElementById('copyQuotePortalLinkBtn');
+            var openButton = document.getElementById('openQuotePortalBtn');
+            if (!isChangeOrder) {
+                if (intro) intro.textContent = 'QuoteDr will add this document to the client portal you choose. Clients receive the portal link, while the quote remains available inside that portal.';
+                if (icon) icon.innerHTML = '<i class="fas fa-shield-halved"></i>';
+                if (input && !window._currentQuotePortalUrl) input.value = 'Choose a client portal to prepare its link';
+                if (help) help.style.display = 'none';
+                if (copyButton) copyButton.innerHTML = '<i class="fas fa-copy me-1"></i>Choose Portal &amp; Copy Link';
+                if (openButton) openButton.innerHTML = '<i class="fas fa-arrow-up-right-from-square me-1"></i>Choose Portal &amp; Open';
+                setQuotePortalShareButtonsDisabled(false);
+                return;
+            }
+
+            if (intro) intro.textContent = 'This change order stays with the original quote and will be added to that same client portal.';
+            if (icon) icon.innerHTML = '<i class="fas fa-lock"></i>';
+            if (help) help.style.display = '';
+            if (copyButton) copyButton.innerHTML = '<i class="fas fa-copy me-1"></i>Copy Locked Portal Link';
+            if (openButton) openButton.innerHTML = '<i class="fas fa-arrow-up-right-from-square me-1"></i>Open Locked Portal';
+            if (error) {
+                if (input) input.value = 'Portal unavailable — see details below';
+                var resultEl = document.getElementById('sendQuoteEmailResult');
+                if (resultEl) resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-triangle-exclamation me-1"></i>' + _escapeHtml(error.message || String(error)) + '</span>';
+                setQuotePortalShareButtonsDisabled(true);
+                return;
+            }
+            if (input && !window._currentQuotePortalUrl) {
+                input.value = 'Locked to: ' + (portal && portal.name || 'Original quote portal');
+            }
+            setQuotePortalShareButtonsDisabled(false);
+        }
+
+        async function prepareQuotePortalShareContext() {
+            var quoteData = getCurrentQuoteDataForPortal();
+            if (!quotePortalDocumentIsChangeOrder(quoteData)) {
+                renderQuotePortalShareContext(quoteData, null, null);
+                return null;
+            }
+            try {
+                var portal = await resolveChangeOrderLockedPortal(quoteData);
+                renderQuotePortalShareContext(quoteData, portal, null);
+                return portal;
+            } catch (error) {
+                renderQuotePortalShareContext(quoteData, null, error);
+                return null;
+            }
+        }
+
+        async function showChangeOrderPortalLockHelp() {
+            var message = 'A change order is part of the original quote, so QuoteDr sends it only to that quote\'s existing client portal. This prevents a project change from being shared with the wrong client or separated from its contract history.\n\nIf you meant to create an editable revision instead, open the dashboard, select the original portal quote, and choose Duplicate As Revision.';
+            var openDashboard = typeof qdConfirm === 'function'
+                ? await qdConfirm(message, {
+                    title: 'Why This Portal Is Locked',
+                    okText: 'Open Dashboard',
+                    cancelText: 'Stay Here',
+                    okClass: 'btn-primary',
+                    type: 'info'
+                })
+                : window.confirm(message + '\n\nOpen the dashboard in a new tab?');
+            if (openDashboard) window.open('dashboard.html', '_blank', 'noopener');
+        }
+
+        async function enforceChangeOrderPortalDestination(quoteData, requestedPortal) {
+            if (!quotePortalDocumentIsChangeOrder(quoteData)) return requestedPortal;
+            var lockedPortal = await resolveChangeOrderLockedPortal(quoteData);
+            if (requestedPortal && requestedPortal.id && String(requestedPortal.id) !== String(lockedPortal.id)) {
+                throw new Error('Change orders can only be shared through the original quote\'s client portal.');
+            }
+            return lockedPortal;
+        }
+
         function ensureQuotePortalAssignmentModal() {
             if (document.getElementById('quotePortalAssignModal')) return;
             document.body.insertAdjacentHTML('beforeend', `
@@ -17291,6 +17436,11 @@ Example:
                 var quoteData = getCurrentQuoteDataForPortal();
                 if (!quoteData.supabaseId) throw new Error('Save the quote before adding it to a portal.');
                 window._currentQuoteData = quoteData;
+                if (quotePortalDocumentIsChangeOrder(quoteData)) {
+                    var lockedPortal = await resolveChangeOrderLockedPortal(quoteData);
+                    renderQuotePortalShareContext(quoteData, lockedPortal, null);
+                    return await finishQuotePortalAssignment(lockedPortal);
+                }
                 document.getElementById('quotePortalAssignTitle').textContent = (quoteData.quoteNumber || 'Quote') + ' - ' + (quoteData.clientName || 'Client');
                 document.getElementById('quotePortalAssignClientName').value = quoteData.clientName || '';
                 document.getElementById('quotePortalAssignClientEmail').value = quoteData.clientEmail || quoteData.email || '';
@@ -17317,6 +17467,9 @@ Example:
 
         async function ensureQuotePortalUrl(statusEl, portal) {
             var quoteData = getCurrentQuoteDataForPortal();
+            if (typeof enforceChangeOrderPortalDestination === 'function') {
+                portal = await enforceChangeOrderPortalDestination(quoteData, portal);
+            }
             if (!portal && quoteData.portal_visible) {
                 portal = {
                     id: quoteData.portal_id,
@@ -17435,6 +17588,10 @@ Example:
             var resultEl = document.getElementById('quotePortalAssignResult');
             var btn = document.getElementById('quotePortalAssignCreateBtn');
             var quoteData = getCurrentQuoteDataForPortal();
+            if (quotePortalDocumentIsChangeOrder(quoteData)) {
+                if (resultEl) resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-lock me-1"></i>Change orders must use the original quote\'s client portal.</span>';
+                return;
+            }
             var clientName = document.getElementById('quotePortalAssignClientName')?.value.trim() || quoteData.clientName || 'Client';
             var clientEmail = document.getElementById('quotePortalAssignClientEmail')?.value.trim() || quoteData.clientEmail || quoteData.email || '';
             var portalName = document.getElementById('quotePortalAssignPortalName')?.value.trim() || clientName;
@@ -17512,6 +17669,12 @@ Example:
             var quoteData = getCurrentQuoteDataForPortal();
             try {
                 window._resumeQuotePortalAction = action;
+                if (quotePortalDocumentIsChangeOrder(quoteData) && !window._currentQuotePortalUrl) {
+                    var lockedPortal = await resolveChangeOrderLockedPortal(quoteData);
+                    renderQuotePortalShareContext(quoteData, lockedPortal, null);
+                    await finishQuotePortalAssignment(lockedPortal);
+                    return;
+                }
                 if (!window._currentQuotePortalUrl && !(quoteData.portal_visible && quoteData.portal_id)) {
                     if (resultEl) resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-folder-open me-1"></i>Choose the correct client portal to continue.</span>';
                     await openQuotePortalAssignment({ resumeQuotePortalAction: action });
@@ -17544,6 +17707,19 @@ Example:
             // Gather quote info
             var qData = getCurrentQuoteDataForPortal();
             var portalUrl = '';
+            if (quotePortalDocumentIsChangeOrder(qData) && !window._currentQuotePortalUrl) {
+                window._resumeQuoteEmailAfterPortal = true;
+                resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-lock me-1"></i>Preparing the original quote\'s client portal...</span>';
+                try {
+                    var lockedPortal = await resolveChangeOrderLockedPortal(qData);
+                    renderQuotePortalShareContext(qData, lockedPortal, null);
+                    await finishQuotePortalAssignment(lockedPortal);
+                } catch(error) {
+                    window._resumeQuoteEmailAfterPortal = false;
+                    renderQuotePortalShareContext(qData, null, error);
+                }
+                return;
+            }
             if (!window._currentQuotePortalUrl && !(qData.portal_visible && qData.portal_id)) {
                 window._resumeQuoteEmailAfterPortal = true;
                 resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-folder-open me-1"></i>Choose a client portal, then this email will send its portal link.</span>';
@@ -17562,7 +17738,9 @@ Example:
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Email Portal Link';
                 if (finishDeferredQuotePortalRedirect()) return;
-                await openQuotePortalAssignment({ resumeQuoteEmailAfterPortal: true });
+                if (!quotePortalDocumentIsChangeOrder(qData)) {
+                    await openQuotePortalAssignment({ resumeQuoteEmailAfterPortal: true });
+                }
                 return;
             }
             var profile = {};
