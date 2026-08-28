@@ -17,6 +17,7 @@ const ROOT_SAFE_KEYS = new Set([
   'validUntilDate', 'fullResolutionPhotosEnabled', 'parentQuoteId', 'parent_quote_id',
   'parentQuoteNumber', 'parentQuoteTotal', 'changeOrderNumber', 'change_order_number',
   'changeOrderPreviousApprovedTotal', 'changeOrderPriceSummary', 'changeReason',
+  'changeOrderHighlightLegend',
   'document_validity', 'documentValidity', 'invalidated_at', 'invalidatedAt',
   'invalidated_reason', 'invalidatedReason', 'voided_at', 'voidedAt',
   'portal_id', 'portal_visible', 'portal_added_at', 'portal_client_name',
@@ -33,7 +34,7 @@ const ROOT_SAFE_KEYS = new Set([
 ]);
 
 const ROOT_COMPLEX_KEYS = new Set([
-  'quoteDividerLabels', 'terms', 'changeOrderPriceSummary', '_roomNotes',
+  'quoteDividerLabels', 'terms', 'changeOrderPriceSummary', 'changeOrderHighlightLegend', '_roomNotes',
   'terms_accepted_snapshot'
 ]);
 
@@ -43,7 +44,7 @@ const ITEM_COPY_KEYS = new Set([
   'highlightColor', 'icon', 'text', 'optional', 'optionalSelectedByDefault',
   '_optionalSelected', '_removed', 'upgraded', 'selectedUpgradeOptionIds',
   'priceTbd', 'pricingMode', 'hasTbdSelections', 'requiresConsultation',
-  '_coRemoved', '_coChangeStatus', '_clientDecisionApplied'
+  '_coRemoved', '_coChangeStatus', '_coClientChoiceReopened', '_clientDecisionApplied'
 ]);
 
 const PRICE_KEYS = new Set([
@@ -499,7 +500,7 @@ function sanitizeItem(source, room) {
   for (const key of ['_baseUnitType', '_baseDescription', '_baseItemDescription']) {
     if (source[key] !== undefined) output[key] = cleanString(source[key], key === '_baseItemDescription' ? 4000 : 500);
   }
-  for (const key of ['optional', 'optionalSelectedByDefault', '_optionalSelected', '_removed', 'upgraded', 'priceTbd', 'hasTbdSelections', 'requiresConsultation', '_coRemoved', '_clientDecisionApplied']) {
+  for (const key of ['optional', 'optionalSelectedByDefault', '_optionalSelected', '_removed', 'upgraded', 'priceTbd', 'hasTbdSelections', 'requiresConsultation', '_coRemoved', '_coClientChoiceReopened', '_clientDecisionApplied']) {
     if (source[key] !== undefined) output[key] = source[key] === true;
   }
   if (source._basePriceTbd !== undefined) output._basePriceTbd = source._basePriceTbd === true;
@@ -687,6 +688,16 @@ function sanitizeQuoteAdjustment(data, totals) {
   };
 }
 
+function sanitizeChangeOrderHighlightLegend(value) {
+  if (!isRecord(value)) return {};
+  const output = {};
+  for (const key of ['yellow', 'blue', 'purple']) {
+    const label = cleanString(value[key], 120);
+    if (label) output[key] = label;
+  }
+  return output;
+}
+
 function cents(value) {
   return Math.max(0, Math.round(finiteNumber(value, 0) * 100));
 }
@@ -792,6 +803,8 @@ export function projectClientDocumentData(data, options = {}) {
   if (isRecord(source.invoiceSettings)) output.invoiceSettings = sanitizeInvoiceSettings(source.invoiceSettings);
   if (isRecord(source.changeOrderPriceSummary)) output.changeOrderPriceSummary = sanitizeChangeOrderSummary(source.changeOrderPriceSummary);
   else delete output.changeOrderPriceSummary;
+  if (isRecord(source.changeOrderHighlightLegend)) output.changeOrderHighlightLegend = sanitizeChangeOrderHighlightLegend(source.changeOrderHighlightLegend);
+  else delete output.changeOrderHighlightLegend;
   if (isRecord(source.quoteDividerLabels)) {
     output.quoteDividerLabels = {
       singular: cleanString(source.quoteDividerLabels.singular, 80),
@@ -1139,6 +1152,9 @@ function applyItemDecision(data, decision) {
   if (decision.roomId && cleanId(room.id) !== decision.roomId) throw new ClientDocumentDecisionError('A selected room is stale', 'stale_client_decision');
   if (decision.itemId && cleanId(item.id) !== decision.itemId) throw new ClientDocumentDecisionError('A selected item is stale', 'stale_client_decision');
   const before = selectionFingerprint(item);
+  const inheritedChangeOrderChoiceLocked = String(data.documentType || data.type || '').toLowerCase() === 'change_order'
+    && isRecord(item._coOriginal)
+    && item._coClientChoiceReopened !== true;
 
   if (decision.optionalSelected !== undefined) {
     if (item.optional !== true) throw new ClientDocumentDecisionError('Only optional items may be added or removed');
@@ -1190,6 +1206,9 @@ function applyItemDecision(data, decision) {
   }
 
   const changed = before !== selectionFingerprint(item);
+  if (inheritedChangeOrderChoiceLocked && changed) {
+    throw new ClientDocumentDecisionError('This previously approved Change Order item is locked. The contractor must explicitly reopen it before the client can change its selections.');
+  }
   if (changed) item._clientDecisionApplied = true;
   return changed;
 }

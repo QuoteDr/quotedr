@@ -461,6 +461,92 @@ test('change-order projection redacts original snapshots while preserving net an
   assert.equal(api.calculateClientDocumentTotals(clientChangedProjection.data, { documentType: 'change_order' }).documentTotal, clientChangedTotals.documentTotal);
 });
 
+test('change-order inherited choices stay locked unless the contractor explicitly reopens them', async () => {
+  const api = await policy();
+  const inheritedChoice = {
+    id: 'co-floor-choice',
+    description: 'Flooring labour',
+    quantity: 100,
+    unitType: 'sq ft',
+    rate: 2,
+    total: 0,
+    _coOriginal: { description: 'Flooring labour', quantity: 100, unitType: 'sq ft', rate: 2, total: 200 },
+    _coChangeStatus: 'unchanged',
+    choiceGroup: {
+      id: 'floor-choice',
+      name: 'Flooring choice',
+      type: 'single',
+      selectedOptionIds: ['laminate'],
+      options: [
+        { id: 'laminate', name: 'Laminate', rate: 2, unitType: 'sq ft' },
+        { id: 'hardwood', name: 'Hardwood', rate: 2.5, unitType: 'sq ft' }
+      ]
+    }
+  };
+  const data = {
+    documentType: 'change_order',
+    taxEnabled: false,
+    rooms: [{ id: 'co-room', name: 'Flooring', items: [inheritedChoice] }]
+  };
+  const changedChoice = {
+    items: [{
+      roomIndex: 0,
+      itemIndex: 0,
+      roomId: 'co-room',
+      itemId: 'co-floor-choice',
+      choice: { groupId: 'floor-choice', selectedOptionIds: ['hardwood'], enhancementGroups: [] }
+    }]
+  };
+
+  assert.deepEqual(
+    decisions.collectItems(data.rooms, { documentType: 'change_order' }),
+    [],
+    'locked historical choices must not be included in the client decision payload'
+  );
+  assert.throws(
+    () => api.applyClientDocumentDecision(data, changedChoice, { applySelections: true }),
+    /contractor must explicitly reopen/i,
+    'the authoritative merge must reject a forged change to a locked historical choice'
+  );
+
+  const reopened = JSON.parse(JSON.stringify(data));
+  reopened.rooms[0].items[0]._coClientChoiceReopened = true;
+  const collected = decisions.collectItems(reopened.rooms, { documentType: 'change_order' });
+  assert.equal(collected.length, 1, 'reopened choices should be submitted for approval');
+  const applied = api.applyClientDocumentDecision(reopened, changedChoice, { applySelections: true });
+  assert.deepEqual(applied.data.rooms[0].items[0].choiceGroup.selectedOptionIds, ['hardwood']);
+  assert.equal(applied.data.rooms[0].items[0]._clientDecisionApplied, true);
+
+  const ordinaryQuote = JSON.parse(JSON.stringify(data));
+  ordinaryQuote.documentType = 'quote';
+  assert.equal(
+    decisions.collectItems(ordinaryQuote.rooms, { documentType: 'quote' }).length,
+    1,
+    'historical metadata on an ordinary quote must not accidentally suppress its choices'
+  );
+});
+
+test('change-order custom highlight legends are client-safe and limited to non-semantic colours', async () => {
+  const api = await policy();
+  const projected = api.projectClientDocumentData({
+    documentType: 'change_order',
+    changeOrderHighlightLegend: {
+      yellow: 'Client decision required',
+      blue: 'Existing finish retained',
+      purple: 'Allowance pending',
+      orange: 'Must not override Changed',
+      green: 'Must not override Added',
+      pink: 'Must not override Removed'
+    },
+    rooms: []
+  }, { documentType: 'change_order' });
+  assert.deepEqual(projected.changeOrderHighlightLegend, {
+    yellow: 'Client decision required',
+    blue: 'Existing finish retained',
+    purple: 'Allowance pending'
+  });
+});
+
 test('accepted legacy quote projects the authoritative signed total instead of stale pre-upgrade rooms', async () => {
   const api = await policy();
   const row = {

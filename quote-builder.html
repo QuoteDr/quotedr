@@ -3022,7 +3022,7 @@ if (location.search.includes('debug')) {
                             </div>
                         </div>
                     </div>
-                    <div class="quote-adjustment-panel">
+                    <div class="quote-adjustment-panel" id="quotePaymentPanel">
                         <div class="row g-2 align-items-end">
                             <div class="col-md-7">
                                 <label class="form-label" for="quotePaymentName">Payment received</label>
@@ -3136,13 +3136,25 @@ if (location.search.includes('debug')) {
                 </div>
                 <div class="modal-body">
                     <div class="small text-muted mb-2" id="lineItemHighlightModalMessage">Choose a faint highlight colour for this line item.</div>
+                    <div class="alert alert-warning py-2 small d-none" id="changeOrderHighlightGuidance">
+                        <i class="fas fa-triangle-exclamation me-1"></i>
+                        QuoteDr already marks <strong>Changed</strong>, <strong>Added</strong>, and <strong>Removed</strong> work automatically. A manual highlight is an additional client-facing note and must have one clear meaning.
+                    </div>
                     <div id="lineItemHighlightOptions" class="row g-2" data-room-id="" data-item-index=""></div>
+                    <div class="mt-3 d-none" id="changeOrderHighlightMeaningWrap">
+                        <label class="form-label fw-semibold mb-1" for="changeOrderHighlightMeaning">What does this colour mean?</label>
+                        <input type="text" class="form-control" id="changeOrderHighlightMeaning" maxlength="120" placeholder="Example: Client decision required">
+                        <div class="form-text">This wording will appear in the client’s Change Order legend.</div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" onclick="setActiveLineItemHighlight('')">
                         <i class="fas fa-ban me-1"></i>Clear
                     </button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary d-none" id="applyChangeOrderHighlightBtn" onclick="applyActiveChangeOrderHighlight()">
+                        <i class="fas fa-check me-1"></i>Apply Highlight
+                    </button>
                 </div>
             </div>
         </div>
@@ -9876,6 +9888,25 @@ Example:
             orange: { label: 'Orange', background: 'rgba(245, 158, 11, 0.16)', swatch: '#ffe7c2', border: '#f59e0b' },
             purple: { label: 'Purple', background: 'rgba(139, 92, 246, 0.14)', swatch: '#eee3ff', border: '#8b5cf6' }
         };
+        const CHANGE_ORDER_CUSTOM_HIGHLIGHT_KEYS = ['yellow', 'blue', 'purple'];
+        window._changeOrderHighlightLegend = window._changeOrderHighlightLegend || {};
+
+        function changeOrderCustomHighlightLabel(colorKey) {
+            return String(window._changeOrderHighlightLegend && window._changeOrderHighlightLegend[colorKey] || '').trim();
+        }
+
+        function cleanupUnusedChangeOrderHighlightLegend() {
+            if (window._quoteDocumentType !== 'change_order') return;
+            var used = {};
+            (rooms || []).forEach(function(room) {
+                (room.items || []).forEach(function(item) {
+                    if (item && item.highlightColor) used[item.highlightColor] = true;
+                });
+            });
+            Object.keys(window._changeOrderHighlightLegend || {}).forEach(function(key) {
+                if (!used[key]) delete window._changeOrderHighlightLegend[key];
+            });
+        }
 
         function getLineItemHighlight(item) {
             if (!item || !item.highlightColor) return null;
@@ -9890,6 +9921,7 @@ Example:
             } else {
                 delete room.items[itemIndex].highlightColor;
             }
+            if (typeof cleanupUnusedChangeOrderHighlightLegend === 'function') cleanupUnusedChangeOrderHighlightLegend();
             renderRooms();
             if (typeof saveSessionQuote === 'function') saveSessionQuote();
             if (typeof markUnsaved === 'function') markUnsaved();
@@ -9911,16 +9943,21 @@ Example:
             optionsEl.setAttribute('data-item-index', bulkItems.length ? '' : String(itemIndex));
             optionsEl.setAttribute('data-highlight-mode', bulkItems.length ? 'bulk' : 'single');
             optionsEl.setAttribute('data-selected-indexes', bulkIndexes.join(','));
+            var candidateColor = optionsEl.getAttribute('data-candidate-color') || activeColor;
+            var keys = window._quoteDocumentType === 'change_order' ? CHANGE_ORDER_CUSTOM_HIGHLIGHT_KEYS : Object.keys(LINE_ITEM_HIGHLIGHTS);
             let html = '';
-            Object.keys(LINE_ITEM_HIGHLIGHTS).forEach(function(key) {
+            keys.forEach(function(key) {
                 const highlight = LINE_ITEM_HIGHLIGHTS[key];
-                const isActive = activeColor === key;
+                const isActive = candidateColor === key;
                 html += '<div class="col-6">';
                 html += '<button type="button" class="line-item-highlight-option w-100 ' + (isActive ? 'active' : '') + '" onclick="setActiveLineItemHighlight(\'' + key + '\')">';
                 html += '<span class="d-flex align-items-center gap-2">';
                 html += '<span class="quote-item-highlight-swatch" style="background:' + (highlight.swatch || highlight.background) + '; border-color:' + highlight.border + ';"></span>';
                 html += '<span class="fw-semibold">' + qdTemplateEscapeHtml(highlight.label) + '</span>';
                 html += '</span>';
+                if (window._quoteDocumentType === 'change_order' && changeOrderCustomHighlightLabel(key)) {
+                    html += '<span class="small text-muted d-block mt-1 text-start">' + qdTemplateEscapeHtml(changeOrderCustomHighlightLabel(key)) + '</span>';
+                }
                 html += '</button>';
                 html += '</div>';
             });
@@ -9930,11 +9967,16 @@ Example:
         function openLineItemHighlightModal(roomId, itemIndex) {
             const room = rooms.find(r => r.id === roomId);
             if (!room || !room.items[itemIndex]) return;
+            var optionsEl = document.getElementById('lineItemHighlightOptions');
+            if (optionsEl) optionsEl.setAttribute('data-candidate-color', room.items[itemIndex].highlightColor || '');
             renderLineItemHighlightModalOptions(roomId, itemIndex);
             const titleEl = document.getElementById('lineItemHighlightModalTitle');
             const messageEl = document.getElementById('lineItemHighlightModalMessage');
             if (titleEl) titleEl.innerHTML = '<i class="fas fa-highlighter me-2"></i>Highlight Item';
-            if (messageEl) messageEl.textContent = 'Choose a faint highlight colour for this line item.';
+            if (messageEl) messageEl.textContent = window._quoteDocumentType === 'change_order'
+                ? 'Choose a custom annotation colour and explain its meaning to the client.'
+                : 'Choose a faint highlight colour for this line item.';
+            configureChangeOrderHighlightModal(room.items[itemIndex].highlightColor || '');
             const modalEl = document.getElementById('lineItemHighlightModal');
             if (!modalEl || !window.bootstrap) return;
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -9942,6 +9984,18 @@ Example:
 
         function setActiveLineItemHighlight(colorKey) {
             const optionsEl = document.getElementById('lineItemHighlightOptions');
+            if (window._quoteDocumentType === 'change_order' && colorKey) {
+                if (CHANGE_ORDER_CUSTOM_HIGHLIGHT_KEYS.indexOf(colorKey) === -1) return;
+                optionsEl.setAttribute('data-candidate-color', colorKey);
+                var meaning = document.getElementById('changeOrderHighlightMeaning');
+                if (meaning) meaning.value = changeOrderCustomHighlightLabel(colorKey);
+                renderLineItemHighlightModalOptions(
+                    parseInt(optionsEl.getAttribute('data-room-id'), 10),
+                    parseInt(optionsEl.getAttribute('data-item-index'), 10),
+                    String(optionsEl.getAttribute('data-selected-indexes') || '').split(',').map(Number).filter(Number.isFinite)
+                );
+                return;
+            }
             const roomId = parseInt(optionsEl && optionsEl.getAttribute('data-room-id'), 10);
             const itemIndex = parseInt(optionsEl && optionsEl.getAttribute('data-item-index'), 10);
             const isBulk = optionsEl && optionsEl.getAttribute('data-highlight-mode') === 'bulk';
@@ -10662,6 +10716,7 @@ Example:
                     delete room.items[index].highlightColor;
                 }
             });
+            if (typeof cleanupUnusedChangeOrderHighlightLegend === 'function') cleanupUnusedChangeOrderHighlightLegend();
             var itemLabel = indexes.length === 1 ? 'line item' : 'line items';
             var message = hasHighlight
                 ? 'Highlighted ' + indexes.length + ' selected ' + itemLabel + '.'
@@ -10676,11 +10731,20 @@ Example:
                 await qdAlert('Select one or more line items first.');
                 return;
             }
+            var selectedItems = selectedIndexes.map(function(index) { return room.items[index]; });
+            var sharedColor = selectedItems.length && selectedItems.every(function(item) { return item.highlightColor === selectedItems[0].highlightColor; })
+                ? (selectedItems[0].highlightColor || '')
+                : '';
+            var optionsEl = document.getElementById('lineItemHighlightOptions');
+            if (optionsEl) optionsEl.setAttribute('data-candidate-color', sharedColor);
             renderLineItemHighlightModalOptions(room.id, null, selectedIndexes);
             var titleEl = document.getElementById('lineItemHighlightModalTitle');
             var messageEl = document.getElementById('lineItemHighlightModalMessage');
             if (titleEl) titleEl.innerHTML = '<i class="fas fa-highlighter me-2"></i>Highlight Selected Items';
-            if (messageEl) messageEl.textContent = 'Choose one faint highlight colour for all ' + selectedIndexes.length + ' selected line items.';
+            if (messageEl) messageEl.textContent = window._quoteDocumentType === 'change_order'
+                ? 'Choose one custom annotation colour for all ' + selectedIndexes.length + ' selected line items, then explain its meaning to the client.'
+                : 'Choose one faint highlight colour for all ' + selectedIndexes.length + ' selected line items.';
+            configureChangeOrderHighlightModal(sharedColor);
             var modalEl = document.getElementById('lineItemHighlightModal');
             if (!modalEl || !window.bootstrap) return;
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -11926,6 +11990,11 @@ Example:
         }
 
         function getQuotePaymentsReceived() {
+            // A Change Order is an approval for the delta only. Payments made
+            // against the parent project must never reduce that approval amount.
+            if (window._quoteDocumentType === 'change_order') {
+                return { name: 'Deposit paid', amount: 0 };
+            }
             var nameEl = document.getElementById('quotePaymentName');
             var amountEl = document.getElementById('quotePaymentAmount');
             var amount = parseFloat(amountEl && amountEl.value);
@@ -12090,7 +12159,7 @@ Example:
                 ? {
                     taxCents: Math.round((taxEnabled ? taxableSubtotal * _taxRate : 0) * 100),
                     payableTotalCents: Math.round((taxableSubtotal + (taxEnabled ? taxableSubtotal * _taxRate : 0)) * 100),
-                    paidCents: QuoteDrPayableTotal.toCents(getQuotePaymentsReceived().amount || 0)
+                    paidCents: 0
                 }
                 : QuoteDrPayableTotal.calculate({
                     subtotal: subtotal,
@@ -12100,7 +12169,7 @@ Example:
                     paid: getQuotePaymentsReceived().amount || 0
                 });
             if (window._quoteDocumentType === 'change_order') {
-                payable.balanceDueCents = payable.payableTotalCents - payable.paidCents;
+                payable.balanceDueCents = payable.payableTotalCents;
             }
             const tax = QuoteDrPayableTotal.fromCents(payable.taxCents);
             const total = QuoteDrPayableTotal.fromCents(payable.payableTotalCents);
@@ -12118,8 +12187,8 @@ Example:
             }
             payable = window._quoteDocumentType === 'change_order'
                 ? Object.assign({}, payable, {
-                    paidCents: QuoteDrPayableTotal.toCents(paymentReceivedAmount),
-                    balanceDueCents: payable.payableTotalCents - QuoteDrPayableTotal.toCents(paymentReceivedAmount)
+                    paidCents: 0,
+                    balanceDueCents: payable.payableTotalCents
                 })
                 : QuoteDrPayableTotal.calculate({
                     subtotal: subtotal,
@@ -12193,6 +12262,47 @@ Example:
             if (window._quoteDocumentType === 'change_order' && typeof scheduleAutomaticChangeOrderScope === 'function') {
                 scheduleAutomaticChangeOrderScope();
             }
+        }
+
+        function configureChangeOrderHighlightModal(activeColor) {
+            var isCo = window._quoteDocumentType === 'change_order';
+            var guidance = document.getElementById('changeOrderHighlightGuidance');
+            var meaningWrap = document.getElementById('changeOrderHighlightMeaningWrap');
+            var applyBtn = document.getElementById('applyChangeOrderHighlightBtn');
+            var meaning = document.getElementById('changeOrderHighlightMeaning');
+            var optionsEl = document.getElementById('lineItemHighlightOptions');
+            if (guidance) guidance.classList.toggle('d-none', !isCo);
+            if (meaningWrap) meaningWrap.classList.toggle('d-none', !isCo);
+            if (applyBtn) applyBtn.classList.toggle('d-none', !isCo);
+            if (optionsEl) optionsEl.setAttribute('data-candidate-color', isCo ? (activeColor || '') : '');
+            if (meaning) meaning.value = isCo && activeColor ? changeOrderCustomHighlightLabel(activeColor) : '';
+        }
+
+        async function applyActiveChangeOrderHighlight() {
+            if (window._quoteDocumentType !== 'change_order') return;
+            var optionsEl = document.getElementById('lineItemHighlightOptions');
+            var colorKey = String(optionsEl && optionsEl.getAttribute('data-candidate-color') || '');
+            var meaningEl = document.getElementById('changeOrderHighlightMeaning');
+            var meaning = String(meaningEl && meaningEl.value || '').trim();
+            if (!colorKey || CHANGE_ORDER_CUSTOM_HIGHLIGHT_KEYS.indexOf(colorKey) === -1) {
+                await qdAlert('Choose a custom highlight colour first.');
+                return;
+            }
+            if (!meaning) {
+                await qdAlert('Explain what this highlight means to the client before applying it.');
+                if (meaningEl) meaningEl.focus();
+                return;
+            }
+            window._changeOrderHighlightLegend[colorKey] = meaning.slice(0, 120);
+            var roomId = parseInt(optionsEl.getAttribute('data-room-id'), 10);
+            var itemIndex = parseInt(optionsEl.getAttribute('data-item-index'), 10);
+            var isBulk = optionsEl.getAttribute('data-highlight-mode') === 'bulk';
+            var selectedIndexes = String(optionsEl.getAttribute('data-selected-indexes') || '').split(',').map(Number).filter(Number.isFinite);
+            if (isBulk) setSelectedLineItemHighlights(roomId, selectedIndexes, colorKey);
+            else setLineItemHighlight(roomId, itemIndex, colorKey);
+            var modalEl = document.getElementById('lineItemHighlightModal');
+            var instance = modalEl && window.bootstrap ? bootstrap.Modal.getInstance(modalEl) : null;
+            if (instance) instance.hide();
         }
 
         function qdFormatMoney(value, symbol, options) {
@@ -14266,7 +14376,7 @@ Example:
                             if (highlight) rowClassNames.push('quote-item-highlighted');
                             var rowClass = rowClassNames.length ? ' class="' + rowClassNames.join(' ') + '"' : '';
                             var rowStyles = [];
-                            if (highlight) {
+                            if (highlight && !(coStatus && coStatus !== 'unchanged')) {
                                 rowStyles.push('--line-highlight-bg: ' + highlight.background);
                                 rowStyles.push('--line-highlight-border: ' + highlight.border);
                             } else if (isOptional && !coStatus) {
@@ -14298,9 +14408,13 @@ Example:
                             if (hasUpgradeGroups) {
                                 html += renderItemUpgradeGroups(room.id, origIndex, item);
                             }
+                            html += renderChangeOrderClientChoiceLockControl(room.id, origIndex, item);
                             if (coStatus) {
                                 var badgeClass = coStatus === 'added' ? 'bg-success' : (coStatus === 'removed' ? 'bg-danger' : (coStatus === 'changed' ? 'bg-warning text-dark' : 'bg-secondary'));
                                 html += ' <span class="badge ' + badgeClass + '">' + coStatus.replace(/^\w/, function(ch) { return ch.toUpperCase(); }) + '</span>';
+                            }
+                            if (window._quoteDocumentType === 'change_order' && highlight && changeOrderCustomHighlightLabel(item.highlightColor)) {
+                                html += ' <span class="badge border text-dark ms-1" style="background:' + highlight.swatch + ';border-color:' + highlight.border + ' !important;"><i class="fas fa-highlighter me-1"></i>' + qdTemplateEscapeHtml(changeOrderCustomHighlightLabel(item.highlightColor)) + '</span>';
                             }
                             if (item._coOriginal) {
                                 html += '<span class="co-original-summary">Original: ' + qdTemplateEscapeHtml(coFormatQty(item._coOriginal.quantity, item._coOriginal.unitType || item.unitType || item.unit || '')) + ' @ ' + qdFormatMoney(item._coOriginal.rate) + '</span>';
@@ -17142,6 +17256,25 @@ Example:
             });
         }
 
+        async function confirmChangeOrderHighlightLegend(quoteData) {
+            if (!quoteData || quoteData.documentType !== 'change_order') return true;
+            var legend = quoteData.changeOrderHighlightLegend || {};
+            var missing = [];
+            (quoteData.rooms || []).forEach(function(room) {
+                (room.items || []).forEach(function(item) {
+                    if (!item || !item.highlightColor) return;
+                    var validCustomColor = CHANGE_ORDER_CUSTOM_HIGHLIGHT_KEYS.indexOf(item.highlightColor) !== -1;
+                    var label = String(legend[item.highlightColor] || '').trim();
+                    if (!validCustomColor || !label) missing.push((room.name ? room.name + ' — ' : '') + (item.description || item.name || 'Line item'));
+                });
+            });
+            if (!missing.length) return true;
+            var message = 'Every manual Change Order highlight needs a client-facing meaning. Review: ' + missing.slice(0, 6).join('; ') + (missing.length > 6 ? '; plus ' + (missing.length - 6) + ' more.' : '.');
+            if (typeof qdAlert === 'function') await qdAlert(message, { title: 'Unexplained Highlights', type: 'warning' });
+            else window.alert(message);
+            return false;
+        }
+
         function redirectPortalLockedQuoteBuilderToDashboard() {
             if (!window._quoteLockedAfterPortalPublish || window._quotePortalRedirectInProgress) return;
             window._quotePortalRedirectInProgress = true;
@@ -17482,6 +17615,8 @@ Example:
             if (!portal || !portal.id) throw new Error('Choose which client portal this quote belongs in.');
             var quoteWillBecomePortalLocked = quoteData.portal_visible !== true;
             if (quoteWillBecomePortalLocked) {
+                var highlightsConfirmed = await confirmChangeOrderHighlightLegend(quoteData);
+                if (!highlightsConfirmed) throw new Error('Explain the manual Change Order highlights before adding this document to the portal.');
                 var pricingConfirmed = await confirmQuotePortalZeroPricedItems(quoteData);
                 if (!pricingConfirmed) throw new Error('Review the zero-priced items before adding this quote to the portal.');
                 var confirmed = await confirmQuotePortalLockBeforePublish(quoteData);
@@ -18120,6 +18255,47 @@ Example:
             };
         }
 
+        function changeOrderItemHasClientChoices(item) {
+            return !!(item && (
+                item.optional === true ||
+                item.upgrade ||
+                item.choiceGroup ||
+                (Array.isArray(item.upgradeGroups) && item.upgradeGroups.length)
+            ));
+        }
+
+        function renderChangeOrderClientChoiceLockControl(roomId, itemIndex, item) {
+            if (window._quoteDocumentType !== 'change_order' || !item || !item._coOriginal || !changeOrderItemHasClientChoices(item)) return '';
+            var reopened = item._coClientChoiceReopened === true;
+            return '<div class="mt-2"><button type="button" class="btn btn-sm ' + (reopened ? 'btn-warning' : 'btn-outline-success') + '" onclick="event.stopPropagation(); toggleChangeOrderClientChoices(' + roomId + ', ' + itemIndex + ')">' +
+                '<i class="fas fa-' + (reopened ? 'lock-open' : 'lock') + ' me-1"></i>' + (reopened ? 'Client choices reopened' : 'Previously approved choices locked') +
+                '</button></div>';
+        }
+
+        async function toggleChangeOrderClientChoices(roomId, itemIndex) {
+            var room = rooms.find(function(candidate) { return candidate.id === roomId; });
+            var item = room && room.items && room.items[itemIndex];
+            if (!item || !item._coOriginal || !changeOrderItemHasClientChoices(item)) return;
+            var reopened = item._coClientChoiceReopened === true;
+            if (!reopened) {
+                var confirmed = await qdConfirm(
+                    'This reopens choices that were already approved on the original quote. The client will be able to select a different option, and their selection will update this Change Order total before they sign.',
+                    { title: 'Reopen Previously Approved Choices?', okText: 'Reopen Choices', okClass: 'btn-warning', type: 'warning' }
+                );
+                if (!confirmed) return;
+            }
+            _pushUndo();
+            item._coClientChoiceReopened = !reopened;
+            renderRooms();
+            calculateTotals();
+            markUnsaved();
+            if (typeof showToast === 'function') {
+                showToast(item._coClientChoiceReopened
+                    ? 'The client may now make a new selection for this item.'
+                    : 'The item is locked to the contractor-selected choice.', 'info');
+            }
+        }
+
         function coFormatQty(value, unit) {
             var qty = parseFloat(value) || 0;
             var formatted = Number.isInteger(qty) ? String(qty) : qty.toFixed(2).replace(/\.?0+$/, '');
@@ -18240,6 +18416,10 @@ Example:
             if (totalTitle) totalTitle.innerHTML = isCo ? '<i class="fas fa-calculator"></i> Change Order Total' : '<i class="fas fa-calculator"></i> Quote Total';
             var finalLabel = document.querySelector('.quote-total-final-label');
             if (finalLabel) finalLabel.textContent = isCo ? 'Net Change' : 'Total';
+            var paymentPanel = document.getElementById('quotePaymentPanel');
+            if (paymentPanel) paymentPanel.style.display = isCo ? 'none' : '';
+            var paymentRow = document.getElementById('quotePaymentRow');
+            if (paymentRow) paymentRow.style.display = isCo ? 'none' : '';
             var coMenu = document.getElementById('createChangeOrderMenuItem');
             if (coMenu) {
                 var baseStatus = document.getElementById('quoteStatus')?.value || '';
@@ -18350,6 +18530,8 @@ Example:
             if (document.getElementById('quoteStatus')) document.getElementById('quoteStatus').value = 'draft';
             if (document.getElementById('quoteTitle')) document.getElementById('quoteTitle').value = 'Change Order #' + nextNumber;
             if (document.getElementById('changeOrderReason')) document.getElementById('changeOrderReason').value = '';
+            setQuotePaymentsReceived(null);
+            window._changeOrderHighlightLegend = {};
             window._changeOrderScopeAutomatic = getChangeOrderScopePreferences().automaticDefault !== false;
             window._changeOrderScopeAiOwned = false;
             window._changeOrderScopeFingerprint = '';

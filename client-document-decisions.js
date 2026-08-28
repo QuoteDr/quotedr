@@ -67,11 +67,16 @@
         };
     }
 
-    function collectItems(rooms) {
+    function collectItems(rooms, options) {
+        var isChangeOrder = String(options && options.documentType || '').toLowerCase() === 'change_order';
         var decisions = [];
         (Array.isArray(rooms) ? rooms : []).forEach(function(room, roomIndex) {
             (Array.isArray(room && room.items) ? room.items : []).forEach(function(item, itemIndex) {
                 item = item || {};
+                // Previously approved Change Order lines are contractual history.
+                // Only collect client selections when the contractor explicitly
+                // reopens that line for a new decision.
+                if (isChangeOrder && item._coOriginal && item._coClientChoiceReopened !== true) return;
                 var decision = {
                     roomIndex: roomIndex,
                     itemIndex: itemIndex
@@ -117,9 +122,9 @@
         return output;
     }
 
-    function collect(rooms, roomNotes) {
+    function collect(rooms, roomNotes, options) {
         return {
-            items: collectItems(rooms),
+            items: collectItems(rooms, options),
             roomNotes: collectRoomNotes(roomNotes)
         };
     }

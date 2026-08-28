@@ -3903,8 +3903,9 @@ if (location.search.includes('debug')) {
             }
         }
 
-        function renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff) {
+        function renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff, forceLocked) {
             if (isSignedDiff || !item) return '';
+            var choicesLocked = forceLocked === true || viewerChangeOrderClientChoicesLocked(item);
             var room = quoteData.rooms && quoteData.rooms[roomIdx];
             item.upgradeGroups = normalizeViewerItemUpgradeGroups(item);
             clearInvalidViewerItemUpgradeSelections(item);
@@ -3916,6 +3917,7 @@ if (location.search.includes('debug')) {
                 var compatible = (group.options || []).filter(function(option) {
                     return isViewerItemUpgradeOptionCompatible(option, selectedIds.filter(function(id) { return id !== option.id; }));
                 });
+                if (choicesLocked) compatible = compatible.filter(function(option) { return (group.selectedOptionIds || []).indexOf(option.id) !== -1; });
                 if (!compatible.length) return;
                 html += '<div class="small mb-2"><span class="fw-semibold">' + escapeHtml(group.name || 'Upgrade Options') + '</span> ';
                 html += '<span class="text-muted">(' + (group.type === 'consultation' ? 'requires consultation' : (group.type === 'multiple' ? 'pick multiple' : 'optional pick one')) + ')</span>';
@@ -3943,7 +3945,7 @@ if (location.search.includes('debug')) {
                     var uncheckedIcon = group.type === 'multiple' ? 'fa-square' : 'fa-circle';
                     var optionPriceHtml = requiresConsultation ? '<span class="opacity-75">Consultation required</span>' : (priceTbd ? '<span class="opacity-75">' + viewerPriceTbdLabel() + '</span>' : '<span class="opacity-75">' + viewerMoney(optionTotal, { forceSign: option.upgradeType !== 'replacement' }) + '</span>');
                     html += '<div class="viewer-upgrade-option-wrap d-inline-flex flex-column align-items-start gap-1">';
-                    html += '<button type="button" class="btn btn-sm quote-upgrade-option-btn ' + (selected ? 'is-selected' : '') + ' py-0" onclick="toggleViewerItemUpgradeOption(' + roomIdx + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')">' +
+                    html += '<button type="button" class="btn btn-sm quote-upgrade-option-btn ' + (selected ? 'is-selected' : '') + ' py-0" ' + (choicesLocked ? 'disabled' : 'onclick="toggleViewerItemUpgradeOption(' + roomIdx + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')"') + '>' +
                         '<i class="fas ' + (selected ? checkedIcon : uncheckedIcon) + ' me-1"></i>' + escapeHtml(option.name || 'Upgrade') + ' ' + optionPriceHtml +
                         '</button>';
                     if (option.photo) {
@@ -3968,6 +3970,7 @@ if (location.search.includes('debug')) {
         function toggleViewerItemUpgradeOption(roomIdx, itemIndex, groupId, optionId) {
             var item = quoteData.rooms && quoteData.rooms[roomIdx] && quoteData.rooms[roomIdx].items && quoteData.rooms[roomIdx].items[itemIndex];
             if (!item) return;
+            if (viewerChangeOrderClientChoicesLocked(item)) return;
             item.upgradeGroups = normalizeViewerItemUpgradeGroups(item);
             var group = item.upgradeGroups.find(function(candidate) { return candidate.id === groupId; });
             if (!group) return;
@@ -3984,6 +3987,7 @@ if (location.search.includes('debug')) {
             group.selectedOptionIds = selected;
             item.selectedUpgradeOptionIds = getViewerSelectedItemUpgradeIds(item);
             applyViewerItemUpgradeGroups(item);
+            markViewerChangeOrderClientDecision(item);
             renderQuote();
             updateTotal();
             updateActionButton();
@@ -4065,6 +4069,10 @@ if (location.search.includes('debug')) {
         }
 
         function getViewerPaymentsReceived() {
+            var co = window.QuoteDrChangeOrders;
+            if (co && co.isChangeOrder(quoteData)) {
+                return { name: 'Deposit paid', amount: 0 };
+            }
             var payment = quoteData && (quoteData.paymentsReceived || quoteData.paymentReceived);
             payment = payment || {};
             var amount = viewerNumber(payment.amount || payment.value);
@@ -4321,6 +4329,7 @@ if (location.search.includes('debug')) {
                                                 <span class="co-sample-added"><i class="fas fa-plus"></i>Added</span>
                                                 <span class="co-sample-removed"><i class="fas fa-minus"></i>Removed</span>
                                             </div>
+                                            ${renderViewerChangeOrderCustomLegend()}
                                         </div>
                                     </li>
                                     <li>
@@ -4363,34 +4372,80 @@ if (location.search.includes('debug')) {
             window.setTimeout(openChangeOrderExplainer, 350);
         }
 
+        function viewerChangeOrderClientChoicesLocked(item) {
+            var co = window.QuoteDrChangeOrders;
+            return !!(co && co.isChangeOrder(quoteData) && item && item._coOriginal && item._coClientChoiceReopened !== true);
+        }
+
+        function viewerChangeOrderChoiceWasReopened(item) {
+            var co = window.QuoteDrChangeOrders;
+            return !!(co && co.isChangeOrder(quoteData) && item && item._coOriginal && item._coClientChoiceReopened === true);
+        }
+
+        function markViewerChangeOrderClientDecision(item) {
+            if (viewerChangeOrderChoiceWasReopened(item)) item._clientDecisionApplied = true;
+        }
+
+        function viewerChangeOrderCustomHighlightLabel(item) {
+            if (!item || !item.highlightColor || !quoteData || !quoteData.changeOrderHighlightLegend) return '';
+            return String(quoteData.changeOrderHighlightLegend[item.highlightColor] || '').trim();
+        }
+
+        function renderViewerChangeOrderCustomLegend() {
+            var legend = quoteData && quoteData.changeOrderHighlightLegend;
+            if (!legend || typeof legend !== 'object') return '';
+            var used = {};
+            (quoteData.rooms || []).forEach(function(room) {
+                (room.items || []).forEach(function(item) {
+                    if (item && item.highlightColor && String(legend[item.highlightColor] || '').trim()) used[item.highlightColor] = true;
+                });
+            });
+            var entries = Object.keys(used).map(function(colorKey) {
+                var style = VIEWER_LINE_ITEM_HIGHLIGHTS[colorKey];
+                var label = String(legend[colorKey] || '').trim();
+                if (!style || !label) return '';
+                return '<span style="background:' + style.background + ';color:#1f2937;border:1px solid ' + style.border + '"><i class="fas fa-highlighter"></i>' + escapeHtml(label) + '</span>';
+            }).filter(Boolean);
+            if (!entries.length) return '';
+            return '<div class="small fw-semibold mt-3 mb-1">Contractor highlights</div><div class="change-order-highlight-samples">' + entries.join('') + '</div>';
+        }
+
         function renderViewerChoiceGroup(roomIdx, itemIndex, item, isSignedDiff) {
             var group = item.choiceGroup;
             if (!group || !Array.isArray(group.options)) return '';
             var room = quoteData.rooms && quoteData.rooms[roomIdx];
             applyViewerChoiceGroupToItem(item);
             var selectedIds = getViewerChoiceSelectedOptions(group).map(function(option) { return option.id; });
-            var typeLabel = group.type === 'multiple' ? 'Choose any that apply' : 'Choose one option';
+            var choicesLocked = viewerChangeOrderClientChoicesLocked(item);
+            var choicesReopened = viewerChangeOrderChoiceWasReopened(item);
+            var readOnly = isSignedDiff || choicesLocked;
+            var visibleOptions = choicesLocked
+                ? group.options.filter(function(option) { return selectedIds.indexOf(option.id) !== -1; })
+                : group.options;
+            var typeLabel = choicesLocked
+                ? 'Previously approved selection — locked'
+                : (choicesReopened ? 'Reopened for a new client selection' : (group.type === 'multiple' ? 'Choose any that apply' : 'Choose one option'));
             var groupNote = viewerVisibleNotes(item, '');
             var html = '<div class="choice-group-card py-3 border-bottom" id="item_' + roomIdx + '_' + itemIndex + '">';
             html += '<div class="d-flex justify-content-between gap-3 mb-2"><div><strong>' + escapeHtml(group.name || item.description || 'Options') + '</strong><div class="text-muted small"><i class="fas fa-layer-group me-1"></i>' + typeLabel + '</div></div>';
-            html += '<div class="text-end small text-muted">' + (group.required ? 'Required' : 'Optional') + '</div></div>';
+            html += '<div class="text-end small ' + (choicesLocked ? 'text-success fw-semibold' : 'text-muted') + '">' + (choicesLocked ? '<i class="fas fa-lock me-1"></i>Locked' : (group.required ? 'Required' : 'Optional')) + '</div></div>';
             html += '<div class="row g-2">';
-            group.options.forEach(function(option) {
+            visibleOptions.forEach(function(option) {
                 var checked = selectedIds.indexOf(option.id) !== -1;
                 var optionQty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : (parseFloat(item.quantity) || 0);
                 var optionTotal = viewerItemMarkedAmount(room, item, optionQty * (parseFloat(option.rate) || 0));
                 var optionPriceText = isViewerPriceTbd(option) ? viewerPriceTbdLabel() : viewerMoney(optionTotal);
                 var optionRateText = isViewerPriceTbd(option) ? viewerPriceTbdLabel() : viewerMoney(viewerItemMarkedAmount(room, item, option.rate));
                 var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
-                html += '<div class="col-md-6' + (!isSignedDiff && option.photo ? ' choice-option-with-photo' : '') + '"><button type="button" class="w-100 text-start btn choice-option-btn ' + (checked ? 'choice-option-selected' : '') + '" ' + (isSignedDiff ? 'disabled' : 'onclick="toggleViewerChoiceOption(' + roomIdx + ',' + itemIndex + ',' + optionArg + ')"') + '>';
+                html += '<div class="col-md-6' + (!isSignedDiff && option.photo ? ' choice-option-with-photo' : '') + '"><button type="button" class="w-100 text-start btn choice-option-btn ' + (checked ? 'choice-option-selected' : '') + '" ' + (readOnly ? 'disabled' : 'onclick="toggleViewerChoiceOption(' + roomIdx + ',' + itemIndex + ',' + optionArg + ')"') + '>';
                 html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>' + optionPriceText + '</strong></div>';
                 if (option.itemDescription || option.description) html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.itemDescription || option.description) + '</div>';
                 html += '<div class="small opacity-75 mt-1">' + optionQty + ' ' + escapeHtml(option.unitType || item.unitType || '') + ' @ ' + optionRateText + '</div>';
                 html += '</button>' + (!isSignedDiff && option.photo ? '<div class="viewer-choice-option-photo-actions">' + renderViewerPhotoButton(option.photos || option.photo, 'Picture', 'btn-outline-secondary', option.photosFull || option.photoFull) + '</div>' : '') + '</div>';
             });
             html += '</div>';
-            html += renderViewerChoiceGroupEnhancements(roomIdx, itemIndex, item, isSignedDiff);
-            html += renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff);
+            html += renderViewerChoiceGroupEnhancements(roomIdx, itemIndex, item, isSignedDiff, choicesLocked);
+            html += renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff, choicesLocked);
             if (groupNote) {
                 html += '<div class="choice-group-note text-muted mt-2"><small><i class="fas fa-info-circle"></i> ' + escapeHtml(groupNote) + '</small></div>';
             }
@@ -4398,7 +4453,7 @@ if (location.search.includes('debug')) {
             return html;
         }
 
-        function renderViewerChoiceGroupEnhancements(roomIdx, itemIndex, item, isSignedDiff) {
+        function renderViewerChoiceGroupEnhancements(roomIdx, itemIndex, item, isSignedDiff, choicesLocked) {
             var group = item.choiceGroup;
             if (!group) return '';
             var room = quoteData.rooms && quoteData.rooms[roomIdx];
@@ -4411,6 +4466,7 @@ if (location.search.includes('debug')) {
                 var compatible = (enhGroup.options || []).filter(function(option) {
                     return isViewerChoiceGroupEnhancementCompatible(group, option, selectedIds.filter(function(id) { return id !== option.id; }));
                 });
+                if (choicesLocked) compatible = compatible.filter(function(option) { return (enhGroup.selectedOptionIds || []).indexOf(option.id) !== -1; });
                 if (!compatible.length) return;
                 html += '<div class="mb-2"><div class="small text-muted mb-1">' + escapeHtml(enhGroup.name || 'Enhancements') + ' - ' + (enhGroup.type === 'multiple' ? 'choose any that apply' : 'optional') + '</div><div class="row g-2">';
                 compatible.forEach(function(option) {
@@ -4420,7 +4476,7 @@ if (location.search.includes('debug')) {
                     var totalText = isViewerPriceTbd(option) ? viewerPriceTbdLabel() : viewerMoney(total, { forceSign: option.upgradeType !== 'replacement' });
                     var groupArg = JSON.stringify(enhGroup.id || '').replace(/"/g, '&quot;');
                     var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
-                    html += '<div class="col-md-6' + (!isSignedDiff && option.photo ? ' choice-option-with-photo' : '') + '"><button type="button" class="w-100 text-start btn choice-option-btn ' + (checked ? 'choice-option-selected' : '') + '" ' + (isSignedDiff ? 'disabled' : 'onclick="toggleViewerChoiceGroupEnhancement(' + roomIdx + ',' + itemIndex + ',' + groupArg + ',' + optionArg + ')"') + '>';
+                    html += '<div class="col-md-6' + (!isSignedDiff && option.photo ? ' choice-option-with-photo' : '') + '"><button type="button" class="w-100 text-start btn choice-option-btn ' + (checked ? 'choice-option-selected' : '') + '" ' + ((isSignedDiff || choicesLocked) ? 'disabled' : 'onclick="toggleViewerChoiceGroupEnhancement(' + roomIdx + ',' + itemIndex + ',' + groupArg + ',' + optionArg + ')"') + '>';
                     html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>' + totalText + '</strong></div>';
                     if (option.itemDescription || option.description) html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.itemDescription || option.description) + '</div>';
                     html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + '</div>';
@@ -4435,6 +4491,7 @@ if (location.search.includes('debug')) {
         function toggleViewerChoiceOption(roomIdx, itemIndex, optionId) {
             var item = quoteData.rooms[roomIdx]?.items[itemIndex];
             if (!item || !item.choiceGroup) return;
+            if (viewerChangeOrderClientChoicesLocked(item)) return;
             var group = item.choiceGroup;
             var selected = Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.slice() : [];
             if (group.type === 'multiple') {
@@ -4447,6 +4504,7 @@ if (location.search.includes('debug')) {
             group.selectedOptionIds = selected;
             clearInvalidViewerChoiceGroupEnhancementSelections(group);
             applyViewerChoiceGroupToItem(item);
+            markViewerChangeOrderClientDecision(item);
             renderQuote();
             updateTotal();
         }
@@ -4454,6 +4512,7 @@ if (location.search.includes('debug')) {
         function toggleViewerChoiceGroupEnhancement(roomIdx, itemIndex, enhancementGroupId, optionId) {
             var item = quoteData.rooms[roomIdx]?.items[itemIndex];
             if (!item || !item.choiceGroup) return;
+            if (viewerChangeOrderClientChoicesLocked(item)) return;
             var group = item.choiceGroup;
             group.enhancementGroups = normalizeViewerChoiceGroupEnhancementGroups(group.enhancementGroups);
             var enhGroup = group.enhancementGroups.find(function(candidate) { return candidate.id === enhancementGroupId; });
@@ -4471,6 +4530,7 @@ if (location.search.includes('debug')) {
             enhGroup.selectedOptionIds = selected;
             clearInvalidViewerChoiceGroupEnhancementSelections(group);
             applyViewerChoiceGroupToItem(item);
+            markViewerChangeOrderClientDecision(item);
             renderQuote();
             updateTotal();
         }
@@ -4827,12 +4887,15 @@ if (location.search.includes('debug')) {
                         : (item.itemDescription || ''));
                     const visibleNotes = viewerVisibleNotes(item, displayDesc);
                     const isOptional = !!item.optional;
+                    const clientChoicesLocked = viewerChangeOrderClientChoicesLocked(item);
+                    const clientChoicesReopened = viewerChangeOrderChoiceWasReopened(item);
                     const optionalSelected = isOptional ? syncViewerOptionalItemState(item) : true;
                     const displayedItemTotalText = isOptional && !optionalSelected && !linePriceTbd
                         ? viewerMoney(itemTotal, { forceSign: true })
                         : itemTotalText;
                     const isRemoved = !!item._removed && !isOptional;
                     const lineItemHighlight = getViewerLineItemHighlight(item);
+                    const coCustomHighlightLabel = isChangeOrder ? viewerChangeOrderCustomHighlightLabel(item) : '';
 
                     // Find original item for diff (match by description)
                     const origRoom = origRoomsForDiff[roomIdx] || {};
@@ -4869,16 +4932,16 @@ if (location.search.includes('debug')) {
                     } else {
                         const itemClasses = ['py-2', 'border-bottom'];
                         const itemStyles = [];
-                        if (lineItemHighlight) {
-                            itemClasses.push('viewer-line-item-highlighted');
-                            itemStyles.push('--viewer-line-highlight-bg: ' + lineItemHighlight.background);
-                            itemStyles.push('--viewer-line-highlight-border: ' + lineItemHighlight.border);
-                        } else if (isChangeOrder && coStatus === 'changed') {
+                        if (isChangeOrder && coStatus === 'changed') {
                             itemClasses.push('viewer-change-order-item-changed');
                         } else if (isChangeOrder && coStatus === 'added') {
                             itemClasses.push('viewer-change-order-item-added');
                         } else if (isChangeOrder && coStatus === 'removed') {
                             itemClasses.push('viewer-change-order-item-removed');
+                        } else if (lineItemHighlight) {
+                            itemClasses.push('viewer-line-item-highlighted');
+                            itemStyles.push('--viewer-line-highlight-bg: ' + lineItemHighlight.background);
+                            itemStyles.push('--viewer-line-highlight-border: ' + lineItemHighlight.border);
                         } else if (isOptional && !isSignedDiff) {
                             itemStyles.push('border-left:3px dashed #0dcaf0');
                             itemStyles.push('padding-left:8px');
@@ -4897,6 +4960,9 @@ if (location.search.includes('debug')) {
                                         ${isChangeOrder && coStatus === 'changed' ? '<span class="badge bg-warning text-dark ms-2">Changed</span>' : ''}
                                         ${isChangeOrder && coStatus === 'added' ? '<span class="badge bg-success ms-2">Added</span>' : ''}
                                         ${isChangeOrder && coStatus === 'removed' ? '<span class="badge bg-danger ms-2">Removed</span>' : ''}
+                                        ${coCustomHighlightLabel && lineItemHighlight ? `<span class="badge border text-dark ms-2" style="background:${lineItemHighlight.background};border-color:${lineItemHighlight.border} !important;"><i class="fas fa-highlighter me-1"></i>${escapeHtml(coCustomHighlightLabel)}</span>` : ''}
+                                        ${clientChoicesLocked ? '<span class="badge bg-light text-success border ms-2"><i class="fas fa-lock me-1"></i>Previously approved choice</span>' : ''}
+                                        ${clientChoicesReopened ? '<span class="badge bg-warning text-dark ms-2"><i class="fas fa-lock-open me-1"></i>Reopened for selection</span>' : ''}
                                         ${wasOptionalAdded ? '<span class="badge bg-success ms-2">Added by client</span>' : ''}
                                         ${isOptional && !isSignedDiff ? (optionalSelected
                                             ? '<span class="badge bg-success ms-2" style="font-size:0.65em;"><i class="fas fa-check-circle me-1"></i>Included in quote</span>'
@@ -4915,13 +4981,13 @@ if (location.search.includes('debug')) {
                                 </div>
                             </div>
                             ${coCanExplain ? `<div class="viewer-change-order-note" id="co_note_${roomIdx}_${itemIndex}"><i class="fas fa-circle-info me-1"></i>${escapeHtml(coExplanation)}</div>` : ''}
-                            ${hasUpgradeGroups ? renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff) : ''}
+                            ${hasUpgradeGroups ? renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff, clientChoicesLocked) : ''}
                             ${visibleNotes ? `<div class="text-muted mb-1"><small><i class="fas fa-info-circle"></i> ${visibleNotes}</small></div>` : ''}
                             ${isSignedDiff ? `
                                 ${wasUpgraded && origItem ? `<div class="mt-1"><span class="badge bg-success me-1"><i class="fas fa-arrow-up me-1"></i>Upgraded by client</span><span class="text-muted small">was: ${origItem.description} @ ${viewerMoney(viewerItemMarkedAmount(room, origItem, origItem.rate))} = ${viewerMoney(viewerItemMarkedAmount(room, origItem, qvLineTotal(origItem)))}</span></div>` : ''}
                             ` : `
                             <div class="d-flex gap-2 mt-1 flex-wrap">
-                                ${hasLegacyUpgrade ? `
+                                ${hasLegacyUpgrade && !clientChoicesLocked ? `
                                 <div>
                                     ${!isUpgraded ? `<div class="text-muted mb-1" style="font-size:0.88rem;"><i class="fas fa-arrow-up" style="color:#f0ad4e;"></i> <strong>Upgrade available:</strong> ${item.upgrade.name}</div>` : ''}
                                     ${item.upgrade.photo ? `<div class="mb-2">${renderViewerPhotoButton(item.upgrade.photos || item.upgrade.photo, 'Upgrade Picture', 'btn-outline-warning', item.upgrade.photosFull || item.upgrade.photoFull)}</div>` : ''}
@@ -4929,7 +4995,7 @@ if (location.search.includes('debug')) {
                                         <i class="fas fa-arrow-up"></i> ${isUpgraded ? 'Upgraded ✓' : 'Upgrade: ' + item.upgrade.name}
                                     </button>
                                 </div>` : ''}
-                                ${isOptional ? `<button class="btn btn-sm ${optionalSelected ? 'btn-success' : 'btn-outline-primary viewer-optional-add-nudge'}" onclick="toggleViewerOptionalItem(${roomIdx}, ${itemIndex})" style="font-size:0.82rem;">
+                                ${isOptional && !clientChoicesLocked ? `<button class="btn btn-sm ${optionalSelected ? 'btn-success' : 'btn-outline-primary viewer-optional-add-nudge'}" onclick="toggleViewerOptionalItem(${roomIdx}, ${itemIndex})" style="font-size:0.82rem;">
                                     <i class="fas fa-${optionalSelected ? 'check-circle' : 'plus-circle'}"></i> ${optionalSelected ? 'Added to Quote' : 'Add to Quote'}
                                 </button>` : ''}
                             </div>`}
@@ -5024,9 +5090,11 @@ if (location.search.includes('debug')) {
         function toggleViewerOptionalItem(roomIdx, itemIdx) {
             const item = quoteData.rooms[roomIdx]?.items[itemIdx];
             if (!item || !item.optional) return;
+            if (viewerChangeOrderClientChoicesLocked(item)) return;
             const selected = !syncViewerOptionalItemState(item);
             item._optionalSelected = selected;
             item._removed = !selected;
+            markViewerChangeOrderClientDecision(item);
             renderQuote();
             updateTotal();
         }
@@ -5034,6 +5102,7 @@ if (location.search.includes('debug')) {
         function toggleViewerUpgrade(roomIdx, itemIdx) {
             const item = quoteData.rooms[roomIdx]?.items[itemIdx];
             if (!item || !item.upgrade) return;
+            if (viewerChangeOrderClientChoicesLocked(item)) return;
             if (item._baseRate === undefined || item._baseRate === null) item._baseRate = item.rate;
             if (item._baseTotal === undefined || item._baseTotal === null) item._baseTotal = qvBaseLineTotal(item);
             item.upgraded = !item.upgraded;
@@ -5043,6 +5112,7 @@ if (location.search.includes('debug')) {
                 item.rate = item._baseRate || item.rate;
             }
             item.total = qvLineTotal(item);
+            markViewerChangeOrderClientDecision(item);
             renderQuote();
             updateTotal();
         }
@@ -5446,6 +5516,8 @@ if (location.search.includes('debug')) {
         }
 
         function quotePaidAmountCents() {
+            var co = window.QuoteDrChangeOrders;
+            if (co && co.isChangeOrder(quoteData)) return 0;
             if (_documentPaymentState && Number.isFinite(Number(_documentPaymentState.paidCents))) {
                 return Math.max(0, Math.round(Number(_documentPaymentState.paidCents)));
             }
@@ -5831,7 +5903,7 @@ if (location.search.includes('debug')) {
                     var isChangeOrder = !!(window.QuoteDrChangeOrders && QuoteDrChangeOrders.isChangeOrder(quoteData));
                     var requestedStatus = isChangeOrder ? 'approved' : 'accepted';
                     if (!window.QuoteDrClientDecisions) throw new Error('Secure client decision support is unavailable. Please refresh and try again.');
-                    var clientDecision = QuoteDrClientDecisions.collect(quoteData.rooms || [], quoteData._roomNotes || {});
+                    var clientDecision = QuoteDrClientDecisions.collect(quoteData.rooms || [], quoteData._roomNotes || {}, { documentType: quoteData.documentType || quoteData.type });
                     clientDecision.status = requestedStatus;
                     clientDecision.signature = {
                         method: 'typed',
@@ -5919,7 +5991,7 @@ if (location.search.includes('debug')) {
                 if (shareToken && typeof updateSecureClientDocument === 'function') {
                     if (!window.QuoteDrClientDecisions) return;
                     updateSecureClientDocument(_sqid, shareToken, 'client_update', {
-                        decision: QuoteDrClientDecisions.collect(quoteData.rooms || [], quoteData._roomNotes || {})
+                        decision: QuoteDrClientDecisions.collect(quoteData.rooms || [], quoteData._roomNotes || {}, { documentType: quoteData.documentType || quoteData.type })
                     }, portalAnchorId).then(function() {});
                 }
             }

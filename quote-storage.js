@@ -1043,6 +1043,7 @@
                 changeOrderScopeAutomatic: window._changeOrderScopeAutomatic !== false,
                 changeOrderScopeAiOwned: window._changeOrderScopeAiOwned === true,
                 changeOrderScopeFingerprint: window._changeOrderScopeFingerprint || '',
+                changeOrderHighlightLegend: window._changeOrderHighlightLegend || {},
                 status: status,
                 quoteTitle:     document.getElementById('quoteTitle')?.value     || '',
                 clientName:     document.getElementById('clientName')?.value     || '',
@@ -1068,7 +1069,7 @@
                 categoryStyles: getQuoteCategoryStylesSnapshot(),
                 roomCounter: roomCounter,
                 quoteAdjustment: getQuoteClientAdjustment(),
-                paymentsReceived: getQuotePaymentsReceived(),
+                paymentsReceived: isChangeOrder ? { name: 'Deposit paid', amount: 0 } : getQuotePaymentsReceived(),
                 taxEnabled: (typeof getQuoteTaxEnabled === 'function') ? getQuoteTaxEnabled() : true,
                 taxRate: (function(){ try { var p = JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}'); return p.taxRate !== undefined && p.taxRate !== '' ? parseFloat(p.taxRate) / 100 : 0.13; } catch(e){ return 0.13; } })(),
                 taxLabel: (function(){ try { return JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}').taxLabel || 'HST'; } catch(e){ return 'HST'; } })(),
@@ -1233,7 +1234,8 @@
             }
             roomCounter = data.roomCounter || rooms.length;
             setQuoteClientAdjustment(data.quoteAdjustment || data.clientAdjustment || null);
-            setQuotePaymentsReceived(data.paymentsReceived || data.paymentReceived || null);
+            var loadedDocumentType = data.type || data.documentType || 'quote';
+            setQuotePaymentsReceived(loadedDocumentType === 'change_order' ? null : (data.paymentsReceived || data.paymentReceived || null));
             if (typeof setQuoteTaxEnabled === 'function') setQuoteTaxEnabled(data.taxEnabled !== false);
             window._quotePaymentFallbackBalanceDue = null;
             if (!data.paymentsReceived && !data.paymentReceived && data._paymentBalanceDueFallback !== undefined && data._paymentBalanceDueFallback !== null && data._paymentBalanceDueFallback !== '') {
@@ -1257,6 +1259,9 @@
             window._changeOrderScopeAiOwned = data.changeOrderScopeAiOwned === true;
             window._changeOrderScopeFingerprint = data.changeOrderScopeFingerprint || '';
             window._changeOrderScopeLastGeneratedText = window._changeOrderScopeAiOwned ? (data.changeReason || '') : '';
+            window._changeOrderHighlightLegend = data.changeOrderHighlightLegend && typeof data.changeOrderHighlightLegend === 'object'
+                ? JSON.parse(JSON.stringify(data.changeOrderHighlightLegend))
+                : {};
             window._quoteServerUpdatedAt = data._serverUpdatedAt || data.serverUpdatedAt || data.updated_at || null;
             window._quoteLocalEditAt = data._clientEditedAt || data._saveMeta && data._saveMeta.clientEditedAt || data.savedAt || null;
             setTimeout(function() {
