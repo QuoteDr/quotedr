@@ -1336,8 +1336,8 @@
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:green;"><i class="fas fa-check"></i> Quote saved!</span>';
                 hideQuoteGenerationProgress();
 
-                // Show portal-only sharing options. The portal action performs
-                // assignment before it prepares, copies, opens, or emails a URL.
+                // Show portal-only sharing options. Adding to a portal is an
+                // explicit first step; link actions unlock only after it succeeds.
                 let modal = document.getElementById('interactiveLinkModal');
                 if (!modal) {
                     document.body.insertAdjacentHTML('beforeend', `
@@ -1357,23 +1357,25 @@
                                             <input type="text" id="quotePortalLinkInput" class="form-control" value="Choose a client portal to prepare its link" readonly aria-label="Client portal link">
                                             <button type="button" class="btn btn-outline-primary" id="changeOrderPortalLockHelpBtn" onclick="showChangeOrderPortalLockHelp()" aria-label="Why is this portal locked?" title="Why is this portal locked?" style="display:none; font-weight:800;">?</button>
                                         </div>
+                                        <button type="button" class="btn btn-primary btn-sm w-100 mb-3" onclick="addCurrentQuoteToPortal()" id="openQuotePortalBtn">
+                                            <i class="fas fa-folder-plus me-1"></i>Add to Portal
+                                        </button>
                                         <div style="border:1px solid #dee2e6; border-radius:8px; padding:14px; background:#f8f9fa; margin-bottom:12px;">
                                             <div class="fw-bold small mb-2"><i class="fas fa-envelope me-1" style="color:#1a56a0;"></i>Email client portal link</div>
                                             <input type="email" id="sendQuoteEmail" class="form-control form-control-sm mb-2" placeholder="Client email address">
                                             <textarea id="sendQuoteMessage" class="form-control form-control-sm mb-2" rows="2" placeholder="Optional personal message (e.g. Great chatting with you! Let me know if you have any questions.)"></textarea>
-                                            <button class="btn btn-primary btn-sm w-100" onclick="sendQuoteByEmail()" id="sendQuoteEmailBtn">
-                                                <i class="fas fa-paper-plane me-1"></i>Email Portal Link
-                                            </button>
-                                            <div class="row g-2 mt-2">
-                                                <div class="col-sm-6">
-                                                    <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="shareCurrentQuotePortal('copy')" id="copyQuotePortalLinkBtn">
-                                                        <i class="fas fa-copy me-1"></i>Choose Portal &amp; Copy Link
-                                                    </button>
-                                                </div>
-                                                <div class="col-sm-6">
-                                                    <button type="button" class="btn btn-outline-primary btn-sm w-100" onclick="shareCurrentQuotePortal('open')" id="openQuotePortalBtn">
-                                                        <i class="fas fa-arrow-up-right-from-square me-1"></i>Choose Portal &amp; Open
-                                                    </button>
+                                            <div id="sendQuoteEmailGate" title="Add to portal first to create your link!" onclick="explainQuotePortalLinkGate(event)">
+                                                <button class="btn btn-primary btn-sm w-100" onclick="sendQuoteByEmail()" id="sendQuoteEmailBtn" disabled>
+                                                    <i class="fas fa-paper-plane me-1"></i>Email Portal Link
+                                                </button>
+                                            </div>
+                                            <div class="mt-2">
+                                                <div>
+                                                    <div id="copyQuotePortalLinkGate" title="Add to portal first to create your link!" onclick="explainQuotePortalLinkGate(event)">
+                                                        <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="shareCurrentQuotePortal('copy')" id="copyQuotePortalLinkBtn" disabled>
+                                                            <i class="fas fa-copy me-1"></i>Copy Portal Link
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div id="sendQuoteEmailResult" class="mt-2 small"></div>
@@ -1404,6 +1406,12 @@
                     await prepareQuotePortalShareContext();
                 }
                 var linkModalEl = document.getElementById('interactiveLinkModal');
+                if (linkModalEl && linkModalEl.dataset.portalShareExitBound !== 'true') {
+                    linkModalEl.dataset.portalShareExitBound = 'true';
+                    linkModalEl.addEventListener('hidden.bs.modal', function() {
+                        if (typeof finishQuotePortalShareModal === 'function') finishQuotePortalShareModal();
+                    });
+                }
                 var linkModal = bootstrap.Modal.getInstance(linkModalEl) || new bootstrap.Modal(linkModalEl);
                 linkModal.show();
 

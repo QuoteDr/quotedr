@@ -48,8 +48,8 @@ assert(emailFunction.includes('isQuoteDrPortalUrl'), 'email function should vali
 assert(emailFunction.includes('QuoteDr document emails must use a secure client portal link'), 'email function should reject standalone document URLs');
 
 assert(!quoteStyle.includes('quoteAddToPortalEmail'), 'portal inclusion should not be optional for quote email');
-assert(quoteStyle.includes("shareCurrentQuotePortal('copy')"), 'quote modal should expose portal assignment plus copying');
-assert(quoteStyle.includes("shareCurrentQuotePortal('open')"), 'quote modal should expose portal assignment plus opening');
+assert(quoteStyle.includes("shareCurrentQuotePortal('copy')"), 'quote modal should expose portal-link copying after assignment');
+assert(quoteStyle.includes('onclick="addCurrentQuoteToPortal()"'), 'quote modal should expose explicit portal assignment before link actions');
 assert(!quoteStyle.includes('Copy Quote Link'), 'quote modal should not expose a standalone quote-link button');
 assert(quoteStyle.includes('window._currentQuoteData'), 'quote link generation should keep the current quote data for portal publishing');
 assert(quoteStyle.includes("window._currentQuoteUrl = ''"), 'quote preparation should clear any standalone quote URL');
@@ -58,7 +58,7 @@ assert(builder.includes('openQuotePortalAssignment'), 'quotes should require cho
 assert(builder.includes('renderQuotePortalAssignmentList'), 'quote portal assignment modal should render existing portals');
 assert(builder.includes('assignCurrentQuoteToPortal'), 'quote portal assignment modal should assign the quote to a selected portal');
 assert(builder.includes('createPortalForCurrentQuote'), 'quote portal assignment modal should support creating a portal for the quote');
-assert(builder.includes('resumeQuoteEmailAfterPortal'), 'quote email flow should resume after choosing a portal');
+assert(builder.includes('setQuotePortalLinkActionsReady'), 'quote email and copy actions should unlock only after portal publication');
 assert(builder.includes("emailKind: qData.type === 'change_order'"), 'quote and change-order emails should be identified as portal-only');
 
 console.log('invoice portal links static test passed');

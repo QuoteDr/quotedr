@@ -34,12 +34,11 @@ assert(
 );
 
 assert(
-  /function armQuotePortalLockRedirect\(quoteData\) \{[\s\S]*?if \(window\._resumeQuoteEmailAfterPortal\) \{[\s\S]*?window\._quotePortalRedirectAfterEmail = true;[\s\S]*?if \(window\._resumeQuotePortalAction\) \{[\s\S]*?window\._quotePortalRedirectAfterShare = true;[\s\S]*?setTimeout\(redirectPortalLockedQuoteBuilderToDashboard, 0\)/.test(builder) &&
-    builder.includes('function finishDeferredQuotePortalRedirect()') &&
-    builder.includes('function finishDeferredQuotePortalShareRedirect()') &&
-    /async function sendQuoteByEmail\(\) \{[\s\S]*?Please enter a valid email address[\s\S]*?finishDeferredQuotePortalRedirect\(\)[\s\S]*?portalUrl = window\._currentQuotePortalUrl \|\| await ensureQuotePortalUrl\(resultEl\)[\s\S]*?quoteUrl: portalUrl[\s\S]*?finally \{[\s\S]*?finishDeferredQuotePortalRedirect\(\)/.test(builder) &&
-    /async function shareCurrentQuotePortal\(action\) \{[\s\S]*?window\._resumeQuotePortalAction = action[\s\S]*?openQuotePortalAssignment\(\{ resumeQuotePortalAction: action \}\)[\s\S]*?performQuotePortalAction\(portalUrl, action\)/.test(builder),
-  'Portal-assisted email should finish sending before the locked builder redirects'
+  /function armQuotePortalLockRedirect\(quoteData\) \{[\s\S]*?if \(window\._quotePortalHoldRedirectForSharing\) \{[\s\S]*?window\._quotePortalRedirectAfterShareModal = true;[\s\S]*?setTimeout\(redirectPortalLockedQuoteBuilderToDashboard, 0\)/.test(builder) &&
+    builder.includes('function finishQuotePortalShareModal()') &&
+    /async function sendQuoteByEmail\(\) \{[\s\S]*?if \(!window\._currentQuotePortalUrl \|\| qData\.portal_visible !== true\) \{[\s\S]*?explainQuotePortalLinkGate\(\)[\s\S]*?Please enter a valid email address[\s\S]*?portalUrl = window\._currentQuotePortalUrl \|\| await ensureQuotePortalUrl\(resultEl\)[\s\S]*?quoteUrl: portalUrl/.test(builder) &&
+    /async function shareCurrentQuotePortal\(action\) \{[\s\S]*?if \(!window\._currentQuotePortalUrl \|\| quoteData\.portal_visible !== true\) \{[\s\S]*?explainQuotePortalLinkGate\(\)[\s\S]*?performQuotePortalAction\(window\._currentQuotePortalUrl, action\)/.test(builder),
+  'Portal link actions should remain gated until explicit publication, then stay available until the locked share modal closes'
 );
 
 assert(

@@ -17318,6 +17318,10 @@ Example:
                 window._quotePortalRedirectAfterShare = true;
                 return;
             }
+            if (window._quotePortalHoldRedirectForSharing) {
+                window._quotePortalRedirectAfterShareModal = true;
+                return;
+            }
             if (window._quotePortalRedirectScheduled) return;
             window._quotePortalRedirectScheduled = true;
             setTimeout(redirectPortalLockedQuoteBuilderToDashboard, 0);
@@ -17403,11 +17407,58 @@ Example:
             return lockedPortal;
         }
 
-        function setQuotePortalShareButtonsDisabled(disabled) {
-            ['sendQuoteEmailBtn', 'copyQuotePortalLinkBtn', 'openQuotePortalBtn'].forEach(function(id) {
-                var button = document.getElementById(id);
-                if (button) button.disabled = disabled === true;
+        function setQuotePortalLinkActionsReady(ready, message) {
+            var gateMessage = message || 'Add to portal first to create your link!';
+            [
+                { buttonId: 'sendQuoteEmailBtn', gateId: 'sendQuoteEmailGate' },
+                { buttonId: 'copyQuotePortalLinkBtn', gateId: 'copyQuotePortalLinkGate' }
+            ].forEach(function(control) {
+                var button = document.getElementById(control.buttonId);
+                var gate = document.getElementById(control.gateId);
+                if (button) {
+                    button.disabled = ready !== true;
+                    button.style.pointerEvents = ready === true ? '' : 'none';
+                    button.setAttribute('aria-disabled', ready === true ? 'false' : 'true');
+                }
+                if (gate) {
+                    gate.title = ready === true ? '' : gateMessage;
+                    gate.dataset.portalLinkReady = ready === true ? 'true' : 'false';
+                    gate.style.cursor = ready === true ? '' : 'not-allowed';
+                }
             });
+        }
+
+        function explainQuotePortalLinkGate(event) {
+            var gate = event && event.currentTarget;
+            if (gate && gate.dataset.portalLinkReady === 'true') return;
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            var resultEl = document.getElementById('sendQuoteEmailResult');
+            var message = 'Add to portal first to create your link!';
+            if (resultEl) resultEl.innerHTML = '<span class="text-warning-emphasis"><i class="fas fa-folder-plus me-1"></i>' + message + '</span>';
+            if (typeof qdToast === 'function') qdToast({ title: 'Add to Portal First', message: message, type: 'info' });
+        }
+
+        function setQuotePortalAddButtonState(state) {
+            var button = document.getElementById('openQuotePortalBtn');
+            if (!button) return;
+            if (state === 'adding') {
+                button.disabled = true;
+                button.className = 'btn btn-primary btn-sm w-100';
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Adding to Portal...';
+                return;
+            }
+            if (state === 'added') {
+                button.disabled = true;
+                button.className = 'btn btn-success btn-sm w-100';
+                button.innerHTML = '<i class="fas fa-check-circle me-1"></i>Added to Portal';
+                return;
+            }
+            button.disabled = state === 'unavailable';
+            button.className = 'btn btn-primary btn-sm w-100';
+            button.innerHTML = '<i class="fas fa-folder-plus me-1"></i>Add to Portal';
         }
 
         function renderQuotePortalShareContext(quoteData, portal, error) {
@@ -17417,34 +17468,43 @@ Example:
             var input = document.getElementById('quotePortalLinkInput');
             var help = document.getElementById('changeOrderPortalLockHelpBtn');
             var copyButton = document.getElementById('copyQuotePortalLinkBtn');
-            var openButton = document.getElementById('openQuotePortalBtn');
+            var portalReady = !!window._currentQuotePortalUrl && quoteData && quoteData.portal_visible === true;
             if (!isChangeOrder) {
                 if (intro) intro.textContent = 'QuoteDr will add this document to the client portal you choose. Clients receive the portal link, while the quote remains available inside that portal.';
                 if (icon) icon.innerHTML = '<i class="fas fa-shield-halved"></i>';
                 if (input && !window._currentQuotePortalUrl) input.value = 'Choose a client portal to prepare its link';
                 if (help) help.style.display = 'none';
-                if (copyButton) copyButton.innerHTML = '<i class="fas fa-copy me-1"></i>Choose Portal &amp; Copy Link';
-                if (openButton) openButton.innerHTML = '<i class="fas fa-arrow-up-right-from-square me-1"></i>Choose Portal &amp; Open';
-                setQuotePortalShareButtonsDisabled(false);
+                if (copyButton) copyButton.innerHTML = '<i class="fas fa-copy me-1"></i>Copy Portal Link';
+                setQuotePortalLinkActionsReady(portalReady);
+                setQuotePortalAddButtonState(portalReady ? 'added' : 'ready');
                 return;
             }
 
             if (intro) intro.textContent = 'This change order stays with the original quote and will be added to that same client portal.';
             if (icon) icon.innerHTML = '<i class="fas fa-lock"></i>';
             if (help) help.style.display = '';
-            if (copyButton) copyButton.innerHTML = '<i class="fas fa-copy me-1"></i>Copy Locked Portal Link';
-            if (openButton) openButton.innerHTML = '<i class="fas fa-arrow-up-right-from-square me-1"></i>Open Locked Portal';
+            if (copyButton) copyButton.innerHTML = '<i class="fas fa-copy me-1"></i>Copy Portal Link';
             if (error) {
                 if (input) input.value = 'Portal unavailable — see details below';
                 var resultEl = document.getElementById('sendQuoteEmailResult');
                 if (resultEl) resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-triangle-exclamation me-1"></i>' + _escapeHtml(error.message || String(error)) + '</span>';
-                setQuotePortalShareButtonsDisabled(true);
+                setQuotePortalLinkActionsReady(false);
+                setQuotePortalAddButtonState('unavailable');
                 return;
             }
             if (input && !window._currentQuotePortalUrl) {
                 input.value = 'Locked to: ' + (portal && portal.name || 'Original quote portal');
             }
-            setQuotePortalShareButtonsDisabled(false);
+            setQuotePortalLinkActionsReady(portalReady);
+            setQuotePortalAddButtonState(portalReady ? 'added' : 'ready');
+        }
+
+        function finishQuotePortalShareModal() {
+            window._quotePortalHoldRedirectForSharing = false;
+            if (window._quotePortalRedirectAfterShareModal || window._quoteLockedAfterPortalPublish) {
+                window._quotePortalRedirectAfterShareModal = false;
+                redirectPortalLockedQuoteBuilderToDashboard();
+            }
         }
 
         async function prepareQuotePortalShareContext() {
@@ -17584,6 +17644,14 @@ Example:
                 renderQuotePortalAssignmentList();
                 var modalEl = document.getElementById('quotePortalAssignModal');
                 var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                if (options.keepShareModalOpen) {
+                    modalEl.addEventListener('hidden.bs.modal', function resetCancelledPortalAdd() {
+                        if (!window._currentQuotePortalUrl) {
+                            window._quotePortalHoldRedirectForSharing = false;
+                            renderQuotePortalShareContext(getCurrentQuoteDataForPortal(), null, null);
+                        }
+                    }, { once: true });
+                }
                 var pendingAction = window._resumeQuotePortalAction;
                 if (pendingAction) {
                     modalEl.addEventListener('hidden.bs.modal', function clearCancelledQuotePortalAction() {
@@ -17693,6 +17761,7 @@ Example:
             if (modal) modal.hide();
             var emailResultEl = document.getElementById('sendQuoteEmailResult');
             if (emailResultEl) emailResultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Quote added to the client portal.</span>';
+            renderQuotePortalShareContext(window._currentQuoteData || getCurrentQuoteDataForPortal(), portal, null);
             if (window._resumeQuoteEmailAfterPortal) {
                 resumeQuoteEmailAfterPortal();
             } else if (window._resumeQuotePortalAction) {
@@ -17701,6 +17770,25 @@ Example:
                 await performQuotePortalAction(portalUrl, action);
             }
             return portalUrl;
+        }
+
+        async function addCurrentQuoteToPortal() {
+            var resultEl = document.getElementById('sendQuoteEmailResult');
+            var quoteData = getCurrentQuoteDataForPortal();
+            if (window._currentQuotePortalUrl && quoteData.portal_visible === true) {
+                renderQuotePortalShareContext(quoteData, window._changeOrderLockedPortal || null, null);
+                return window._currentQuotePortalUrl;
+            }
+            window._quotePortalHoldRedirectForSharing = true;
+            setQuotePortalAddButtonState('adding');
+            if (resultEl) resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Preparing the client portal...</span>';
+            try {
+                return await openQuotePortalAssignment({ keepShareModalOpen: true });
+            } catch (error) {
+                window._quotePortalHoldRedirectForSharing = false;
+                renderQuotePortalShareContext(quoteData, null, error);
+                return null;
+            }
         }
 
         async function assignCurrentQuoteToPortal(portalId) {
@@ -17799,33 +17887,22 @@ Example:
         }
 
         async function shareCurrentQuotePortal(action) {
-            action = action === 'open' ? 'open' : 'copy';
+            action = 'copy';
             var resultEl = document.getElementById('sendQuoteEmailResult');
             var quoteData = getCurrentQuoteDataForPortal();
             try {
-                window._resumeQuotePortalAction = action;
-                if (quotePortalDocumentIsChangeOrder(quoteData) && !window._currentQuotePortalUrl) {
-                    var lockedPortal = await resolveChangeOrderLockedPortal(quoteData);
-                    renderQuotePortalShareContext(quoteData, lockedPortal, null);
-                    await finishQuotePortalAssignment(lockedPortal);
+                if (!window._currentQuotePortalUrl || quoteData.portal_visible !== true) {
+                    explainQuotePortalLinkGate();
                     return;
                 }
-                if (!window._currentQuotePortalUrl && !(quoteData.portal_visible && quoteData.portal_id)) {
-                    if (resultEl) resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-folder-open me-1"></i>Choose the correct client portal to continue.</span>';
-                    await openQuotePortalAssignment({ resumeQuotePortalAction: action });
-                    return;
-                }
-                var portalUrl = window._currentQuotePortalUrl || await ensureQuotePortalUrl(resultEl);
-                window._resumeQuotePortalAction = '';
-                await performQuotePortalAction(portalUrl, action);
+                await performQuotePortalAction(window._currentQuotePortalUrl, action);
             } catch(e) {
-                window._resumeQuotePortalAction = '';
                 if (resultEl) resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
             }
         }
 
         async function publishCurrentQuoteToPortal() {
-            return shareCurrentQuotePortal('copy');
+            return addCurrentQuoteToPortal();
         }
 
         async function sendQuoteByEmail() {
@@ -17833,6 +17910,11 @@ Example:
             var msgEl = document.getElementById('sendQuoteMessage');
             var resultEl = document.getElementById('sendQuoteEmailResult');
             var btn = document.getElementById('sendQuoteEmailBtn');
+            var qData = getCurrentQuoteDataForPortal();
+            if (!window._currentQuotePortalUrl || qData.portal_visible !== true) {
+                explainQuotePortalLinkGate();
+                return;
+            }
             var email = emailEl ? emailEl.value.trim() : '';
             if (!email || !email.includes('@')) {
                 resultEl.innerHTML = '<span class="text-danger">Please enter a valid email address.</span>';
@@ -17840,29 +17922,7 @@ Example:
                 return;
             }
             // Gather quote info
-            var qData = getCurrentQuoteDataForPortal();
             var portalUrl = '';
-            if (quotePortalDocumentIsChangeOrder(qData) && !window._currentQuotePortalUrl) {
-                window._resumeQuoteEmailAfterPortal = true;
-                resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-lock me-1"></i>Preparing the original quote\'s client portal...</span>';
-                try {
-                    var lockedPortal = await resolveChangeOrderLockedPortal(qData);
-                    renderQuotePortalShareContext(qData, lockedPortal, null);
-                    await finishQuotePortalAssignment(lockedPortal);
-                } catch(error) {
-                    window._resumeQuoteEmailAfterPortal = false;
-                    renderQuotePortalShareContext(qData, null, error);
-                }
-                return;
-            }
-            if (!window._currentQuotePortalUrl && !(qData.portal_visible && qData.portal_id)) {
-                window._resumeQuoteEmailAfterPortal = true;
-                resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-folder-open me-1"></i>Choose a client portal, then this email will send its portal link.</span>';
-                try {
-                    await openQuotePortalAssignment({ resumeQuoteEmailAfterPortal: true });
-                } catch(e) {}
-                return;
-            }
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Preparing portal link...';
             try {
