@@ -171,6 +171,7 @@ const legacyPlaceholder = {
     makePortalId() { return 'portal-new'; },
     quoteClientName() { return 'Fallback client'; },
     quoteClientEmail() { return 'fallback@example.com'; },
+    dashboardDocumentIsChangeOrder() { return false; },
     async upsertDashboardEmptyPortal(portal) { savedEmptyPortals.push(portal); },
     async refreshQuotes() {},
     async finishPendingDashboardPortalAction(quoteId) { finishedPortalActions.push(quoteId); },

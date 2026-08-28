@@ -2346,15 +2346,47 @@
             return window._dashboardPortalThemePresets;
         }
 
-        function openPortalAssignment(quoteId) {
+        async function openPortalAssignment(quoteId) {
             var quote = (allQuotes || []).find(function(q) { return q.id === quoteId; });
             if (!quote) { qdAlert('Could not find that quote. Please refresh and try again.'); return; }
+            window._portalAssignLockedPortal = null;
+            window._portalAssignLockError = '';
+            try {
+                quote = await loadDashboardFullQuote(quote);
+            } catch (error) {
+                qdAlert('Could not load that document: ' + (error && error.message ? error.message : String(error)));
+                return;
+            }
+            try {
+                window._portalAssignLockedPortal = await resolveDashboardChangeOrderLockedPortal(quote);
+            } catch (error) {
+                window._portalAssignLockError = error && error.message ? error.message : String(error);
+            }
             window._portalAssignQuoteId = quoteId;
             resetPortalAssignmentSearch();
             var d = quote.data || {};
             document.getElementById('portalAssignQuoteTitle').textContent = (d.quoteTitle || quote.client_name || quote.quote_number || 'Selected quote');
             document.getElementById('portalAssignSelectedWrap').style.display = '';
-            document.getElementById('portalAssignCreateWrap').style.display = '';
+            var isLockedChangeOrder = dashboardDocumentIsChangeOrder(quote);
+            document.getElementById('portalAssignCreateWrap').style.display = isLockedChangeOrder ? 'none' : '';
+            var addNewButton = document.getElementById('portalAssignAddNewBtn');
+            var mergeButton = document.getElementById('portalAssignMergeBtn');
+            var searchWrap = document.getElementById('portalAssignSearchWrap');
+            var lockWrap = document.getElementById('portalAssignLockWrap');
+            if (addNewButton) addNewButton.style.display = isLockedChangeOrder ? 'none' : '';
+            if (mergeButton) mergeButton.style.display = isLockedChangeOrder ? 'none' : '';
+            if (searchWrap) searchWrap.style.display = isLockedChangeOrder ? 'none' : '';
+            if (lockWrap) {
+                lockWrap.classList.toggle('d-none', !isLockedChangeOrder);
+                var lockText = document.getElementById('portalAssignLockText');
+                if (lockText) {
+                    lockText.textContent = window._portalAssignLockError
+                        ? window._portalAssignLockError
+                        : 'Locked to: ' + (window._portalAssignLockedPortal && window._portalAssignLockedPortal.name || 'the original quote portal');
+                }
+                lockWrap.classList.toggle('alert-danger', !!window._portalAssignLockError);
+                lockWrap.classList.toggle('alert-info', !window._portalAssignLockError);
+            }
             document.getElementById('portalAssignCreateBtn').innerHTML = '<i class="fas fa-plus me-1"></i>Create Portal & Add';
             document.getElementById('portalAssignRemoveBtn').style.display = '';
             document.getElementById('portalAssignClientName').value = quoteClientName(quote);
@@ -2371,12 +2403,22 @@
 
         function openPortalManager() {
             window._portalAssignQuoteId = '';
+            window._portalAssignLockedPortal = null;
+            window._portalAssignLockError = '';
             window._portalMergeMode = false;
             window._portalMergeSelected = {};
             resetPortalAssignmentSearch();
             document.getElementById('portalAssignQuoteTitle').textContent = 'Manage all client portals';
             document.getElementById('portalAssignSelectedWrap').style.display = 'none';
             document.getElementById('portalAssignCreateWrap').style.display = 'none';
+            var addNewButton = document.getElementById('portalAssignAddNewBtn');
+            var mergeButton = document.getElementById('portalAssignMergeBtn');
+            var searchWrap = document.getElementById('portalAssignSearchWrap');
+            var lockWrap = document.getElementById('portalAssignLockWrap');
+            if (addNewButton) addNewButton.style.display = '';
+            if (mergeButton) mergeButton.style.display = '';
+            if (searchWrap) searchWrap.style.display = '';
+            if (lockWrap) lockWrap.classList.add('d-none');
             document.getElementById('portalAssignClientName').value = '';
             document.getElementById('portalAssignClientEmail').value = '';
             document.getElementById('portalAssignPortalName').value = '';
@@ -2435,8 +2477,21 @@
             var hasSelectedQuote = !!quoteId;
             var portals = buildPortalRegistry(allQuotes);
             renderPortalMergeActions(portals);
+            var lockedPortal = window._portalAssignLockedPortal || null;
+            var lockError = String(window._portalAssignLockError || '').trim();
+            if (hasSelectedQuote && lockError) {
+                wrap.innerHTML = '<div class="alert alert-danger mb-0"><i class="fas fa-triangle-exclamation me-1"></i>' + escapeHtml(lockError) + '</div>';
+                return;
+            }
+            if (hasSelectedQuote && lockedPortal) {
+                portals = portals.filter(function(portal) {
+                    return String(portal && portal.id || '') === String(lockedPortal.id || '');
+                });
+            }
             if (!portals.length) {
-                wrap.innerHTML = '<div class="text-muted small border rounded p-3">No portals exist yet. Click Add New Portal to create one.</div>';
+                wrap.innerHTML = lockedPortal
+                    ? '<div class="alert alert-danger mb-0">The original quote portal is unavailable. QuoteDr stopped this change order from being assigned elsewhere.</div>'
+                    : '<div class="text-muted small border rounded p-3">No portals exist yet. Click Add New Portal to create one.</div>';
                 return;
             }
             var searchInput = document.getElementById('portalAssignSearch');
@@ -2461,7 +2516,7 @@
                 var portalOpenUrl = portalUrlForDashboard(portalForUrl, window._portalAssignQuoteId || '', { admin: true });
                 var portalClientUrl = portalUrlForDashboard(portalForUrl, window._portalAssignQuoteId || '');
                 var addButton = hasSelectedQuote
-                    ? '<button type="button" class="btn btn-primary btn-sm" onclick="assignQuoteToPortal(' + jsAttr(portal.id) + ')"><i class="fas fa-folder-plus me-1"></i>Add here</button>'
+                    ? '<button type="button" class="btn btn-primary btn-sm" onclick="assignQuoteToPortal(' + jsAttr(portal.id) + ')"><i class="fas ' + (lockedPortal ? 'fa-lock' : 'fa-folder-plus') + ' me-1"></i>' + (lockedPortal ? 'Add to Locked Portal' : 'Add here') + '</button>'
                     : '';
                 var mergeBox = mergeMode
                     ? '<div class="form-check me-2 mt-1"><input class="form-check-input" type="checkbox" id="portal-merge-' + portalDom + '" ' + (window._portalMergeSelected[portal.id] ? 'checked' : '') + ' onchange="togglePortalMergeSelection(' + jsAttr(portal.id) + ', this.checked)"><label class="visually-hidden" for="portal-merge-' + portalDom + '">Select portal to merge</label></div>'
@@ -2534,6 +2589,84 @@
             return buildPortalRegistry(allQuotes).find(function(portal) {
                 return (portalId && String(portal.id) === portalId) || (portal.quoteIds || []).includes(quote.id);
             }) || null;
+        }
+
+        function dashboardDocumentIsChangeOrder(quote) {
+            if (window.QuoteDrChangeOrders && typeof QuoteDrChangeOrders.isChangeOrder === 'function') {
+                return QuoteDrChangeOrders.isChangeOrder(quote);
+            }
+            var data = quote && quote.data || quote || {};
+            return String(quote && quote.type || data.type || data.documentType || '').toLowerCase() === 'change_order';
+        }
+
+        function dashboardChangeOrderParentId(quote) {
+            if (window.QuoteDrChangeOrders && typeof QuoteDrChangeOrders.parentQuoteId === 'function') {
+                return String(QuoteDrChangeOrders.parentQuoteId(quote) || '').trim();
+            }
+            var data = quote && quote.data || quote || {};
+            return String(quote && quote.parent_quote_id || data.parentQuoteId || data.parent_quote_id || '').trim();
+        }
+
+        function dashboardPortalFromParentQuote(parentQuote) {
+            var data = parentQuote && parentQuote.data || {};
+            if (!parentQuote || data.portal_visible !== true) return null;
+            var portalId = String(data.portal_id || quotePortalKey(parentQuote) || '').trim();
+            if (!portalId) return null;
+            var registryPortal = buildPortalRegistry(allQuotes).find(function(portal) {
+                return String(portal && portal.id || '') === portalId || (portal.quoteIds || []).includes(parentQuote.id);
+            });
+            if (registryPortal) return registryPortal;
+            return {
+                id: portalId,
+                legacy: !data.portal_id,
+                name: data.portal_name || data.portal_client_name || parentQuote.client_name || 'Client Portal',
+                clientName: data.portal_client_name || parentQuote.client_name || '',
+                clientEmail: data.portal_client_email || quoteClientEmail(parentQuote),
+                pin: data.portal_pin || '',
+                secureToken: String(data.portal_share_token || '').trim(),
+                secureAnchorId: String(data.portal_share_anchor_id || '').trim(),
+                secureCreatedAt: String(data.portal_share_created_at || '').trim(),
+                quoteIds: [parentQuote.id],
+                quotes: [parentQuote],
+                anchorRows: []
+            };
+        }
+
+        async function resolveDashboardChangeOrderLockedPortal(quote) {
+            if (!dashboardDocumentIsChangeOrder(quote)) return null;
+            var parentId = dashboardChangeOrderParentId(quote);
+            if (!parentId) throw new Error('This change order is missing its original quote link. Create it again from the original quote.');
+            var parentQuote = await loadDashboardFullQuote(parentId);
+            if (!parentQuote) throw new Error('The original quote could not be found. QuoteDr stopped this change order from being shared.');
+            var lockedPortal = dashboardPortalFromParentQuote(parentQuote);
+            if (!lockedPortal) throw new Error('The original quote is not currently in a client portal. Add the original quote to its portal before sharing this change order.');
+            var data = quote && quote.data || {};
+            if (data.portal_visible === true && data.portal_id && String(data.portal_id) !== String(lockedPortal.id)) {
+                throw new Error('This change order is assigned to a different portal. QuoteDr stopped the send so the original project history is not split.');
+            }
+            return Object.assign({}, lockedPortal, {
+                lockedToParentQuote: true,
+                parentQuoteId: parentId,
+                parentQuoteNumber: parentQuote.quote_number || parentQuote.data && parentQuote.data.quoteNumber || ''
+            });
+        }
+
+        async function enforceDashboardChangeOrderPortalDestination(quote, requestedPortal) {
+            if (!dashboardDocumentIsChangeOrder(quote)) return requestedPortal;
+            var lockedPortal = await resolveDashboardChangeOrderLockedPortal(quote);
+            if (requestedPortal && requestedPortal.id && String(requestedPortal.id) !== String(lockedPortal.id)) {
+                throw new Error('Change orders can only be shared through the original quote\'s client portal.');
+            }
+            return lockedPortal;
+        }
+
+        async function showDashboardChangeOrderPortalLockHelp() {
+            var message = 'A change order belongs to the original quote, so QuoteDr keeps it in that quote\'s existing client portal. This protects the project history and prevents it from being sent to the wrong client.\n\nIf you meant to create an editable document that can go elsewhere, use Duplicate As Revision from the original quote instead.';
+            if (typeof qdAlert === 'function') {
+                await qdAlert(message, { title: 'Why This Portal Is Locked', type: 'info' });
+                return;
+            }
+            window.alert(message);
         }
 
         async function preserveDashboardEmptyPortalIfLastDocument(quote, portal) {
@@ -2625,12 +2758,19 @@
         async function shareDocumentThroughPortal(quoteId, clientName, clientEmail) {
             var quote = (allQuotes || []).find(function(row) { return row.id === quoteId; });
             if (!quote) { qdAlert('Could not find that document. Please refresh and try again.'); return; }
+            try {
+                quote = await loadDashboardFullQuote(quote);
+                await resolveDashboardChangeOrderLockedPortal(quote);
+            } catch (error) {
+                qdAlert(error && error.message ? error.message : String(error), { title: 'Portal Destination Locked', type: 'warning' });
+                return;
+            }
             if (quote.data && quote.data.portal_visible === true) {
                 await shareClientPortal(quoteId, clientName, clientEmail, { autoCopy: true });
                 return;
             }
             queueDashboardPortalAction({ type: 'share', quoteId: quoteId, clientName: clientName, clientEmail: clientEmail });
-            openPortalAssignment(quoteId);
+            await openPortalAssignment(quoteId);
         }
 
         async function confirmDashboardPortalZeroPricedItems(quote) {
@@ -3159,6 +3299,12 @@
             var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
             if (!target || !portal) return;
             target = await loadDashboardFullQuote(target);
+            try {
+                portal = await enforceDashboardChangeOrderPortalDestination(target, portal);
+            } catch (error) {
+                qdAlert(error && error.message ? error.message : String(error), { title: 'Portal Destination Locked', type: 'warning' });
+                return;
+            }
             if (!(await confirmDashboardPortalZeroPricedItems(target))) return;
             if (portal.quotes && portal.quotes[0]) await loadDashboardFullQuote(portal.quotes[0]);
             var durablePortalId = portal.legacy ? makePortalId(portal.name) : portal.id;
@@ -3227,6 +3373,10 @@
         async function createPortalForQuote() {
             var quoteId = window._portalAssignQuoteId || '';
             var target = (allQuotes || []).find(function(q) { return q.id === quoteId; });
+            if (target && dashboardDocumentIsChangeOrder(target)) {
+                qdAlert('Change orders must use the original quote\'s client portal. Create a revision instead if this document needs a different destination.', { title: 'Portal Destination Locked', type: 'warning' });
+                return;
+            }
             var clientName = document.getElementById('portalAssignClientName').value.trim() || (target ? quoteClientName(target) : '');
             var clientEmail = document.getElementById('portalAssignClientEmail').value.trim() || (target ? quoteClientEmail(target) : '');
             var portalName = document.getElementById('portalAssignPortalName').value.trim() || clientName;
@@ -3880,7 +4030,7 @@
                     clientEmail: savedEmail,
                     email: clientEmail
                 });
-                openPortalAssignment(quoteId);
+                await openPortalAssignment(quoteId);
                 return;
             }
             if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Sending...'; }
@@ -6031,17 +6181,21 @@ function renderBusinessInsights(quotes) {
           <div class="text-muted mb-1">Selected document</div>
           <strong id="portalAssignQuoteTitle">Selected quote</strong>
         </div>
+        <div class="alert alert-info d-none align-items-center justify-content-between gap-2 mb-3" id="portalAssignLockWrap">
+          <div><i class="fas fa-lock me-2"></i><strong id="portalAssignLockText">Locked to the original quote portal</strong></div>
+          <button type="button" class="btn btn-outline-primary btn-sm flex-shrink-0" onclick="showDashboardChangeOrderPortalLockHelp()" aria-label="Why is this portal locked?" title="Why is this portal locked?">?</button>
+        </div>
         <div class="row g-3">
           <div class="col-lg-7">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <h6 class="mb-0">Existing portals</h6>
               <div class="d-flex gap-1">
-                <button type="button" class="btn btn-primary btn-sm" onclick="showNewPortalForm()"><i class="fas fa-plus me-1"></i>Add New Portal</button>
-                <button type="button" class="btn btn-outline-warning btn-sm" onclick="startPortalMergeMode()"><i class="fas fa-code-merge me-1"></i>Merge Portals</button>
+                <button type="button" class="btn btn-primary btn-sm" id="portalAssignAddNewBtn" onclick="showNewPortalForm()"><i class="fas fa-plus me-1"></i>Add New Portal</button>
+                <button type="button" class="btn btn-outline-warning btn-sm" id="portalAssignMergeBtn" onclick="startPortalMergeMode()"><i class="fas fa-code-merge me-1"></i>Merge Portals</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="renderPortalAssignmentList()"><i class="fas fa-rotate me-1"></i>Refresh</button>
               </div>
             </div>
-            <div class="input-group input-group-sm mb-2">
+            <div class="input-group input-group-sm mb-2" id="portalAssignSearchWrap">
               <span class="input-group-text" aria-hidden="true"><i class="fas fa-search"></i></span>
               <input type="search" class="form-control" id="portalAssignSearch" placeholder="Search portal name, client, or email" aria-label="Search portals by portal name, client name, or email" autocomplete="off" oninput="renderPortalAssignmentList()">
               <button type="button" class="btn btn-outline-secondary" onclick="clearPortalAssignmentSearch()">Clear</button>
