@@ -22,8 +22,21 @@
         return !!item && (item.priceTbd === true || String(item.pricingMode || '').toLowerCase() === 'tbd');
     }
 
-    function itemSellTotal(item) {
+    function documentIsChangeOrder(documentData) {
+        documentData = documentData || {};
+        return documentData.type === 'change_order' || documentData.documentType === 'change_order' || documentData._type === 'change_order';
+    }
+
+    function itemSellTotal(item, documentData) {
         if (!item) return 0;
+        // Change orders store the line's net adjustment in `total`. An unchanged,
+        // fully priced line therefore has total=0 even though its current base
+        // quantity and rate are valid. Read the gross/base line amount here so
+        // the portal guard only warns about genuinely zero-priced work.
+        if (documentIsChangeOrder(documentData)) {
+            var changeOrderQuantity = item.quantity === undefined || item.quantity === null || item.quantity === '' ? 1 : finite(item.quantity, 0);
+            return changeOrderQuantity * finite(item.rate, 0);
+        }
         if (item.total !== undefined && item.total !== null && item.total !== '') return finite(item.total, 0);
         var quantity = item.quantity === undefined || item.quantity === null || item.quantity === '' ? 1 : finite(item.quantity, 0);
         return quantity * finite(item.rate, 0);
@@ -35,12 +48,13 @@
         (Array.isArray(documentData.rooms) ? documentData.rooms : []).forEach(function(room, roomIndex) {
             (Array.isArray(room && room.items) ? room.items : []).forEach(function(item, itemIndex) {
                 if (!itemIsIncluded(item) || itemIsPriceTbd(item)) return;
-                if (Math.round(itemSellTotal(item) * 100) !== 0) return;
+                if (Math.round(itemSellTotal(item, documentData) * 100) !== 0) return;
                 findings.push({
                     roomIndex: roomIndex,
                     itemIndex: itemIndex,
                     roomName: String(room && room.name || 'Unassigned').trim() || 'Unassigned',
-                    itemName: itemName(item)
+                    itemName: itemName(item),
+                    changeOrder: documentIsChangeOrder(documentData)
                 });
             });
         });
@@ -53,9 +67,11 @@
             return finding.roomName + ' — ' + finding.itemName;
         });
         var more = findings.length > shown.length ? '; plus ' + (findings.length - shown.length) + ' more' : '';
+        var isChangeOrder = findings.some(function(finding) { return finding.changeOrder === true; });
         return 'QuoteDr found ' + findings.length + ' included line item' + (findings.length === 1 ? '' : 's') +
-            ' with a $0 price: ' + shown.join('; ') + more +
-            '. These will appear as free to the client. Go back and review them, or continue only if the $0 pricing is intentional.';
+            ' with a $0 ' + (isChangeOrder ? 'base price' : 'price') + ': ' + shown.join('; ') + more +
+            '. ' + (isChangeOrder ? 'Unchanged work with a $0 net change is ignored by this check. ' : '') +
+            'These will appear as free to the client. Go back and review them, or continue only if the $0 pricing is intentional.';
     }
 
     async function confirmZeroPricedItems(documentData, confirmFn) {
@@ -74,6 +90,7 @@
     return {
         itemIsIncluded: itemIsIncluded,
         itemIsPriceTbd: itemIsPriceTbd,
+        documentIsChangeOrder: documentIsChangeOrder,
         itemSellTotal: itemSellTotal,
         findZeroPricedItems: findZeroPricedItems,
         zeroPriceWarningMessage: zeroPriceWarningMessage,

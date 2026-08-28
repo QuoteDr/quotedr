@@ -32,6 +32,67 @@ assert.deepStrictEqual(
 );
 assert(!readiness.zeroPriceWarningMessage(readiness.findZeroPricedItems(quote)).includes('Unselected add-on'));
 
+const changeOrder = {
+  type: 'change_order',
+  documentType: 'change_order',
+  rooms: [{
+    name: 'Living Room',
+    items: [
+      {
+        description: 'Priced unchanged molding',
+        quantity: 2,
+        rate: 290,
+        total: 0,
+        _coOriginal: { quantity: 2, rate: 290, total: 580 },
+        _coChangeStatus: 'unchanged'
+      },
+      {
+        description: 'Priced unchanged trim',
+        quantity: 64,
+        rate: 12,
+        total: 0,
+        _coOriginal: { quantity: 64, rate: 12, total: 768 },
+        _coChangeStatus: 'unchanged'
+      },
+      {
+        description: 'Changed work with a real zero base price',
+        quantity: 1,
+        rate: 0,
+        total: -100,
+        _coOriginal: { quantity: 1, rate: 100, total: 100 },
+        _coChangeStatus: 'changed'
+      },
+      {
+        description: 'New zero-priced work',
+        quantity: 1,
+        rate: 0,
+        total: 0,
+        _coChangeStatus: 'added'
+      },
+      {
+        description: 'Removed original work',
+        quantity: 0,
+        rate: 100,
+        total: -100,
+        _coOriginal: { quantity: 1, rate: 100, total: 100 },
+        _coChangeStatus: 'removed',
+        _coRemoved: true
+      }
+    ]
+  }]
+};
+
+const changeOrderFindings = readiness.findZeroPricedItems(changeOrder);
+assert.deepStrictEqual(
+  changeOrderFindings.map((finding) => finding.itemName),
+  ['Changed work with a real zero base price', 'New zero-priced work'],
+  'change-order readiness should ignore $0 net adjustments but still flag genuinely zero base prices'
+);
+const changeOrderWarning = readiness.zeroPriceWarningMessage(changeOrderFindings);
+assert(changeOrderWarning.includes('$0 base price'), 'change-order warning should name the base-price problem');
+assert(changeOrderWarning.includes('Unchanged work with a $0 net change is ignored'), 'change-order warning should explain that zero net changes are valid');
+assert(!changeOrderWarning.includes('Priced unchanged molding'), 'priced unchanged work should never appear in the warning');
+
 function extractFunction(source, name) {
   const start = source.indexOf(`function ${name}(`);
   assert(start >= 0, `missing function ${name}`);
