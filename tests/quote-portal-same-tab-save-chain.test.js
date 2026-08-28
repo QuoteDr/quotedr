@@ -38,7 +38,7 @@ function createContext(options = {}) {
   const v1 = '2026-07-19T14:00:00.000Z';
   const v2 = options.localVersion || '2026-07-19T14:01:00.000Z';
   const v3 = '2026-07-19T14:02:00.000Z';
-  const calls = { saves: [], redirects: 0 };
+  const calls = { saves: [], redirects: 0, highlightChecks: 0 };
   const elements = {
     clientName: { value: 'Live Client' },
     clientEmail: { value: 'live@example.test' },
@@ -69,6 +69,10 @@ function createContext(options = {}) {
       _serverUpdatedAt: v2,
       portal_visible: false
     }),
+    confirmChangeOrderHighlightLegend: async () => {
+      calls.highlightChecks += 1;
+      return true;
+    },
     confirmQuotePortalZeroPricedItems: async () => true,
     confirmQuotePortalLockBeforePublish: async () => true,
     findBuilderPortalStableShare: () => ({ token: '', anchorId: '', createdAt: '' }),
@@ -126,6 +130,7 @@ function createContext(options = {}) {
 
   assert.strictEqual(url, 'https://example.test/p/test-company/token-1');
   assert.strictEqual(success.calls.saves.length, 1, 'portal publishing should perform one quote save');
+  assert.strictEqual(success.calls.highlightChecks, 1, 'portal publishing should run the Change Order highlight legend guard');
   assert.strictEqual(success.calls.saves[0]._serverUpdatedAt, success.v2, 'portal publishing should use the newest same-tab cloud acknowledgement');
   assert.strictEqual(success.calls.saves[0].rooms[0].name, 'Live room', 'portal publishing should use current builder contents instead of the old share snapshot');
   assert.deepStrictEqual(success.calls.saves[0].style, { accent: '#123456' }, 'share-only metadata should survive the fresh builder merge');
