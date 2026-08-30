@@ -2380,6 +2380,7 @@
             }).filter(Boolean);
             saveManageCategoryCustomOrder(order);
             showManageItemsToast('Custom category order saved.', true);
+            if (typeof renderRooms === 'function') renderRooms();
         }
 
         function initManageCategorySortable() {
@@ -2420,6 +2421,7 @@
                 }));
             }
             renderAllItemsList();
+            if (typeof renderRooms === 'function') renderRooms();
             if (manageItemsCategoryOrderMode === 'custom') showManageCategoryCustomOrderHelp();
         }
 

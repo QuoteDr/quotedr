@@ -1170,6 +1170,19 @@
             width: 18px;
         }
         .room-bulk-count:empty { display: none; }
+        .room-category-order-option {
+            display: block;
+            border: 1px solid #d8e2ee;
+            border-radius: 10px;
+            padding: 0.85rem;
+            background: #fff;
+            cursor: pointer;
+        }
+        .room-category-order-option:has(input:checked) {
+            border-color: #1a56a0;
+            box-shadow: 0 0 0 2px rgba(26, 86, 160, 0.14);
+            background: #f8fbff;
+        }
         /* Hide markup controls when printing for client view */
         @media print {
             .room-header > div:not(:first-child) {
@@ -3144,6 +3157,45 @@ if (location.search.includes('debug')) {
                             <div id="profitReportContent" class="small"></div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Room Category Order Modal -->
+    <div class="modal fade" id="roomCategoryOrderModal" tabindex="-1" aria-hidden="true" data-enter-submit="#saveRoomCategoryOrderBtn">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-arrow-down-wide-short me-2"></i>Order Categories</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-muted mb-3" id="roomCategoryOrderContext">Choose how this room’s category headings should be arranged.</div>
+                    <div class="d-grid gap-2">
+                        <label class="room-category-order-option" for="roomCategoryOrderManual">
+                            <span class="d-flex align-items-start gap-2">
+                                <input class="form-check-input mt-1" type="radio" name="roomCategoryOrderMode" id="roomCategoryOrderManual" value="manual" checked>
+                                <span><strong>Choose my own order</strong><small class="d-block text-muted">Keeps categories in the order you add them. Use the handle to the left of a category name to drag it anywhere.</small></span>
+                            </span>
+                        </label>
+                        <label class="room-category-order-option" for="roomCategoryOrderManage">
+                            <span class="d-flex align-items-start gap-2">
+                                <input class="form-check-input mt-1" type="radio" name="roomCategoryOrderMode" id="roomCategoryOrderManage" value="manage">
+                                <span><strong>Follow Manage Line Items order</strong><small class="d-block text-muted">Uses the category order currently selected in Manage Line Items.</small></span>
+                            </span>
+                        </label>
+                        <label class="room-category-order-option" for="roomCategoryOrderAlphabetical">
+                            <span class="d-flex align-items-start gap-2">
+                                <input class="form-check-input mt-1" type="radio" name="roomCategoryOrderMode" id="roomCategoryOrderAlphabetical" value="alphabetical">
+                                <span><strong>Alphabetical</strong><small class="d-block text-muted">Automatically keeps this room’s categories sorted A–Z.</small></span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveRoomCategoryOrderBtn" onclick="saveRoomCategoryOrderMode()"><i class="fas fa-check me-1"></i>Apply Order</button>
                 </div>
             </div>
         </div>
@@ -10963,6 +11015,79 @@ Example:
             }, []);
             finishRoomBulkItemAction('Deleted ' + selectedIndexes.length + ' line item' + (selectedIndexes.length === 1 ? '' : 's') + '.');
         }
+        var activeRoomCategoryOrderRoomId = null;
+
+        function getRoomCategoryOrderMode(room) {
+            var mode = String(room && room.categoryOrderMode || '').toLowerCase();
+            return mode === 'manage' || mode === 'alphabetical' ? mode : 'manual';
+        }
+
+        function getRoomCategoriesInAddedOrder(room) {
+            var seen = new Set();
+            return (room && Array.isArray(room.items) ? room.items : []).reduce(function(categories, item) {
+                var category = String(item && item.category || 'Miscellaneous').trim() || 'Miscellaneous';
+                if (!seen.has(category)) {
+                    seen.add(category);
+                    categories.push(category);
+                }
+                return categories;
+            }, []);
+        }
+
+        function getRoomOrderedCategories(room, availableCategories) {
+            var categories = Array.isArray(availableCategories) ? availableCategories.slice() : getRoomCategoriesInAddedOrder(room);
+            var categorySet = new Set(categories);
+            var mode = getRoomCategoryOrderMode(room);
+            if (mode === 'alphabetical') {
+                return categories.sort(function(a, b) { return String(a).localeCompare(String(b)); });
+            }
+            if (mode === 'manage') {
+                var managedOrder = typeof window.getManageItemsOrderedCategories === 'function'
+                    ? window.getManageItemsOrderedCategories()
+                    : [];
+                var matching = managedOrder.filter(function(category) { return categorySet.has(category); });
+                var matched = new Set(matching);
+                return matching.concat(categories.filter(function(category) { return !matched.has(category); }));
+            }
+            var customOrder = room && Array.isArray(room.categoryOrder) ? room.categoryOrder : [];
+            var matchingCustom = customOrder.filter(function(category) { return categorySet.has(category); });
+            var customSet = new Set(matchingCustom);
+            return matchingCustom.concat(categories.filter(function(category) { return !customSet.has(category); }));
+        }
+
+        function openRoomCategoryOrderModal(roomId) {
+            var room = quoteBuilderRoomById(roomId);
+            if (!room) return;
+            activeRoomCategoryOrderRoomId = room.id;
+            var mode = getRoomCategoryOrderMode(room);
+            var selected = document.querySelector('input[name="roomCategoryOrderMode"][value="' + mode + '"]');
+            if (selected) selected.checked = true;
+            var context = document.getElementById('roomCategoryOrderContext');
+            if (context) context.textContent = 'Choose how category headings in ' + (room.name || getQuoteDividerLabels().singular) + ' should be arranged.';
+            var modalEl = document.getElementById('roomCategoryOrderModal');
+            if (!modalEl || !window.bootstrap) return;
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        function saveRoomCategoryOrderMode() {
+            var room = quoteBuilderRoomById(activeRoomCategoryOrderRoomId);
+            var selected = document.querySelector('input[name="roomCategoryOrderMode"]:checked');
+            if (!room || !selected) return;
+            var currentOrder = getRoomOrderedCategories(room, getRoomCategoriesInAddedOrder(room));
+            var nextMode = selected.value === 'manage' || selected.value === 'alphabetical' ? selected.value : 'manual';
+            _pushUndo();
+            room.categoryOrderMode = nextMode;
+            room.categoryOrder = nextMode === 'manual'
+                ? currentOrder
+                : getRoomOrderedCategories(room, getRoomCategoriesInAddedOrder(room));
+            renderRooms();
+            if (typeof saveSessionQuote === 'function') saveSessionQuote();
+            if (typeof markUnsaved === 'function') markUnsaved();
+            var modalEl = document.getElementById('roomCategoryOrderModal');
+            var instance = modalEl && window.bootstrap ? bootstrap.Modal.getInstance(modalEl) : null;
+            if (instance) instance.hide();
+        }
+
         var activeQuoteCategoryChange = null;
 
         function replaceQuoteCategoryOrder(room, oldCategory, newCategory) {
@@ -14389,6 +14514,7 @@ Example:
                 html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="openSelectedLineItemHighlightModal(' + room.id + ')"><i class="fas fa-highlighter text-warning"></i>Highlight Selected...</button></li>';
                 html += '<li><button type="button" class="dropdown-item text-danger disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="deleteSelectedRoomItems(' + room.id + ')"><i class="fas fa-trash"></i>Delete Selected</button></li>';
                 html += '<li><hr class="dropdown-divider"></li>';
+                html += '<li><button type="button" class="dropdown-item" onclick="openRoomCategoryOrderModal(' + room.id + ')"><i class="fas fa-arrow-down-wide-short text-primary"></i>Order Categories</button></li>';
                 html += '<li><button type="button" class="dropdown-item" onclick="saveRoomAsTemplate(' + room.id + ')"><i class="fas fa-bookmark text-info"></i>Save ' + qdTemplateEscapeHtml(getQuoteDividerLabels().singular) + ' Template</button></li>';
                 html += '<li><button type="button" class="dropdown-item text-danger" onclick="deleteRoom(' + room.id + ', this)"><i class="fas fa-trash"></i>Delete ' + qdTemplateEscapeHtml(getQuoteDividerLabels().singular) + '</button></li>';
                 html += '</ul></div>';
@@ -14417,9 +14543,9 @@ Example:
                 html += '<div class="room-item-drop-zone quote-line-items-sortable" data-room-id="' + room.id + '" aria-label="Drop line item into ' + qdTemplateEscapeHtml(room.name) + '"><i class="fas fa-arrow-down me-2"></i>Drop line item into ' + qdTemplateEscapeHtml(room.name) + '</div>';
 
                 if (room.items.length > 0) {
-                    // Build category groups in default trade order
-                    const sortedItems = sortItemsByCategory(room.items);
-                    // Collect groups preserving sorted order
+                    // Build category groups while preserving the order items were added.
+                    const sortedItems = room.items.slice();
+                    // Collect groups preserving first appearance and line item order.
                     const groupOrder = [];
                     const groups = {};
                     sortedItems.forEach(item => {
@@ -14428,11 +14554,10 @@ Example:
                         groups[cat].push({ item, origIndex: room.items.indexOf(item) });
                     });
 
-                    // Apply per-room custom category order if set
-                    const customOrder = room.categoryOrder;
-                    const orderedCats = customOrder
-                        ? [...customOrder.filter(c => groups[c]), ...groupOrder.filter(c => !customOrder.includes(c))]
-                        : groupOrder;
+                    // Apply this room's chosen category ordering mode and persist the resolved
+                    // order so the client viewer renders the exact same arrangement.
+                    const orderedCats = getRoomOrderedCategories(room, groupOrder);
+                    room.categoryOrder = orderedCats.slice();
 
                     // Wrap everything in a sortable container
                     html += '<div class="cat-groups-container" data-room-id="' + room.id + '">';
@@ -14861,12 +14986,25 @@ Example:
                     handle: '.cat-drag-handle',
                     animation: 150,
                     ghostClass: 'sortable-ghost',
-                    onEnd: function() {
-                        const room = rooms.find(r => r.id === roomId);
+                    onEnd: async function(evt) {
+                        const room = quoteBuilderRoomById(roomId);
                         if (!room) return;
+                        if (evt && evt.oldIndex === evt.newIndex) return;
+                        const previousMode = getRoomCategoryOrderMode(room);
+                        _pushUndo();
                         const blocks = catContainer.querySelectorAll('.cat-group-block');
                         room.categoryOrder = Array.from(blocks).map(el => el.dataset.cat);
+                        room.categoryOrderMode = 'manual';
                         renderRooms();
+                        if (typeof saveSessionQuote === 'function') saveSessionQuote();
+                        if (typeof markUnsaved === 'function') markUnsaved();
+                        if (previousMode !== 'manual') {
+                            await qdAlert('Automatic category ordering has been turned off for this room because you changed the order manually. Your new order has been kept.', {
+                                title: 'Custom Category Order',
+                                type: 'info',
+                                okText: 'Got it'
+                            });
+                        }
                     }
                 });
             });
