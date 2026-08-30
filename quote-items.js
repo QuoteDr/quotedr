@@ -10,6 +10,7 @@
         var MANAGE_CATEGORY_RENAMES_KEY = 'ald_manage_items_category_renames';
         var MANAGE_CATEGORY_ORDER_MODE_KEY = 'ald_manage_items_category_order_mode';
         var MANAGE_CATEGORY_CUSTOM_ORDER_KEY = 'ald_manage_items_category_custom_order';
+        var MANAGE_CATEGORY_ORDER_CUSTOMIZED_KEY = 'ald_manage_items_category_order_customized';
         var MANAGE_CATEGORY_ORDER_UPDATED_AT_KEY = 'ald_manage_items_category_order_updated_at';
         var MANAGE_CATEGORY_ORDER_CLOUD_KEY = 'manage_items_category_order';
         var MANAGE_PORTRAIT_FIELDS_KEY = 'ald_manage_items_portrait_fields';
@@ -18,6 +19,7 @@
         var manageCategoryRenames = {};
         var manageItemsCategoryOrderMode = 'alphabetical';
         var manageItemsCategoryCustomOrder = [];
+        var manageItemsCategoryOrderCustomized = false;
         var manageCategorySortable = null;
         var manageNewItemWizardUpgradeGroups = [];
         var manageUpgradeWizardState = null;
@@ -2301,6 +2303,17 @@
             } catch(e) {
                 manageItemsCategoryCustomOrder = [];
             }
+            var customizedValue = localStorage.getItem(MANAGE_CATEGORY_ORDER_CUSTOMIZED_KEY);
+            manageItemsCategoryOrderCustomized = customizedValue === null
+                ? manageItemsCategoryOrderMode === 'custom' && !isManageCategoryOrderAlphabetical(manageItemsCategoryCustomOrder)
+                : customizedValue === 'true';
+        }
+
+        function isManageCategoryOrderAlphabetical(order) {
+            var categories = Array.isArray(order) ? order : [];
+            return categories.every(function(category, index) {
+                return index === 0 || String(categories[index - 1] || '').localeCompare(String(category || '')) <= 0;
+            });
         }
 
         function getManageCategoryOrderUpdatedAt() {
@@ -2312,6 +2325,7 @@
             return {
                 mode: getManageItemsCategoryOrderMode(),
                 order: manageItemsCategoryCustomOrder.slice(),
+                customized: manageItemsCategoryOrderCustomized === true,
                 updatedAt: updatedAt || localStorage.getItem(MANAGE_CATEGORY_ORDER_UPDATED_AT_KEY) || new Date().toISOString()
             };
         }
@@ -2321,6 +2335,7 @@
             var updatedAt = options.updatedAt || new Date().toISOString();
             localStorage.setItem(MANAGE_CATEGORY_ORDER_MODE_KEY, getManageItemsCategoryOrderMode());
             localStorage.setItem(MANAGE_CATEGORY_CUSTOM_ORDER_KEY, JSON.stringify(manageItemsCategoryCustomOrder));
+            localStorage.setItem(MANAGE_CATEGORY_ORDER_CUSTOMIZED_KEY, manageItemsCategoryOrderCustomized ? 'true' : 'false');
             localStorage.setItem(MANAGE_CATEGORY_ORDER_UPDATED_AT_KEY, updatedAt);
             if (options.cloud !== false) _saveManageCategoryOrderToCloud(updatedAt).catch(function(){});
             return updatedAt;
@@ -2347,7 +2362,7 @@
                 if (!snapshot || typeof snapshot !== 'object') {
                     var hasLegacyLocalOrder = localStorage.getItem(MANAGE_CATEGORY_ORDER_MODE_KEY) !== null
                         || localStorage.getItem(MANAGE_CATEGORY_CUSTOM_ORDER_KEY) !== null;
-                    if (hasLegacyLocalOrder) {
+                    if (hasLegacyLocalOrder && (manageItemsCategoryOrderMode !== 'custom' || manageItemsCategoryOrderCustomized)) {
                         var migratedAt = new Date().toISOString();
                         persistManageCategoryOrderState({ cloud: false, updatedAt: migratedAt });
                         await _saveManageCategoryOrderToCloud(migratedAt);
@@ -2356,8 +2371,18 @@
                 }
                 var cloudUpdatedAt = Date.parse(snapshot.updatedAt || '') || 0;
                 var localUpdatedAt = getManageCategoryOrderUpdatedAt();
-                if (localUpdatedAt && localUpdatedAt > cloudUpdatedAt) {
-                    await _saveManageCategoryOrderToCloud(localStorage.getItem(MANAGE_CATEGORY_ORDER_UPDATED_AT_KEY));
+                var cloudOrder = Array.isArray(snapshot.order) ? snapshot.order : [];
+                var cloudCustomized = snapshot.customized === true
+                    || (snapshot.customized == null && snapshot.mode === 'custom' && !isManageCategoryOrderAlphabetical(cloudOrder));
+                var localShouldWin = manageItemsCategoryOrderMode === 'custom'
+                    && manageItemsCategoryOrderCustomized
+                    && !cloudCustomized;
+                if (localShouldWin || (localUpdatedAt && localUpdatedAt > cloudUpdatedAt && manageItemsCategoryOrderCustomized === cloudCustomized)) {
+                    var winningUpdatedAt = localShouldWin
+                        ? new Date().toISOString()
+                        : localStorage.getItem(MANAGE_CATEGORY_ORDER_UPDATED_AT_KEY) || new Date().toISOString();
+                    persistManageCategoryOrderState({ cloud: false, updatedAt: winningUpdatedAt });
+                    await _saveManageCategoryOrderToCloud(winningUpdatedAt);
                     return;
                 }
                 manageItemsCategoryOrderMode = snapshot.mode === 'custom' ? 'custom' : 'alphabetical';
@@ -2370,6 +2395,7 @@
                     seen.add(key);
                     return true;
                 });
+                manageItemsCategoryOrderCustomized = cloudCustomized;
                 persistManageCategoryOrderState({
                     cloud: false,
                     updatedAt: snapshot.updatedAt || new Date().toISOString()
@@ -2386,6 +2412,7 @@
         }
 
         function saveManageCategoryCustomOrder(order, options) {
+            options = options || {};
             var seen = new Set();
             manageItemsCategoryCustomOrder = (Array.isArray(order) ? order : []).map(function(cat) {
                 return String(cat || '').trim();
@@ -2395,6 +2422,7 @@
                 seen.add(key);
                 return true;
             });
+            if (options.customized === true) manageItemsCategoryOrderCustomized = true;
             persistManageCategoryOrderState(options);
         }
 
@@ -2458,7 +2486,7 @@
             var order = Array.from(container.querySelectorAll('.manage-items-category')).map(function(section) {
                 return section.dataset.category || '';
             }).filter(Boolean);
-            saveManageCategoryCustomOrder(order);
+            saveManageCategoryCustomOrder(order, { customized: true });
             showManageItemsToast('Custom category order saved.', true);
             if (typeof renderRooms === 'function') renderRooms();
         }

@@ -75,7 +75,10 @@ assert(
 assert(
   items.includes('localUpdatedAt > cloudUpdatedAt') &&
     items.includes('MANAGE_CATEGORY_ORDER_UPDATED_AT_KEY') &&
+    items.includes('MANAGE_CATEGORY_ORDER_CUSTOMIZED_KEY') &&
+    items.includes('localShouldWin') &&
+    items.includes('cloudCustomized') &&
     items.includes('hasLegacyLocalOrder') &&
     items.includes('_saveManageCategoryOrderToCloud(migratedAt)'),
-  'Category-order sync should preserve newer local edits and migrate an existing browser-only order into the account'
+  'Category-order sync should prioritize an actually rearranged list and migrate a deliberate browser-only order into the account'
 );

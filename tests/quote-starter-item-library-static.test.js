@@ -20,7 +20,10 @@ assert(quoteItems.includes('starter.findSavedItem(catalogItem, customItems)'), '
 assert(quoteItems.includes('persistManageItemsLocalSnapshot(customItems)'), 'starter imports should save to ald_custom_items');
 assert(quoteItems.includes('await _doBackupItemsToCloud(customItems)'), 'starter imports should use the existing cloud snapshot');
 assert(!quoteItems.includes("localStorage.setItem('ald_starter_items'"), 'Starter Library must not create a second item database');
-assert(quoteItems.includes('window._manageItemsReadyPromise = itemRestorePromise.then(function()'), 'empty database offer should wait for cloud restoration');
+assert(
+  quoteItems.includes('window._manageItemsReadyPromise = Promise.all([itemRestorePromise, categoryOrderRestorePromise]).then(function()'),
+  'empty database offer should wait for both item and category-order cloud restoration'
+);
 assert(quoteItems.includes('maybeOfferStarterLibrary();'), 'empty database should receive one lightweight starter offer');
 assert(quoteItems.includes("profile.offerStatus = 'dismissed'"), 'starter offer dismissal should be remembered');
 assert(quoteItems.includes("manageStarterLibraryProfile.offerStatus = 'completed'"), 'starter import completion should be remembered');

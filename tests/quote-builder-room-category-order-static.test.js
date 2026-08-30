@@ -28,7 +28,7 @@ assert(
 );
 
 assert(
-  items.includes("saveManageCategoryCustomOrder(order);\n            showManageItemsToast('Custom category order saved.', true);\n            if (typeof renderRooms === 'function') renderRooms();") &&
+  items.includes("saveManageCategoryCustomOrder(order, { customized: true });\n            showManageItemsToast('Custom category order saved.', true);\n            if (typeof renderRooms === 'function') renderRooms();") &&
     items.includes("renderAllItemsList();\n            if (typeof renderRooms === 'function') renderRooms();"),
   'Rooms following Manage Line Items should refresh when its custom order or ordering mode changes'
 );

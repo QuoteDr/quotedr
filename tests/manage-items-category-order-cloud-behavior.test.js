@@ -57,11 +57,14 @@ function createLocalStorage(initial) {
   vm.runInContext([
     "var MANAGE_CATEGORY_ORDER_MODE_KEY = 'ald_manage_items_category_order_mode';",
     "var MANAGE_CATEGORY_CUSTOM_ORDER_KEY = 'ald_manage_items_category_custom_order';",
+    "var MANAGE_CATEGORY_ORDER_CUSTOMIZED_KEY = 'ald_manage_items_category_order_customized';",
     "var MANAGE_CATEGORY_ORDER_UPDATED_AT_KEY = 'ald_manage_items_category_order_updated_at';",
     "var MANAGE_CATEGORY_ORDER_CLOUD_KEY = 'manage_items_category_order';",
     "var manageItemsCategoryOrderMode = 'alphabetical';",
     'var manageItemsCategoryCustomOrder = [];',
+    'var manageItemsCategoryOrderCustomized = false;',
     extractFunction('loadManageCategoryOrderState'),
+    extractFunction('isManageCategoryOrderAlphabetical'),
     extractFunction('getManageCategoryOrderUpdatedAt'),
     extractFunction('getManageItemsCategoryOrderMode'),
     extractFunction('getManageCategoryOrderSnapshot'),
@@ -70,8 +73,8 @@ function createLocalStorage(initial) {
     extractFunction('_restoreManageCategoryOrderFromCloud'),
     'this.loadLocal = loadManageCategoryOrderState;',
     'this.restoreCloud = _restoreManageCategoryOrderFromCloud;',
-    "this.readState = function() { return { mode: manageItemsCategoryOrderMode, order: manageItemsCategoryCustomOrder.slice() }; };",
-    "this.resetState = function() { manageItemsCategoryOrderMode = 'alphabetical'; manageItemsCategoryCustomOrder = []; };"
+    "this.readState = function() { return { mode: manageItemsCategoryOrderMode, order: manageItemsCategoryCustomOrder.slice(), customized: manageItemsCategoryOrderCustomized }; };",
+    "this.resetState = function() { manageItemsCategoryOrderMode = 'alphabetical'; manageItemsCategoryCustomOrder = []; manageItemsCategoryOrderCustomized = false; };"
   ].join('\n'), context);
 
   context.loadLocal();
@@ -88,6 +91,30 @@ function createLocalStorage(initial) {
   assert.equal(restored.mode, 'custom', 'a second browser should restore the account mode');
   assert.deepEqual(Array.from(restored.order), ['Demolition', 'Framing', 'Electrical']);
   assert.equal(localStorage.getItem('ald_manage_items_category_order_mode'), 'custom');
+
+  cloudValue = {
+    mode: 'custom',
+    order: ['Cabinetry', 'CARPENTRY', 'DEMOLITION'],
+    customized: false,
+    updatedAt: '2099-01-01T00:00:00.000Z'
+  };
+  localStorage.clear();
+  localStorage.setItem('ald_manage_items_category_order_mode', 'custom');
+  localStorage.setItem('ald_manage_items_category_custom_order', JSON.stringify(['DEMOLITION', 'FRAMING', 'SUBFLOORING', 'INSULATION']));
+  context.resetState();
+  context.loadLocal();
+  await context.restoreCloud();
+  assert.deepEqual(cloudValue.order, ['DEMOLITION', 'FRAMING', 'SUBFLOORING', 'INSULATION'], 'a deliberate legacy order should replace an accidental alphabetical cloud snapshot');
+  assert.equal(cloudValue.customized, true);
+
+  cloudValue = null;
+  localStorage.clear();
+  localStorage.setItem('ald_manage_items_category_order_mode', 'custom');
+  localStorage.setItem('ald_manage_items_category_custom_order', JSON.stringify(['Cabinetry', 'CARPENTRY', 'DEMOLITION']));
+  context.resetState();
+  context.loadLocal();
+  await context.restoreCloud();
+  assert.equal(cloudValue, null, 'an alphabetically initialized Custom list should not publish itself as a deliberate order');
 
   console.log('manage items category order cloud behavior test passed');
 })().catch(error => {
