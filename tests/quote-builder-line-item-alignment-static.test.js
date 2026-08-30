@@ -52,3 +52,10 @@ assert(
   source.includes('justify-content:flex-end'),
   'Line item action buttons should stay aligned to the far right'
 );
+
+assert(
+  source.includes('.quote-item-discount-note') &&
+    source.includes('white-space: normal') &&
+    source.includes('quote-item-discount-amount'),
+  'Line item discount details should wrap inside the total column instead of overlapping action buttons'
+);

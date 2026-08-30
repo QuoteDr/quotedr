@@ -2197,6 +2197,18 @@
             border-left: 1px solid #e9ecef;
             color: #495057;
         }
+        .quote-item-discount-note {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.05rem;
+            line-height: 1.15;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+        .quote-item-discount-note .quote-item-discount-amount {
+            white-space: nowrap;
+        }
         .quote-item-actions-cell .quote-item-actions {
             justify-content: flex-end;
         }
@@ -14460,7 +14472,7 @@ Example:
                             html += '<td class="quote-item-total-cell"><strong>' + displayTotalText + '</strong>';
                             if (hasDiscount) {
                                 html += '<div class="small text-muted"><s>' + qdFormatMoney(originalLineTotal) + '</s></div>';
-                                html += '<div class="small text-success">' + qdTemplateEscapeHtml(discounts.discountLabel(item)) + (discounts.appliesToUpgrades && !discounts.appliesToUpgrades(item) ? ' (base item only)' : '') + ' -' + qdFormatMoney(displayDiscount) + '</div>';
+                                html += '<div class="small text-success quote-item-discount-note"><span class="quote-item-discount-label">' + qdTemplateEscapeHtml(discounts.discountLabel(item)) + (discounts.appliesToUpgrades && !discounts.appliesToUpgrades(item) ? ' (base item only)' : '') + '</span><span class="quote-item-discount-amount">-' + qdFormatMoney(displayDiscount) + '</span></div>';
                             }
                             if (coStatus && item._coOriginal) {
                                 var deltaTotal = itemChargedTotal(item) * markupFactor;
