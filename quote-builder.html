@@ -7830,7 +7830,11 @@ Example:
 
         function populateCategoryDropdown(selectedCat) {
             const sel = document.getElementById('lineCategory');
-            const cats = Object.keys(pricingDatabase);
+            const cats = typeof window.getManageItemsOrderedCategories === 'function'
+                ? window.getManageItemsOrderedCategories()
+                : Object.keys(pricingDatabase).filter(function(cat) {
+                    return cat.indexOf('__') !== 0 && Array.isArray(pricingDatabase[cat]) && pricingDatabase[cat].length;
+                }).sort(function(a, b) { return a.localeCompare(b); });
             const hiddenCategories = JSON.parse(localStorage.getItem('ald_hidden_categories') || '[]');
             sel.innerHTML = '';
             delete sel.dataset.oneTimeCategory;
@@ -18912,7 +18916,7 @@ Example:
     </script>
     <script src="quote-review-construction-knowledge.js?v=2026080201"></script>
     <script src="quote-starter-item-library.js?v=2026080201"></script>
-    <script src="quote-items.js?v=2026081902"></script>
+    <script src="quote-items.js?v=2026083001"></script>
     <script src="quote-import.js?v=2026082003"></script>
     <script>
         // Load templates from localStorage on startup

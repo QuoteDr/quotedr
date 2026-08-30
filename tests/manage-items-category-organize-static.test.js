@@ -54,3 +54,10 @@ assert(
     items.includes('saveManageCategoryCustomOrder'),
   'Category rename should update the saved custom category order'
 );
+
+assert(
+  items.includes('window.getManageItemsOrderedCategories') &&
+    items.includes('loadManageCategoryOrderState();') &&
+    items.includes('return getOrderedManageCategories().slice();'),
+  'Manage Items should expose its current saved category order to other quote-builder modals'
+);

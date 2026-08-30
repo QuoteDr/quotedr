@@ -6236,6 +6236,10 @@
         window.setManageItemsFilter = setManageItemsFilter;
         window.openManageCategoryOrganizeMenu = openManageCategoryOrganizeMenu;
         window.setManageItemsCategoryOrderMode = setManageItemsCategoryOrderMode;
+        window.getManageItemsOrderedCategories = function() {
+            loadManageCategoryOrderState();
+            return getOrderedManageCategories().slice();
+        };
         window.applyManageItemsPortraitFieldSettings = applyManageItemsPortraitFieldSettings;
         window.filterItemsList = filterItemsList;
         window.renderAllItemsList = renderAllItemsList;
