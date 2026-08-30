@@ -2246,6 +2246,42 @@
             height: 1.4rem;
             border-radius: 6px;
         }
+        .line-item-highlight-modal-dialog {
+            --bs-modal-width: min(1080px, calc(100vw - 2rem));
+        }
+        .line-item-highlight-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(20rem, 0.85fr);
+            gap: 1.5rem;
+            align-items: start;
+        }
+        .line-item-highlight-settings {
+            border: 1px solid #d8e2ee;
+            border-radius: 12px;
+            background: #f8fbff;
+            padding: 1rem;
+        }
+        .highlight-description-display-option {
+            display: block;
+            border: 1px solid #d8e2ee;
+            border-radius: 10px;
+            background: #fff;
+            padding: 0.75rem;
+            cursor: pointer;
+        }
+        .highlight-description-display-option:has(input:checked) {
+            border-color: #1a56a0;
+            box-shadow: 0 0 0 2px rgba(26, 86, 160, 0.14);
+        }
+        @media (max-width: 767.98px) {
+            .line-item-highlight-modal-dialog {
+                --bs-modal-width: calc(100vw - 1rem);
+            }
+            .line-item-highlight-layout {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+        }
     @media (max-width: 768px) {
             .container-fluid { padding-left: 8px !important; padding-right: 8px !important; }
             .btn-sm { font-size: 0.75rem; padding: 4px 7px; }
@@ -3140,23 +3176,45 @@ if (location.search.includes('debug')) {
 
     <!-- Line Item Highlight Modal -->
     <div class="modal fade" id="lineItemHighlightModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable line-item-highlight-modal-dialog">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title" id="lineItemHighlightModalTitle"><i class="fas fa-highlighter me-2"></i>Highlight Item</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="small text-muted mb-2" id="lineItemHighlightModalMessage">Choose a faint highlight colour for this line item.</div>
+                    <div class="text-muted mb-3" id="lineItemHighlightModalMessage">Choose a faint highlight colour for this line item.</div>
                     <div class="alert alert-warning py-2 small d-none" id="changeOrderHighlightGuidance">
                         <i class="fas fa-triangle-exclamation me-1"></i>
                         QuoteDr already marks <strong>Changed</strong>, <strong>Added</strong>, and <strong>Removed</strong> work automatically. A manual highlight is an additional client-facing note and must have one clear meaning.
                     </div>
-                    <div id="lineItemHighlightOptions" class="row g-2" data-room-id="" data-item-index=""></div>
-                    <div class="mt-3" id="changeOrderHighlightMeaningWrap">
-                        <label class="form-label fw-semibold mb-1" for="changeOrderHighlightMeaning" id="lineItemHighlightMeaningLabel">What should this colour tell the client?</label>
-                        <input type="text" class="form-control" id="changeOrderHighlightMeaning" maxlength="120" placeholder="Example: Client-supplied material">
-                        <div class="form-text" id="lineItemHighlightMeaningHelp">Optional. Add one meaning per colour and QuoteDr will show it in the client’s highlight legend.</div>
+                    <div class="line-item-highlight-layout">
+                        <div>
+                            <div class="fw-semibold mb-2">Highlight colour</div>
+                            <div id="lineItemHighlightOptions" class="row g-2" data-room-id="" data-item-index=""></div>
+                        </div>
+                        <div class="line-item-highlight-settings" id="changeOrderHighlightMeaningWrap">
+                            <label class="form-label fw-semibold mb-1" for="changeOrderHighlightMeaning" id="lineItemHighlightMeaningLabel">What should this colour tell the client?</label>
+                            <textarea class="form-control" id="changeOrderHighlightMeaning" rows="6" maxlength="240" placeholder="Example: Client-supplied material"></textarea>
+                            <div class="form-text" id="lineItemHighlightMeaningHelp">Optional. Add one meaning per colour and QuoteDr will show it in the client’s highlight legend.</div>
+                            <fieldset class="mt-3">
+                                <legend class="form-label fw-semibold mb-2">Where should the description appear?</legend>
+                                <div class="d-grid gap-2">
+                                    <label class="highlight-description-display-option" for="highlightDescriptionOnItems">
+                                        <span class="d-flex align-items-start gap-2">
+                                            <input class="form-check-input mt-1" type="radio" name="highlightDescriptionDisplay" id="highlightDescriptionOnItems" value="items" checked>
+                                            <span><strong>Show description on each item</strong><small class="d-block text-muted">Shows beside every highlighted line item and in the legend.</small></span>
+                                        </span>
+                                    </label>
+                                    <label class="highlight-description-display-option" for="highlightDescriptionLegendOnly">
+                                        <span class="d-flex align-items-start gap-2">
+                                            <input class="form-check-input mt-1" type="radio" name="highlightDescriptionDisplay" id="highlightDescriptionLegendOnly" value="legend">
+                                            <span><strong>Only show description in legend</strong><small class="d-block text-muted">Keeps the line items clean; the client can refer to the legend.</small></span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </fieldset>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -9943,6 +10001,7 @@ Example:
                 room.items[itemIndex].highlightColor = colorKey;
             } else {
                 delete room.items[itemIndex].highlightColor;
+                delete room.items[itemIndex].highlightDescriptionOnItem;
             }
             if (typeof cleanupUnusedChangeOrderHighlightLegend === 'function') cleanupUnusedChangeOrderHighlightLegend();
             renderRooms();
@@ -9972,7 +10031,7 @@ Example:
             keys.forEach(function(key) {
                 const highlight = LINE_ITEM_HIGHLIGHTS[key];
                 const isActive = candidateColor === key;
-                html += '<div class="col-6">';
+                html += '<div class="col-6 col-lg-4">';
                 html += '<button type="button" class="line-item-highlight-option w-100 ' + (isActive ? 'active' : '') + '" onclick="setActiveLineItemHighlight(\'' + key + '\')">';
                 html += '<span class="d-flex align-items-center gap-2">';
                 html += '<span class="quote-item-highlight-swatch" style="background:' + (highlight.swatch || highlight.background) + '; border-color:' + highlight.border + ';"></span>';
@@ -9999,7 +10058,7 @@ Example:
             if (messageEl) messageEl.textContent = window._quoteDocumentType === 'change_order'
                 ? 'Choose a custom annotation colour and explain its meaning to the client.'
                 : 'Choose a faint highlight colour. You can optionally explain what it means to the client.';
-            configureChangeOrderHighlightModal(room.items[itemIndex].highlightColor || '');
+            configureChangeOrderHighlightModal(room.items[itemIndex].highlightColor || '', [room.items[itemIndex]]);
             const modalEl = document.getElementById('lineItemHighlightModal');
             if (!modalEl || !window.bootstrap) return;
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -10738,6 +10797,7 @@ Example:
                     room.items[index].highlightColor = colorKey;
                 } else {
                     delete room.items[index].highlightColor;
+                    delete room.items[index].highlightDescriptionOnItem;
                 }
             });
             if (typeof cleanupUnusedChangeOrderHighlightLegend === 'function') cleanupUnusedChangeOrderHighlightLegend();
@@ -10768,7 +10828,7 @@ Example:
             if (messageEl) messageEl.textContent = window._quoteDocumentType === 'change_order'
                 ? 'Choose one custom annotation colour for all ' + selectedIndexes.length + ' selected line items, then explain its meaning to the client.'
                 : 'Choose one faint highlight colour for all ' + selectedIndexes.length + ' selected line items. You can optionally explain its meaning to the client.';
-            configureChangeOrderHighlightModal(sharedColor);
+            configureChangeOrderHighlightModal(sharedColor, selectedItems);
             var modalEl = document.getElementById('lineItemHighlightModal');
             if (!modalEl || !window.bootstrap) return;
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -12288,7 +12348,7 @@ Example:
             }
         }
 
-        function configureChangeOrderHighlightModal(activeColor) {
+        function configureChangeOrderHighlightModal(activeColor, activeItems) {
             var isCo = window._quoteDocumentType === 'change_order';
             var guidance = document.getElementById('changeOrderHighlightGuidance');
             var meaningWrap = document.getElementById('changeOrderHighlightMeaningWrap');
@@ -12297,6 +12357,10 @@ Example:
             var meaningLabel = document.getElementById('lineItemHighlightMeaningLabel');
             var meaningHelp = document.getElementById('lineItemHighlightMeaningHelp');
             var optionsEl = document.getElementById('lineItemHighlightOptions');
+            var items = Array.isArray(activeItems) ? activeItems.filter(Boolean) : [];
+            var showDescriptionOnItems = !items.length || !items.every(function(item) { return item.highlightDescriptionOnItem === false; });
+            var onItemsRadio = document.getElementById('highlightDescriptionOnItems');
+            var legendOnlyRadio = document.getElementById('highlightDescriptionLegendOnly');
             if (guidance) guidance.classList.toggle('d-none', !isCo);
             if (meaningWrap) meaningWrap.classList.remove('d-none');
             if (applyBtn) applyBtn.classList.remove('d-none');
@@ -12306,6 +12370,8 @@ Example:
                 : 'Optional. Add one meaning per colour and QuoteDr will show it in the client’s highlight legend.';
             if (optionsEl) optionsEl.setAttribute('data-candidate-color', activeColor || '');
             if (meaning) meaning.value = activeColor ? quoteHighlightLabel(activeColor) : '';
+            if (onItemsRadio) onItemsRadio.checked = showDescriptionOnItems;
+            if (legendOnlyRadio) legendOnlyRadio.checked = !showDescriptionOnItems;
         }
 
         async function applyActiveLineItemHighlight() {
@@ -12324,13 +12390,19 @@ Example:
                 if (meaningEl) meaningEl.focus();
                 return;
             }
-            if (meaning) quoteHighlightLegend()[colorKey] = meaning.slice(0, 120);
+            if (meaning) quoteHighlightLegend()[colorKey] = meaning.slice(0, 240);
             else delete quoteHighlightLegend()[colorKey];
             window._changeOrderHighlightLegend = window._quoteHighlightLegend;
             var roomId = parseInt(optionsEl.getAttribute('data-room-id'), 10);
             var itemIndex = parseInt(optionsEl.getAttribute('data-item-index'), 10);
             var isBulk = optionsEl.getAttribute('data-highlight-mode') === 'bulk';
             var selectedIndexes = String(optionsEl.getAttribute('data-selected-indexes') || '').split(',').map(Number).filter(Number.isFinite);
+            var room = rooms.find(function(candidate) { return candidate.id === roomId; });
+            var showDescriptionOnItems = !document.getElementById('highlightDescriptionLegendOnly')?.checked;
+            var targetIndexes = isBulk ? selectedIndexes : [itemIndex];
+            targetIndexes.forEach(function(index) {
+                if (room && room.items[index]) room.items[index].highlightDescriptionOnItem = showDescriptionOnItems;
+            });
             if (isBulk) setSelectedLineItemHighlights(roomId, selectedIndexes, colorKey);
             else setLineItemHighlight(roomId, itemIndex, colorKey);
             var modalEl = document.getElementById('lineItemHighlightModal');

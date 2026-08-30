@@ -576,7 +576,7 @@ test('ordinary quote highlight legends are client-safe and support every builder
     },
     rooms: [{
       name: 'Main Floor',
-      items: [{ description: 'Paint', highlightColor: 'orange', quantity: 1, rate: 100 }]
+      items: [{ description: 'Paint', highlightColor: 'orange', highlightDescriptionOnItem: false, quantity: 1, rate: 100 }]
     }]
   }, { documentType: 'quote' });
   assert.deepEqual(projected.highlightLegend, {
@@ -588,6 +588,7 @@ test('ordinary quote highlight legends are client-safe and support every builder
     purple: 'Schedule coordination'
   });
   assert.equal(projected.rooms[0].items[0].highlightColor, 'orange');
+  assert.equal(projected.rooms[0].items[0].highlightDescriptionOnItem, false);
 });
 
 test('accepted legacy quote projects the authoritative signed total instead of stale pre-upgrade rooms', async () => {

@@ -115,4 +115,18 @@ assert(
   'The client quote viewer should show a compact legend and label highlighted quote items'
 );
 
+assert(
+  source.includes('modal-xl modal-dialog-centered modal-dialog-scrollable line-item-highlight-modal-dialog') &&
+    source.includes('id="highlightDescriptionOnItems"') &&
+    source.includes('id="highlightDescriptionLegendOnly"') &&
+    source.includes('Only show description in legend') &&
+    source.includes('highlightDescriptionOnItem = showDescriptionOnItems'),
+  'The larger highlight modal should let the contractor choose item descriptions or a legend-only display'
+);
+
+assert(
+  viewerSource.includes("if (item.highlightDescriptionOnItem === false) return '';") ,
+  'The client viewer should hide an item highlight description when it is configured for the legend only'
+);
+
 console.log('quote builder line item highlight static test passed');

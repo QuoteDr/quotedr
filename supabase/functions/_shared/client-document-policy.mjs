@@ -43,7 +43,7 @@ const ROOT_COMPLEX_KEYS = new Set([
 const ITEM_COPY_KEYS = new Set([
   'id', 'name', 'label', 'description', 'serviceName', 'category', 'unitType', 'unit',
   'quantity', 'notes', 'itemDescription', 'displayDescription', 'actualDescription',
-  'highlightColor', 'icon', 'text', 'optional', 'optionalSelectedByDefault',
+  'highlightColor', 'highlightDescriptionOnItem', 'icon', 'text', 'optional', 'optionalSelectedByDefault',
   '_optionalSelected', '_removed', 'upgraded', 'selectedUpgradeOptionIds',
   'priceTbd', 'pricingMode', 'hasTbdSelections', 'requiresConsultation',
   '_coRemoved', '_coChangeStatus', '_coClientChoiceReopened', '_clientDecisionApplied'
@@ -502,7 +502,7 @@ function sanitizeItem(source, room) {
   for (const key of ['_baseUnitType', '_baseDescription', '_baseItemDescription']) {
     if (source[key] !== undefined) output[key] = cleanString(source[key], key === '_baseItemDescription' ? 4000 : 500);
   }
-  for (const key of ['optional', 'optionalSelectedByDefault', '_optionalSelected', '_removed', 'upgraded', 'priceTbd', 'hasTbdSelections', 'requiresConsultation', '_coRemoved', '_coClientChoiceReopened', '_clientDecisionApplied']) {
+  for (const key of ['optional', 'optionalSelectedByDefault', '_optionalSelected', '_removed', 'upgraded', 'priceTbd', 'hasTbdSelections', 'requiresConsultation', '_coRemoved', '_coClientChoiceReopened', '_clientDecisionApplied', 'highlightDescriptionOnItem']) {
     if (source[key] !== undefined) output[key] = source[key] === true;
   }
   if (source._basePriceTbd !== undefined) output._basePriceTbd = source._basePriceTbd === true;
@@ -704,7 +704,7 @@ function sanitizeChangeOrderHighlightLegend(value) {
   if (!isRecord(value)) return {};
   const output = {};
   for (const key of ['yellow', 'blue', 'purple']) {
-    const label = cleanString(value[key], 120);
+    const label = cleanString(value[key], 240);
     if (label) output[key] = label;
   }
   return output;
@@ -717,7 +717,7 @@ function sanitizeHighlightLegend(value, documentType = 'quote') {
     : ['yellow', 'green', 'blue', 'pink', 'orange', 'purple'];
   const output = {};
   for (const key of keys) {
-    const label = cleanString(value[key], 120);
+    const label = cleanString(value[key], 240);
     if (label) output[key] = label;
   }
   return output;

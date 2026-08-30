@@ -4469,6 +4469,7 @@ if (location.search.includes('debug')) {
 
         function viewerCustomHighlightLabel(item) {
             if (!item || !item.highlightColor) return '';
+            if (item.highlightDescriptionOnItem === false) return '';
             return String(viewerHighlightLegend()[item.highlightColor] || '').trim();
         }
 
