@@ -592,6 +592,39 @@
             font-size: 0.8rem;
             font-weight: 800;
         }
+        .quote-highlight-legend {
+            background:#fff;
+            border:1px solid #d7e2ee;
+            border-left:4px solid #1a56a0;
+            border-radius:12px;
+            padding:14px 16px;
+            margin:0 0 18px;
+            box-shadow:0 4px 14px rgba(16,42,67,0.05);
+        }
+        .quote-highlight-legend-title {
+            display:flex;
+            align-items:center;
+            gap:8px;
+            color:#17324d;
+            font-weight:800;
+            margin-bottom:8px;
+        }
+        .quote-highlight-legend-items {
+            display:flex;
+            flex-wrap:wrap;
+            gap:8px;
+        }
+        .quote-highlight-legend-item {
+            display:inline-flex;
+            align-items:center;
+            gap:7px;
+            padding:6px 10px;
+            border:1px solid;
+            border-radius:999px;
+            color:#1f2937;
+            font-size:0.86rem;
+            font-weight:700;
+        }
         .co-sample-changed { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
         .co-sample-added { background: #ecfdf5; color: #047857; border: 1px solid #bbf7d0; }
         .co-sample-removed { background: #fff1f2; color: #be123c; border: 1px solid #fecdd3; }
@@ -1600,6 +1633,8 @@ if (location.search.includes('debug')) {
             <h4><i class="fas fa-list me-2"></i>Scope & Pricing</h4>
             <span>Review rooms, optional items, and upgrade choices.</span>
         </div>
+
+        <div id="quoteHighlightLegend" class="quote-highlight-legend" style="display:none;"></div>
 
         <div id="quoteContainer">
             <!-- Rooms and items will be loaded here -->
@@ -4426,26 +4461,57 @@ if (location.search.includes('debug')) {
             if (viewerChangeOrderChoiceWasReopened(item)) item._clientDecisionApplied = true;
         }
 
-        function viewerChangeOrderCustomHighlightLabel(item) {
-            if (!item || !item.highlightColor || !quoteData || !quoteData.changeOrderHighlightLegend) return '';
-            return String(quoteData.changeOrderHighlightLegend[item.highlightColor] || '').trim();
+        function viewerHighlightLegend() {
+            if (!quoteData) return {};
+            var legend = quoteData.highlightLegend || quoteData.changeOrderHighlightLegend;
+            return legend && typeof legend === 'object' ? legend : {};
         }
 
-        function renderViewerChangeOrderCustomLegend() {
-            var legend = quoteData && quoteData.changeOrderHighlightLegend;
-            if (!legend || typeof legend !== 'object') return '';
+        function viewerCustomHighlightLabel(item) {
+            if (!item || !item.highlightColor) return '';
+            return String(viewerHighlightLegend()[item.highlightColor] || '').trim();
+        }
+
+        function viewerChangeOrderCustomHighlightLabel(item) {
+            return viewerCustomHighlightLabel(item);
+        }
+
+        function viewerUsedHighlightLegendEntries() {
+            var legend = viewerHighlightLegend();
             var used = {};
-            (quoteData.rooms || []).forEach(function(room) {
+            (quoteData && quoteData.rooms || []).forEach(function(room) {
                 (room.items || []).forEach(function(item) {
                     if (item && item.highlightColor && String(legend[item.highlightColor] || '').trim()) used[item.highlightColor] = true;
                 });
             });
-            var entries = Object.keys(used).map(function(colorKey) {
+            return Object.keys(used).map(function(colorKey) {
                 var style = VIEWER_LINE_ITEM_HIGHLIGHTS[colorKey];
                 var label = String(legend[colorKey] || '').trim();
-                if (!style || !label) return '';
-                return '<span style="background:' + style.background + ';color:#1f2937;border:1px solid ' + style.border + '"><i class="fas fa-highlighter"></i>' + escapeHtml(label) + '</span>';
+                return style && label ? { colorKey: colorKey, style: style, label: label } : null;
             }).filter(Boolean);
+        }
+
+        function renderViewerHighlightLegendCard() {
+            var container = document.getElementById('quoteHighlightLegend');
+            if (!container) return;
+            var entries = viewerUsedHighlightLegendEntries();
+            if (!entries.length) {
+                container.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = '<div class="quote-highlight-legend-title"><i class="fas fa-highlighter"></i>What the highlights mean</div>' +
+                '<div class="small text-muted mb-2">Your contractor highlighted these items to make the quote easier to review.</div>' +
+                '<div class="quote-highlight-legend-items">' + entries.map(function(entry) {
+                    return '<span class="quote-highlight-legend-item" style="background:' + entry.style.background + ';border-color:' + entry.style.border + '"><i class="fas fa-highlighter"></i>' + escapeHtml(entry.label) + '</span>';
+                }).join('') + '</div>';
+            container.style.display = '';
+        }
+
+        function renderViewerChangeOrderCustomLegend() {
+            var entries = viewerUsedHighlightLegendEntries().map(function(entry) {
+                return '<span style="background:' + entry.style.background + ';color:#1f2937;border:1px solid ' + entry.style.border + '"><i class="fas fa-highlighter"></i>' + escapeHtml(entry.label) + '</span>';
+            });
             if (!entries.length) return '';
             return '<div class="small fw-semibold mt-3 mb-1">Contractor highlights</div><div class="change-order-highlight-samples">' + entries.join('') + '</div>';
         }
@@ -4729,6 +4795,7 @@ if (location.search.includes('debug')) {
             viewerPhotoCounter = 0;
             var co = window.QuoteDrChangeOrders;
             var isChangeOrder = !!(co && co.isChangeOrder(quoteData));
+            renderViewerHighlightLegendCard();
             // Populate header fields
             var eyebrow = document.getElementById('proposalEyebrow');
             if (eyebrow && isChangeOrder) eyebrow.innerHTML = '<i class="fas fa-file-circle-plus"></i> Change Order Approval';
@@ -4935,7 +5002,7 @@ if (location.search.includes('debug')) {
                         : itemTotalText;
                     const isRemoved = !!item._removed && !isOptional;
                     const lineItemHighlight = getViewerLineItemHighlight(item);
-                    const coCustomHighlightLabel = isChangeOrder ? viewerChangeOrderCustomHighlightLabel(item) : '';
+                    const customHighlightLabel = viewerCustomHighlightLabel(item);
 
                     // Find original item for diff (match by description)
                     const origRoom = origRoomsForDiff[roomIdx] || {};
@@ -5000,7 +5067,7 @@ if (location.search.includes('debug')) {
                                         ${isChangeOrder && coStatus === 'changed' ? '<span class="badge bg-warning text-dark ms-2">Changed</span>' : ''}
                                         ${isChangeOrder && coStatus === 'added' ? '<span class="badge bg-success ms-2">Added</span>' : ''}
                                         ${isChangeOrder && coStatus === 'removed' ? '<span class="badge bg-danger ms-2">Removed</span>' : ''}
-                                        ${coCustomHighlightLabel && lineItemHighlight ? `<span class="badge border text-dark ms-2" style="background:${lineItemHighlight.background};border-color:${lineItemHighlight.border} !important;"><i class="fas fa-highlighter me-1"></i>${escapeHtml(coCustomHighlightLabel)}</span>` : ''}
+                                        ${customHighlightLabel && lineItemHighlight ? `<span class="badge border text-dark ms-2" style="background:${lineItemHighlight.background};border-color:${lineItemHighlight.border} !important;"><i class="fas fa-highlighter me-1"></i>${escapeHtml(customHighlightLabel)}</span>` : ''}
                                         ${clientChoicesLocked ? '<span class="badge bg-light text-success border ms-2"><i class="fas fa-lock me-1"></i>Previously approved choice</span>' : ''}
                                         ${clientChoicesReopened ? '<span class="badge bg-warning text-dark ms-2"><i class="fas fa-lock-open me-1"></i>Reopened for selection</span>' : ''}
                                         ${wasOptionalAdded ? '<span class="badge bg-success ms-2">Added by client</span>' : ''}

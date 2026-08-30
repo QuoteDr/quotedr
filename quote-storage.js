@@ -1044,7 +1044,10 @@
                 changeOrderScopeAutomatic: window._changeOrderScopeAutomatic !== false,
                 changeOrderScopeAiOwned: window._changeOrderScopeAiOwned === true,
                 changeOrderScopeFingerprint: window._changeOrderScopeFingerprint || '',
-                changeOrderHighlightLegend: window._changeOrderHighlightLegend || {},
+                highlightLegend: window._quoteHighlightLegend || window._changeOrderHighlightLegend || {},
+                changeOrderHighlightLegend: window._quoteDocumentType === 'change_order'
+                    ? (window._quoteHighlightLegend || window._changeOrderHighlightLegend || {})
+                    : {},
                 status: status,
                 quoteTitle:     document.getElementById('quoteTitle')?.value     || '',
                 clientName:     document.getElementById('clientName')?.value     || '',
@@ -1261,9 +1264,11 @@
             window._changeOrderScopeAiOwned = data.changeOrderScopeAiOwned === true;
             window._changeOrderScopeFingerprint = data.changeOrderScopeFingerprint || '';
             window._changeOrderScopeLastGeneratedText = window._changeOrderScopeAiOwned ? (data.changeReason || '') : '';
-            window._changeOrderHighlightLegend = data.changeOrderHighlightLegend && typeof data.changeOrderHighlightLegend === 'object'
-                ? JSON.parse(JSON.stringify(data.changeOrderHighlightLegend))
-                : {};
+            var restoredHighlightLegend = data.highlightLegend && typeof data.highlightLegend === 'object'
+                ? data.highlightLegend
+                : (data.changeOrderHighlightLegend && typeof data.changeOrderHighlightLegend === 'object' ? data.changeOrderHighlightLegend : {});
+            window._quoteHighlightLegend = JSON.parse(JSON.stringify(restoredHighlightLegend));
+            window._changeOrderHighlightLegend = window._quoteHighlightLegend;
             window._quoteServerUpdatedAt = data._serverUpdatedAt || data.serverUpdatedAt || data.updated_at || null;
             window._quoteLocalEditAt = data._clientEditedAt || data._saveMeta && data._saveMeta.clientEditedAt || data.savedAt || null;
             setTimeout(function() {

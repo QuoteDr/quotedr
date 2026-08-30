@@ -530,6 +530,14 @@ test('change-order custom highlight legends are client-safe and limited to non-s
   const api = await policy();
   const projected = api.projectClientDocumentData({
     documentType: 'change_order',
+    highlightLegend: {
+      yellow: 'Client decision required',
+      blue: 'Existing finish retained',
+      purple: 'Allowance pending',
+      orange: 'Must not override Changed',
+      green: 'Must not override Added',
+      pink: 'Must not override Removed'
+    },
     changeOrderHighlightLegend: {
       yellow: 'Client decision required',
       blue: 'Existing finish retained',
@@ -540,11 +548,46 @@ test('change-order custom highlight legends are client-safe and limited to non-s
     },
     rooms: []
   }, { documentType: 'change_order' });
+  assert.deepEqual(projected.highlightLegend, {
+    yellow: 'Client decision required',
+    blue: 'Existing finish retained',
+    purple: 'Allowance pending'
+  });
   assert.deepEqual(projected.changeOrderHighlightLegend, {
     yellow: 'Client decision required',
     blue: 'Existing finish retained',
     purple: 'Allowance pending'
   });
+});
+
+test('ordinary quote highlight legends are client-safe and support every builder colour', async () => {
+  const api = await policy();
+  const projected = api.projectClientDocumentData({
+    documentType: 'quote',
+    highlightLegend: {
+      yellow: 'Client decision required',
+      green: 'Included upgrade',
+      blue: 'Existing finish retained',
+      pink: 'Owner supplied',
+      orange: 'Allowance item',
+      purple: 'Schedule coordination',
+      red: 'Not a supported highlighter colour',
+      constructor: 'Must not escape the allowlist'
+    },
+    rooms: [{
+      name: 'Main Floor',
+      items: [{ description: 'Paint', highlightColor: 'orange', quantity: 1, rate: 100 }]
+    }]
+  }, { documentType: 'quote' });
+  assert.deepEqual(projected.highlightLegend, {
+    yellow: 'Client decision required',
+    green: 'Included upgrade',
+    blue: 'Existing finish retained',
+    pink: 'Owner supplied',
+    orange: 'Allowance item',
+    purple: 'Schedule coordination'
+  });
+  assert.equal(projected.rooms[0].items[0].highlightColor, 'orange');
 });
 
 test('accepted legacy quote projects the authoritative signed total instead of stale pre-upgrade rooms', async () => {

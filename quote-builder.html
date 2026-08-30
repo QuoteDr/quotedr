@@ -3141,10 +3141,10 @@ if (location.search.includes('debug')) {
                         QuoteDr already marks <strong>Changed</strong>, <strong>Added</strong>, and <strong>Removed</strong> work automatically. A manual highlight is an additional client-facing note and must have one clear meaning.
                     </div>
                     <div id="lineItemHighlightOptions" class="row g-2" data-room-id="" data-item-index=""></div>
-                    <div class="mt-3 d-none" id="changeOrderHighlightMeaningWrap">
-                        <label class="form-label fw-semibold mb-1" for="changeOrderHighlightMeaning">What does this colour mean?</label>
-                        <input type="text" class="form-control" id="changeOrderHighlightMeaning" maxlength="120" placeholder="Example: Client decision required">
-                        <div class="form-text">This wording will appear in the client’s Change Order legend.</div>
+                    <div class="mt-3" id="changeOrderHighlightMeaningWrap">
+                        <label class="form-label fw-semibold mb-1" for="changeOrderHighlightMeaning" id="lineItemHighlightMeaningLabel">What should this colour tell the client?</label>
+                        <input type="text" class="form-control" id="changeOrderHighlightMeaning" maxlength="120" placeholder="Example: Client-supplied material">
+                        <div class="form-text" id="lineItemHighlightMeaningHelp">Optional. Add one meaning per colour and QuoteDr will show it in the client’s highlight legend.</div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -3152,7 +3152,7 @@ if (location.search.includes('debug')) {
                         <i class="fas fa-ban me-1"></i>Clear
                     </button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary d-none" id="applyChangeOrderHighlightBtn" onclick="applyActiveChangeOrderHighlight()">
+                    <button type="button" class="btn btn-primary" id="applyChangeOrderHighlightBtn" onclick="applyActiveLineItemHighlight()">
                         <i class="fas fa-check me-1"></i>Apply Highlight
                     </button>
                 </div>
@@ -9889,23 +9889,34 @@ Example:
             purple: { label: 'Purple', background: 'rgba(139, 92, 246, 0.14)', swatch: '#eee3ff', border: '#8b5cf6' }
         };
         const CHANGE_ORDER_CUSTOM_HIGHLIGHT_KEYS = ['yellow', 'blue', 'purple'];
-        window._changeOrderHighlightLegend = window._changeOrderHighlightLegend || {};
+        window._quoteHighlightLegend = window._quoteHighlightLegend || window._changeOrderHighlightLegend || {};
+        window._changeOrderHighlightLegend = window._quoteHighlightLegend;
+
+        function quoteHighlightLegend() {
+            return window._quoteHighlightLegend && typeof window._quoteHighlightLegend === 'object'
+                ? window._quoteHighlightLegend
+                : (window._quoteHighlightLegend = {});
+        }
+
+        function quoteHighlightLabel(colorKey) {
+            return String(quoteHighlightLegend()[colorKey] || '').trim();
+        }
 
         function changeOrderCustomHighlightLabel(colorKey) {
-            return String(window._changeOrderHighlightLegend && window._changeOrderHighlightLegend[colorKey] || '').trim();
+            return quoteHighlightLabel(colorKey);
         }
 
         function cleanupUnusedChangeOrderHighlightLegend() {
-            if (window._quoteDocumentType !== 'change_order') return;
             var used = {};
             (rooms || []).forEach(function(room) {
                 (room.items || []).forEach(function(item) {
                     if (item && item.highlightColor) used[item.highlightColor] = true;
                 });
             });
-            Object.keys(window._changeOrderHighlightLegend || {}).forEach(function(key) {
-                if (!used[key]) delete window._changeOrderHighlightLegend[key];
+            Object.keys(quoteHighlightLegend()).forEach(function(key) {
+                if (!used[key]) delete window._quoteHighlightLegend[key];
             });
+            window._changeOrderHighlightLegend = window._quoteHighlightLegend;
         }
 
         function getLineItemHighlight(item) {
@@ -9955,8 +9966,8 @@ Example:
                 html += '<span class="quote-item-highlight-swatch" style="background:' + (highlight.swatch || highlight.background) + '; border-color:' + highlight.border + ';"></span>';
                 html += '<span class="fw-semibold">' + qdTemplateEscapeHtml(highlight.label) + '</span>';
                 html += '</span>';
-                if (window._quoteDocumentType === 'change_order' && changeOrderCustomHighlightLabel(key)) {
-                    html += '<span class="small text-muted d-block mt-1 text-start">' + qdTemplateEscapeHtml(changeOrderCustomHighlightLabel(key)) + '</span>';
+                if (quoteHighlightLabel(key)) {
+                    html += '<span class="small text-muted d-block mt-1 text-start">' + qdTemplateEscapeHtml(quoteHighlightLabel(key)) + '</span>';
                 }
                 html += '</button>';
                 html += '</div>';
@@ -9975,7 +9986,7 @@ Example:
             if (titleEl) titleEl.innerHTML = '<i class="fas fa-highlighter me-2"></i>Highlight Item';
             if (messageEl) messageEl.textContent = window._quoteDocumentType === 'change_order'
                 ? 'Choose a custom annotation colour and explain its meaning to the client.'
-                : 'Choose a faint highlight colour for this line item.';
+                : 'Choose a faint highlight colour. You can optionally explain what it means to the client.';
             configureChangeOrderHighlightModal(room.items[itemIndex].highlightColor || '');
             const modalEl = document.getElementById('lineItemHighlightModal');
             if (!modalEl || !window.bootstrap) return;
@@ -9984,11 +9995,12 @@ Example:
 
         function setActiveLineItemHighlight(colorKey) {
             const optionsEl = document.getElementById('lineItemHighlightOptions');
-            if (window._quoteDocumentType === 'change_order' && colorKey) {
-                if (CHANGE_ORDER_CUSTOM_HIGHLIGHT_KEYS.indexOf(colorKey) === -1) return;
+            if (colorKey) {
+                var allowedKeys = window._quoteDocumentType === 'change_order' ? CHANGE_ORDER_CUSTOM_HIGHLIGHT_KEYS : Object.keys(LINE_ITEM_HIGHLIGHTS);
+                if (allowedKeys.indexOf(colorKey) === -1) return;
                 optionsEl.setAttribute('data-candidate-color', colorKey);
                 var meaning = document.getElementById('changeOrderHighlightMeaning');
-                if (meaning) meaning.value = changeOrderCustomHighlightLabel(colorKey);
+                if (meaning) meaning.value = quoteHighlightLabel(colorKey);
                 renderLineItemHighlightModalOptions(
                     parseInt(optionsEl.getAttribute('data-room-id'), 10),
                     parseInt(optionsEl.getAttribute('data-item-index'), 10),
@@ -10743,7 +10755,7 @@ Example:
             if (titleEl) titleEl.innerHTML = '<i class="fas fa-highlighter me-2"></i>Highlight Selected Items';
             if (messageEl) messageEl.textContent = window._quoteDocumentType === 'change_order'
                 ? 'Choose one custom annotation colour for all ' + selectedIndexes.length + ' selected line items, then explain its meaning to the client.'
-                : 'Choose one faint highlight colour for all ' + selectedIndexes.length + ' selected line items.';
+                : 'Choose one faint highlight colour for all ' + selectedIndexes.length + ' selected line items. You can optionally explain its meaning to the client.';
             configureChangeOrderHighlightModal(sharedColor);
             var modalEl = document.getElementById('lineItemHighlightModal');
             if (!modalEl || !window.bootstrap) return;
@@ -12270,30 +12282,39 @@ Example:
             var meaningWrap = document.getElementById('changeOrderHighlightMeaningWrap');
             var applyBtn = document.getElementById('applyChangeOrderHighlightBtn');
             var meaning = document.getElementById('changeOrderHighlightMeaning');
+            var meaningLabel = document.getElementById('lineItemHighlightMeaningLabel');
+            var meaningHelp = document.getElementById('lineItemHighlightMeaningHelp');
             var optionsEl = document.getElementById('lineItemHighlightOptions');
             if (guidance) guidance.classList.toggle('d-none', !isCo);
-            if (meaningWrap) meaningWrap.classList.toggle('d-none', !isCo);
-            if (applyBtn) applyBtn.classList.toggle('d-none', !isCo);
-            if (optionsEl) optionsEl.setAttribute('data-candidate-color', isCo ? (activeColor || '') : '');
-            if (meaning) meaning.value = isCo && activeColor ? changeOrderCustomHighlightLabel(activeColor) : '';
+            if (meaningWrap) meaningWrap.classList.remove('d-none');
+            if (applyBtn) applyBtn.classList.remove('d-none');
+            if (meaningLabel) meaningLabel.textContent = isCo ? 'What does this colour mean? (required)' : 'What should this colour tell the client? (optional)';
+            if (meaningHelp) meaningHelp.textContent = isCo
+                ? 'Required. This wording will appear in the client’s Change Order legend.'
+                : 'Optional. Add one meaning per colour and QuoteDr will show it in the client’s highlight legend.';
+            if (optionsEl) optionsEl.setAttribute('data-candidate-color', activeColor || '');
+            if (meaning) meaning.value = activeColor ? quoteHighlightLabel(activeColor) : '';
         }
 
-        async function applyActiveChangeOrderHighlight() {
-            if (window._quoteDocumentType !== 'change_order') return;
+        async function applyActiveLineItemHighlight() {
+            var isCo = window._quoteDocumentType === 'change_order';
             var optionsEl = document.getElementById('lineItemHighlightOptions');
             var colorKey = String(optionsEl && optionsEl.getAttribute('data-candidate-color') || '');
             var meaningEl = document.getElementById('changeOrderHighlightMeaning');
             var meaning = String(meaningEl && meaningEl.value || '').trim();
-            if (!colorKey || CHANGE_ORDER_CUSTOM_HIGHLIGHT_KEYS.indexOf(colorKey) === -1) {
-                await qdAlert('Choose a custom highlight colour first.');
+            var allowedKeys = isCo ? CHANGE_ORDER_CUSTOM_HIGHLIGHT_KEYS : Object.keys(LINE_ITEM_HIGHLIGHTS);
+            if (!colorKey || allowedKeys.indexOf(colorKey) === -1) {
+                await qdAlert('Choose a highlight colour first.');
                 return;
             }
-            if (!meaning) {
+            if (isCo && !meaning) {
                 await qdAlert('Explain what this highlight means to the client before applying it.');
                 if (meaningEl) meaningEl.focus();
                 return;
             }
-            window._changeOrderHighlightLegend[colorKey] = meaning.slice(0, 120);
+            if (meaning) quoteHighlightLegend()[colorKey] = meaning.slice(0, 120);
+            else delete quoteHighlightLegend()[colorKey];
+            window._changeOrderHighlightLegend = window._quoteHighlightLegend;
             var roomId = parseInt(optionsEl.getAttribute('data-room-id'), 10);
             var itemIndex = parseInt(optionsEl.getAttribute('data-item-index'), 10);
             var isBulk = optionsEl.getAttribute('data-highlight-mode') === 'bulk';
@@ -12303,6 +12324,10 @@ Example:
             var modalEl = document.getElementById('lineItemHighlightModal');
             var instance = modalEl && window.bootstrap ? bootstrap.Modal.getInstance(modalEl) : null;
             if (instance) instance.hide();
+        }
+
+        async function applyActiveChangeOrderHighlight() {
+            return applyActiveLineItemHighlight();
         }
 
         function qdFormatMoney(value, symbol, options) {
@@ -14413,8 +14438,8 @@ Example:
                                 var badgeClass = coStatus === 'added' ? 'bg-success' : (coStatus === 'removed' ? 'bg-danger' : (coStatus === 'changed' ? 'bg-warning text-dark' : 'bg-secondary'));
                                 html += ' <span class="badge ' + badgeClass + '">' + coStatus.replace(/^\w/, function(ch) { return ch.toUpperCase(); }) + '</span>';
                             }
-                            if (window._quoteDocumentType === 'change_order' && highlight && changeOrderCustomHighlightLabel(item.highlightColor)) {
-                                html += ' <span class="badge border text-dark ms-1" style="background:' + highlight.swatch + ';border-color:' + highlight.border + ' !important;"><i class="fas fa-highlighter me-1"></i>' + qdTemplateEscapeHtml(changeOrderCustomHighlightLabel(item.highlightColor)) + '</span>';
+                            if (highlight && quoteHighlightLabel(item.highlightColor)) {
+                                html += ' <span class="badge border text-dark ms-1" style="background:' + highlight.swatch + ';border-color:' + highlight.border + ' !important;"><i class="fas fa-highlighter me-1"></i>' + qdTemplateEscapeHtml(quoteHighlightLabel(item.highlightColor)) + '</span>';
                             }
                             if (item._coOriginal) {
                                 html += '<span class="co-original-summary">Original: ' + qdTemplateEscapeHtml(coFormatQty(item._coOriginal.quantity, item._coOriginal.unitType || item.unitType || item.unit || '')) + ' @ ' + qdFormatMoney(item._coOriginal.rate) + '</span>';
@@ -18669,7 +18694,8 @@ Example:
             if (document.getElementById('quoteTitle')) document.getElementById('quoteTitle').value = 'Change Order #' + nextNumber;
             if (document.getElementById('changeOrderReason')) document.getElementById('changeOrderReason').value = '';
             setQuotePaymentsReceived(null);
-            window._changeOrderHighlightLegend = {};
+            window._quoteHighlightLegend = {};
+            window._changeOrderHighlightLegend = window._quoteHighlightLegend;
             window._changeOrderContinuePayment = null;
             window._changeOrderScopeAutomatic = getChangeOrderScopePreferences().automaticDefault !== false;
             window._changeOrderScopeAiOwned = false;

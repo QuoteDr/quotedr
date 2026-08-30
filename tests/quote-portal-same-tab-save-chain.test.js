@@ -69,6 +69,7 @@ function createContext(options = {}) {
       _serverUpdatedAt: v2,
       portal_visible: false
     }),
+    configureChangeOrderContinuePayment: async quote => quote,
     confirmChangeOrderHighlightLegend: async () => {
       calls.highlightChecks += 1;
       return true;

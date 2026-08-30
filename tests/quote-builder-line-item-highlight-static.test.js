@@ -3,6 +3,7 @@ const assert = require('assert');
 
 const source = fs.readFileSync('quote-builder.html', 'utf8');
 const viewerSource = fs.readFileSync('interactive-quote-viewer.html', 'utf8');
+const storageSource = fs.readFileSync('quote-storage.js', 'utf8');
 
 assert(
   source.includes('LINE_ITEM_HIGHLIGHTS'),
@@ -97,6 +98,21 @@ assert(
     viewerSource.includes('--viewer-line-highlight-bg') &&
     viewerSource.includes('--viewer-line-highlight-border'),
   'Interactive quote viewer should render a faint highlighted background for highlighted items'
+);
+
+assert(
+  storageSource.includes('highlightLegend: window._quoteHighlightLegend') &&
+    source.includes('What should this colour tell the client? (optional)') &&
+    source.includes('function applyActiveLineItemHighlight('),
+  'Ordinary quotes should save an optional client-facing meaning for each highlight colour'
+);
+
+assert(
+  viewerSource.includes('id="quoteHighlightLegend"') &&
+    viewerSource.includes('function renderViewerHighlightLegendCard(') &&
+    viewerSource.includes('What the highlights mean') &&
+    viewerSource.includes('viewerCustomHighlightLabel(item)'),
+  'The client quote viewer should show a compact legend and label highlighted quote items'
 );
 
 console.log('quote builder line item highlight static test passed');

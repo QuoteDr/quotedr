@@ -17,7 +17,7 @@ const ROOT_SAFE_KEYS = new Set([
   'validUntilDate', 'fullResolutionPhotosEnabled', 'parentQuoteId', 'parent_quote_id',
   'parentQuoteNumber', 'parentQuoteTotal', 'changeOrderNumber', 'change_order_number',
   'changeOrderPreviousApprovedTotal', 'changeOrderPriceSummary', 'changeReason',
-  'changeOrderHighlightLegend', 'changeOrderContinuePayment',
+  'highlightLegend', 'changeOrderHighlightLegend', 'changeOrderContinuePayment',
   'document_validity', 'documentValidity', 'invalidated_at', 'invalidatedAt',
   'invalidated_reason', 'invalidatedReason', 'voided_at', 'voidedAt',
   'portal_id', 'portal_visible', 'portal_added_at', 'portal_client_name',
@@ -36,7 +36,7 @@ const ROOT_SAFE_KEYS = new Set([
 ]);
 
 const ROOT_COMPLEX_KEYS = new Set([
-  'quoteDividerLabels', 'terms', 'changeOrderPriceSummary', 'changeOrderHighlightLegend', 'changeOrderContinuePayment', '_roomNotes',
+  'quoteDividerLabels', 'terms', 'changeOrderPriceSummary', 'highlightLegend', 'changeOrderHighlightLegend', 'changeOrderContinuePayment', '_roomNotes',
   'terms_accepted_snapshot'
 ]);
 
@@ -710,6 +710,19 @@ function sanitizeChangeOrderHighlightLegend(value) {
   return output;
 }
 
+function sanitizeHighlightLegend(value, documentType = 'quote') {
+  if (!isRecord(value)) return {};
+  const keys = documentType === 'change_order'
+    ? ['yellow', 'blue', 'purple']
+    : ['yellow', 'green', 'blue', 'pink', 'orange', 'purple'];
+  const output = {};
+  for (const key of keys) {
+    const label = cleanString(value[key], 120);
+    if (label) output[key] = label;
+  }
+  return output;
+}
+
 function cents(value) {
   return Math.max(0, Math.round(finiteNumber(value, 0) * 100));
 }
@@ -815,6 +828,8 @@ export function projectClientDocumentData(data, options = {}) {
   if (isRecord(source.invoiceSettings)) output.invoiceSettings = sanitizeInvoiceSettings(source.invoiceSettings);
   if (isRecord(source.changeOrderPriceSummary)) output.changeOrderPriceSummary = sanitizeChangeOrderSummary(source.changeOrderPriceSummary);
   else delete output.changeOrderPriceSummary;
+  if (isRecord(source.highlightLegend)) output.highlightLegend = sanitizeHighlightLegend(source.highlightLegend, totals.documentType);
+  else delete output.highlightLegend;
   if (isRecord(source.changeOrderHighlightLegend)) output.changeOrderHighlightLegend = sanitizeChangeOrderHighlightLegend(source.changeOrderHighlightLegend);
   else delete output.changeOrderHighlightLegend;
   const changeOrderContinuePayment = sanitizeChangeOrderContinuePayment(source.changeOrderContinuePayment || source.change_order_continue_payment);
