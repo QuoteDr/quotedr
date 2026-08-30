@@ -61,3 +61,21 @@ assert(
     items.includes('return getOrderedManageCategories().slice();'),
   'Manage Items should expose its current saved category order to other quote-builder modals'
 );
+
+assert(
+  items.includes("MANAGE_CATEGORY_ORDER_CLOUD_KEY = 'manage_items_category_order'") &&
+    items.includes('function persistManageCategoryOrderState') &&
+    items.includes("saveUserDataValue(MANAGE_CATEGORY_ORDER_CLOUD_KEY") &&
+    items.includes('function _restoreManageCategoryOrderFromCloud') &&
+    items.includes('loadUserDataValue(MANAGE_CATEGORY_ORDER_CLOUD_KEY)') &&
+    items.includes('Promise.all([itemRestorePromise, categoryOrderRestorePromise])'),
+  'Manage Items category ordering should sync through account user_data and restore before the item library is ready'
+);
+
+assert(
+  items.includes('localUpdatedAt > cloudUpdatedAt') &&
+    items.includes('MANAGE_CATEGORY_ORDER_UPDATED_AT_KEY') &&
+    items.includes('hasLegacyLocalOrder') &&
+    items.includes('_saveManageCategoryOrderToCloud(migratedAt)'),
+  'Category-order sync should preserve newer local edits and migrate an existing browser-only order into the account'
+);

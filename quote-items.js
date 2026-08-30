@@ -10,6 +10,8 @@
         var MANAGE_CATEGORY_RENAMES_KEY = 'ald_manage_items_category_renames';
         var MANAGE_CATEGORY_ORDER_MODE_KEY = 'ald_manage_items_category_order_mode';
         var MANAGE_CATEGORY_CUSTOM_ORDER_KEY = 'ald_manage_items_category_custom_order';
+        var MANAGE_CATEGORY_ORDER_UPDATED_AT_KEY = 'ald_manage_items_category_order_updated_at';
+        var MANAGE_CATEGORY_ORDER_CLOUD_KEY = 'manage_items_category_order';
         var MANAGE_PORTRAIT_FIELDS_KEY = 'ald_manage_items_portrait_fields';
         var manageItemsFilter = 'all';
         var manageItemsCategoryState = {};
@@ -2301,11 +2303,89 @@
             }
         }
 
+        function getManageCategoryOrderUpdatedAt() {
+            var value = Date.parse(localStorage.getItem(MANAGE_CATEGORY_ORDER_UPDATED_AT_KEY) || '');
+            return Number.isFinite(value) ? value : 0;
+        }
+
+        function getManageCategoryOrderSnapshot(updatedAt) {
+            return {
+                mode: getManageItemsCategoryOrderMode(),
+                order: manageItemsCategoryCustomOrder.slice(),
+                updatedAt: updatedAt || localStorage.getItem(MANAGE_CATEGORY_ORDER_UPDATED_AT_KEY) || new Date().toISOString()
+            };
+        }
+
+        function persistManageCategoryOrderState(options) {
+            options = options || {};
+            var updatedAt = options.updatedAt || new Date().toISOString();
+            localStorage.setItem(MANAGE_CATEGORY_ORDER_MODE_KEY, getManageItemsCategoryOrderMode());
+            localStorage.setItem(MANAGE_CATEGORY_CUSTOM_ORDER_KEY, JSON.stringify(manageItemsCategoryCustomOrder));
+            localStorage.setItem(MANAGE_CATEGORY_ORDER_UPDATED_AT_KEY, updatedAt);
+            if (options.cloud !== false) _saveManageCategoryOrderToCloud(updatedAt).catch(function(){});
+            return updatedAt;
+        }
+
+        async function _saveManageCategoryOrderToCloud(updatedAt) {
+            try {
+                if (typeof saveUserDataValue !== 'function') return;
+                await saveUserDataValue(MANAGE_CATEGORY_ORDER_CLOUD_KEY, getManageCategoryOrderSnapshot(updatedAt), {
+                    entityType: 'quote_preferences',
+                    entityLabel: 'Manage Line Items category order',
+                    background: true
+                });
+            } catch(e) {
+                console.warn('Manage category order cloud save failed:', e);
+            }
+        }
+
+        async function _restoreManageCategoryOrderFromCloud() {
+            try {
+                if (typeof loadUserDataValue !== 'function') return;
+                var result = await loadUserDataValue(MANAGE_CATEGORY_ORDER_CLOUD_KEY);
+                var snapshot = result && result.data;
+                if (!snapshot || typeof snapshot !== 'object') {
+                    var hasLegacyLocalOrder = localStorage.getItem(MANAGE_CATEGORY_ORDER_MODE_KEY) !== null
+                        || localStorage.getItem(MANAGE_CATEGORY_CUSTOM_ORDER_KEY) !== null;
+                    if (hasLegacyLocalOrder) {
+                        var migratedAt = new Date().toISOString();
+                        persistManageCategoryOrderState({ cloud: false, updatedAt: migratedAt });
+                        await _saveManageCategoryOrderToCloud(migratedAt);
+                    }
+                    return;
+                }
+                var cloudUpdatedAt = Date.parse(snapshot.updatedAt || '') || 0;
+                var localUpdatedAt = getManageCategoryOrderUpdatedAt();
+                if (localUpdatedAt && localUpdatedAt > cloudUpdatedAt) {
+                    await _saveManageCategoryOrderToCloud(localStorage.getItem(MANAGE_CATEGORY_ORDER_UPDATED_AT_KEY));
+                    return;
+                }
+                manageItemsCategoryOrderMode = snapshot.mode === 'custom' ? 'custom' : 'alphabetical';
+                var seen = new Set();
+                manageItemsCategoryCustomOrder = (Array.isArray(snapshot.order) ? snapshot.order : []).map(function(cat) {
+                    return String(cat || '').trim();
+                }).filter(function(cat) {
+                    var key = cat.toLowerCase();
+                    if (!cat || seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
+                persistManageCategoryOrderState({
+                    cloud: false,
+                    updatedAt: snapshot.updatedAt || new Date().toISOString()
+                });
+                if (typeof renderAllItemsList === 'function') renderAllItemsList();
+                if (typeof renderRooms === 'function') renderRooms();
+            } catch(e) {
+                console.warn('Manage category order cloud restore failed:', e);
+            }
+        }
+
         function getManageItemsCategoryOrderMode() {
             return manageItemsCategoryOrderMode === 'custom' ? 'custom' : 'alphabetical';
         }
 
-        function saveManageCategoryCustomOrder(order) {
+        function saveManageCategoryCustomOrder(order, options) {
             var seen = new Set();
             manageItemsCategoryCustomOrder = (Array.isArray(order) ? order : []).map(function(cat) {
                 return String(cat || '').trim();
@@ -2315,7 +2395,7 @@
                 seen.add(key);
                 return true;
             });
-            localStorage.setItem(MANAGE_CATEGORY_CUSTOM_ORDER_KEY, JSON.stringify(manageItemsCategoryCustomOrder));
+            persistManageCategoryOrderState(options);
         }
 
         function getManageCategoryNamesWithItems() {
@@ -2414,12 +2494,12 @@
         async function setManageItemsCategoryOrderMode(mode) {
             loadManageCategoryOrderState();
             manageItemsCategoryOrderMode = mode === 'custom' ? 'custom' : 'alphabetical';
-            localStorage.setItem(MANAGE_CATEGORY_ORDER_MODE_KEY, manageItemsCategoryOrderMode);
             if (manageItemsCategoryOrderMode === 'custom' && !manageItemsCategoryCustomOrder.length) {
-                saveManageCategoryCustomOrder(getManageCategoryNamesWithItems().sort(function(a, b) {
+                manageItemsCategoryCustomOrder = getManageCategoryNamesWithItems().sort(function(a, b) {
                     return a.localeCompare(b);
-                }));
+                });
             }
+            persistManageCategoryOrderState();
             renderAllItemsList();
             if (typeof renderRooms === 'function') renderRooms();
             if (manageItemsCategoryOrderMode === 'custom') showManageCategoryCustomOrderHelp();
@@ -2636,6 +2716,8 @@
 
             // Prefer whichever snapshot was saved most recently. A failed cloud sync must not
             // erase newer local edits on the next refresh.
+            loadManageCategoryOrderState();
+            var categoryOrderRestorePromise = _restoreManageCategoryOrderFromCloud().catch(function(){});
             var itemRestorePromise = _doRestoreItemsFromCloud().then(function(result) {
                 if (!result.error && result.data && Object.keys(result.data).length > 0) {
                     var cloudItems = normalizeManageItemPhotoCollections(result.data);
@@ -2669,7 +2751,7 @@
                     }
                 }
             }).catch(function(){});
-            window._manageItemsReadyPromise = itemRestorePromise.then(function() {
+            window._manageItemsReadyPromise = Promise.all([itemRestorePromise, categoryOrderRestorePromise]).then(function() {
                 maybeOfferStarterLibrary();
                 return customItems;
             });
