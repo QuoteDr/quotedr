@@ -737,6 +737,12 @@
             margin-top: 16px !important;
             color: #1a56a0 !important;
         }
+        #quoteContainer .viewer-category-heading {
+            font-size: 1.05rem;
+            line-height: 1.25;
+            letter-spacing: 0.65px;
+            padding: 10px 12px !important;
+        }
         #quoteContainer .py-2.border-bottom {
             padding: 13px 0 !important;
             border-color: #e8eef6 !important;
@@ -4954,7 +4960,7 @@ if (location.search.includes('debug')) {
                 orderedCats.filter(c => catGroups[c]).forEach(catName => {
                     const catEntries = catGroups[catName];
                     const catDisplay = canonicalCat(catName);
-                    html += `<div class="text-uppercase fw-bold mt-3 mb-1" style="font-size:0.72rem; letter-spacing:0.8px; color:#6c757d; border-bottom:1px solid #dee2e6; padding-bottom:3px;">${quoteViewerCategoryIconMarkup(catName) + catDisplay}</div>`;
+                    html += `<div class="viewer-category-heading text-uppercase fw-bold mt-3 mb-1">${quoteViewerCategoryIconMarkup(catName) + catDisplay}</div>`;
 
                     if (pricingMode === 'category') {
                         const catSubtotal = catEntries.reduce((sum, entry) => entry.item._removed ? sum : sum + (isChangeOrder ? viewerChangeOrderLineDisplayTotal(entry.item, room) : viewerItemMarkedAmount(room, entry.item, qvLineTotal(entry.item))), 0);

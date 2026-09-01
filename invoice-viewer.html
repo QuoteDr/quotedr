@@ -247,6 +247,15 @@
         .invoice-line-items .invoice-amount-cell {
             font-weight: 600;
         }
+        .invoice-line-items .invoice-category-heading {
+            padding: 10px 12px;
+            font-size: 1.05rem;
+            line-height: 1.25;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #495057;
+        }
         .item-upgraded-badge {
             display: inline-block;
             background: #fff3cd;
@@ -2104,7 +2113,7 @@ if (location.search.includes('debug')) {
                 orderedCats.filter(c => catGroups[c]).forEach(catName => {
                     const catItems = catGroups[catName];
                     const catBg = invoiceCategoryBackground(catName);
-                    html += `<tr><td colspan="4" style="background:${catBg}; padding:4px 8px; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:#495057;">${invoiceCategoryIconMarkup(catName) + canonicalCat(catName)}</td></tr>`;
+                    html += `<tr><td colspan="4" class="invoice-category-heading" style="background:${catBg};">${invoiceCategoryIconMarkup(catName) + canonicalCat(catName)}</td></tr>`;
 
                     catItems.forEach(item => {
                     const originalUpgradeItem = getOriginalUpgradeForInvoiceItem(room, item, roomIndex);
