@@ -56,6 +56,9 @@ verify_jwt = false
 [functions.hd-price-sync]
 verify_jwt = false
 
+[functions.supplier-materials]
+verify_jwt = true
+
 [functions.labor-notification-dispatch]
 verify_jwt = false
 

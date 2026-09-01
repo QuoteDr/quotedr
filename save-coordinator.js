@@ -77,6 +77,30 @@
         return JSON.parse(JSON.stringify(value));
     }
 
+    function trimmedElementValue(id, maxLength) {
+        var element = document.getElementById(id);
+        var value = element && 'value' in element ? element.value : '';
+        return String(value || '').trim().slice(0, maxLength || 500);
+    }
+
+    function recoveryContext(options, payload) {
+        var supplied = options && options.context && typeof options.context === 'object' ? cloneValue(options.context) : {};
+        var record = payload && typeof payload === 'object' ? payload : {};
+        var params = null;
+        try { params = new URL(window.location.href).searchParams; } catch (e) {}
+        var context = {
+            documentId: String(supplied.documentId || supplied.quoteId || record.id || record.quoteId || (params && params.get('load')) || '').trim().slice(0, 160),
+            documentNumber: String(supplied.documentNumber || supplied.quoteNumber || record.quoteNumber || record.quote_number || trimmedElementValue('quoteNumber', 160)).trim().slice(0, 160),
+            documentName: String(supplied.documentName || supplied.fileName || record.quoteTitle || record.fileName || record.title || trimmedElementValue('quoteTitle', 300)).trim().slice(0, 300),
+            clientName: String(supplied.clientName || record.clientName || record.client_name || trimmedElementValue('clientName', 300)).trim().slice(0, 300),
+            documentType: String(supplied.documentType || record.documentType || record.type || '').trim().slice(0, 80)
+        };
+        Object.keys(supplied).forEach(function(key) {
+            if (!Object.prototype.hasOwnProperty.call(context, key) && supplied[key] !== undefined && supplied[key] !== null) context[key] = supplied[key];
+        });
+        return context;
+    }
+
     function safeJson(value) {
         var seen = [];
         return JSON.stringify(value, function(key, current) {
@@ -501,7 +525,7 @@
         }
         await putStoreValue(META_STORE, { key: 'lastCloudAckAt', value: new Date().toISOString() });
         clearRecoveryGuidance(operation);
-        resolveVaultIncident(operation).catch(function() {});
+        resolveVaultIncident(operation, { strategy: 'superseded_by_cloud', source: 'system' }).catch(function() {});
         window.dispatchEvent(new CustomEvent('quotedr-save-superseded', {
             detail: { operation: operation, result: result, version: cloudVersion }
         }));
@@ -560,7 +584,7 @@
         await putStoreValue(SNAPSHOT_STORE, snapshot);
         await deleteStoreValue(OUTBOX_STORE, operation.key);
         clearRecoveryGuidance(current || operation);
-        resolveVaultIncident(current || operation).catch(function() {});
+        resolveVaultIncident(current || operation, { strategy: 'portal_locked', source: 'system' }).catch(function() {});
         window.dispatchEvent(new CustomEvent('quotedr-quote-portal-locked', {
             detail: {
                 quoteData: operation.payload || null,
@@ -708,6 +732,7 @@
             action: options.action || 'upsert',
             payload: payload,
             target: options.target ? cloneValue(options.target) : null,
+            context: recoveryContext(options, payload),
             baseVersion: sameEditorChain ? (existing.baseVersion || options.baseVersion || null) : (options.baseVersion || null),
             state: holdExistingConflict ? 'conflict' : 'local_pending',
             attempts: sameEditorChain ? existing.attempts || 0 : 0,
@@ -749,6 +774,7 @@
             entityType: operation.entityType,
             entityId: operation.entityId,
             entityLabel: operation.entityLabel,
+            context: cloneValue(operation.context || {}),
             revision: revision,
             payloadHash: operation.payloadHash,
             payload: snapshotPayload,
@@ -883,7 +909,12 @@
         await deleteStoreValue(OUTBOX_STORE, key);
         if (operation) {
             clearRecoveryGuidance(operation);
-            resolveVaultIncident(operation).catch(function() {});
+            var state = options.state || 'superseded_by_cloud';
+            var strategy = state === 'recovered_as_new' ? 'restored_as_new'
+                : (state === 'explicit_overwrite_selected' ? 'kept_device'
+                    : (state === 'superseded_by_cloud' || state === 'cloud_copy_confirmed' ? 'kept_cloud'
+                        : (state === 'discarded_after_backup' ? 'closed_without_recovery' : state)));
+            resolveVaultIncident(operation, { strategy: strategy, source: 'user' }).catch(function() {});
         }
         await notify();
         return { state: operation || snapshot ? 'discarded' : 'missing' };
@@ -1034,6 +1065,7 @@
                 await notify();
                 var localResult = await saveQuoteToSupabase(quotePayload);
                 if (localResult && localResult.state === 'cloud_saved') {
+                    resolveVaultIncident(operation, { strategy: 'kept_device', source: 'user' }).catch(function() {});
                     window.dispatchEvent(new CustomEvent('quotedr-quote-conflict-resolved', {
                         detail: { strategy: 'use_local', entityId: operation.entityId, result: localResult }
                     }));
@@ -1042,6 +1074,8 @@
             }
             operation.baseVersion = operation.lastError && operation.lastError.serverVersion || operation.baseVersion || null;
             operation.forceConflictOverwrite = true;
+            operation.resolutionStrategy = 'kept_device';
+            operation.resolutionSource = 'user';
             operation.state = 'local_pending';
             operation.attempts = 0;
             operation.lastError = null;
@@ -1057,7 +1091,7 @@
             snapshot.lastError = null;
             await putStoreValue(SNAPSHOT_STORE, snapshot);
             await deleteStoreValue(OUTBOX_STORE, key);
-            resolveVaultIncident(operation).catch(function() {});
+            resolveVaultIncident(operation, { strategy: 'kept_cloud', source: 'user' }).catch(function() {});
             await notify();
             if (operation.entityType === 'quote' && operation.entityId && operation.entityId.indexOf('quote-number:') !== 0) {
                 var url = new URL(window.location.href);
@@ -1146,6 +1180,7 @@
                 saveAction: operation.action,
                 payload: payload,
                 target: redactSensitive(operation.target),
+                context: redactSensitive(operation.context || {}),
                 attempts: operation.attempts,
                 lastError: operation.lastError,
                 localSavedAt: operation.localSavedAt,
@@ -1164,9 +1199,17 @@
         }
     }
 
-    async function resolveVaultIncident(operation) {
-        if (!operation || !operation.vaultedAt) return;
-        await callRecoveryFunction({ action: 'resolve', operationId: operation.operationId, revision: operation.revision });
+    async function resolveVaultIncident(operation, resolution) {
+        if (!operation || !operation.operationId) return;
+        resolution = resolution || {};
+        await callRecoveryFunction({
+            action: 'resolve',
+            operationId: operation.operationId,
+            revision: operation.revision,
+            strategy: resolution.strategy || operation.resolutionStrategy || 'cloud_saved_after_retry',
+            source: resolution.source || operation.resolutionSource || 'system',
+            note: resolution.note || ''
+        });
     }
 
     function redactForExport(value) {

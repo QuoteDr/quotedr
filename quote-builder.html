@@ -8453,6 +8453,7 @@ Example:
         function savedItemQuoteSource(category, item) {
             item = item || {};
             return {
+                savedItemId: item.savedItemId || '',
                 category: category || item.category || '',
                 name: item.name || item.description || '',
                 key: savedItemQuoteSyncKey(category || item.category || '', item.name || item.description || ''),
@@ -9731,6 +9732,9 @@ Example:
                     delete item._undiscountedTotal;
                     applyLineDiscountFields(item);
                     coRefreshItemDelta(item);
+                    if (window.QuoteDrSupplierMaterials?.attachSnapshotToItem) {
+                        await window.QuoteDrSupplierMaterials.attachSnapshotToItem(item);
+                    }
                 } else {
                     // Carry upgrade option from pricing database if available
                     const svcName = document.getElementById('lineService').value;
@@ -9765,9 +9769,12 @@ Example:
                     };
                     applyLineDiscountFields(newItem);
                     const itemsToAdd = await autoGroupQuoteItem(newItem, rooms[roomIndex]);
-                    itemsToAdd.forEach(function(itemToAdd) {
+                    for (const itemToAdd of itemsToAdd) {
+                        if (window.QuoteDrSupplierMaterials?.attachSnapshotToItem) {
+                            await window.QuoteDrSupplierMaterials.attachSnapshotToItem(itemToAdd);
+                        }
                         rooms[roomIndex].items.push(itemToAdd);
-                    });
+                    }
                     if (window._quoteDocumentType === 'change_order') {
                         itemsToAdd.forEach(function(itemToAdd) { coRefreshItemDelta(itemToAdd); });
                     }
@@ -19279,6 +19286,7 @@ Example:
     <script src="quote-starter-item-library.js?v=2026080201"></script>
     <script src="quote-items.js?v=2026083004"></script>
     <script src="quote-import.js?v=2026082003"></script>
+    <script src="supplier-materials.js?v=2026090101"></script>
     <script>
         // Load templates from localStorage on startup
         let templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');

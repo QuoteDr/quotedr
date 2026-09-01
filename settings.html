@@ -3943,6 +3943,62 @@ Sarah Jones, 905-555-5678"></textarea>
 			return row && (row.entity_type === 'quote' || row.entity_type === 'invoice' || target.table === 'quotes');
 		}
 
+		function saveIncidentContext(row) {
+			var context = row && row.document_context || {};
+			var documentName = String(context.documentName || context.fileName || '').trim();
+			var documentNumber = String(context.documentNumber || context.quoteNumber || '').trim();
+			var clientName = String(context.clientName || '').trim();
+			var documentLabel = documentName && documentNumber ? documentName + ' (' + documentNumber + ')' : (documentName || documentNumber);
+			var entityType = String(row && row.entity_type || 'data');
+			var affectedLabel = entityType === 'item_database' ? 'saved item database' : String(row && (row.entity_label || row.entity_type) || 'saved information');
+			var checkInstruction = entityType === 'item_database'
+				? 'open Manage Line Items and check the saved items you were editing'
+				: (documentLabel ? 'open ' + documentLabel + ' and check that the latest information is present' : 'open QuoteDr and check the information you were saving');
+			return {
+				documentName: documentName,
+				documentNumber: documentNumber,
+				clientName: clientName,
+				documentLabel: documentLabel,
+				affectedLabel: affectedLabel,
+				checkInstruction: checkInstruction
+			};
+		}
+
+		function saveIncidentResolutionLabel(row) {
+			var labels = {
+				cloud_saved_after_retry: 'saved to cloud after retry',
+				superseded_by_cloud: 'a newer cloud revision replaced the pending save',
+				kept_cloud: 'the cloud copy was kept',
+				kept_device: 'the device copy was kept',
+				restored_as_new: 'the recovery copy was restored as a new document',
+				portal_locked: 'the document was locked after portal acceptance',
+				admin_replay: 'the retained save was replayed by an administrator',
+				user_confirmed: 'the user confirmed the current data is correct',
+				closed_without_recovery: 'closed without applying the retained copy'
+			};
+			var strategy = String(row && row.resolution_strategy || '');
+			if (labels[strategy]) return labels[strategy];
+			if (row && row.status === 'resolved') return 'resolved (method was not recorded)';
+			if (row && row.status === 'discarded') return 'closed without recovery';
+			return 'not yet confirmed';
+		}
+
+		function saveIncidentMessageDraft(row) {
+			var context = saveIncidentContext(row);
+			var resolved = row && row.status === 'resolved';
+			var contextSentence = context.documentLabel ? ' while you were working in ' + context.documentLabel : '';
+			var subjectContext = context.documentLabel ? ' - ' + context.documentLabel : '';
+			var subject = 'Please confirm your QuoteDr save - ' + context.affectedLabel + subjectContext;
+			var statusText = resolved
+				? 'QuoteDr now records the incident as resolved: ' + saveIncidentResolutionLabel(row) + '.'
+				: 'The incident is still awaiting confirmation and is not yet marked resolved.';
+			var message = 'Hi,\n\n' +
+				'QuoteDr detected a save conflict involving your ' + context.affectedLabel + contextSentence + '. A temporary recovery copy was retained. ' + statusText + '\n\n' +
+				'Please ' + context.checkInstruction + '. If everything looks correct, reply “Confirmed.” If anything is missing, please stop editing that information and reply so we can review the retained recovery copy.\n\n' +
+				'Thank you,\nQuoteDr Support';
+			return { subject: subject, message: message };
+		}
+
 		function updateSaveIncidentCounts() {
 			var pending = saveRecoveryIncidentRows.filter(function(row) { return row.status === 'pending'; }).length;
 			var retry = saveRecoveryIncidentRows.filter(function(row) { return row.status === 'retry_requested'; }).length;
@@ -3979,22 +4035,41 @@ Sarah Jones, 905-555-5678"></textarea>
 				var documentBackup = saveIncidentIsDocumentBackup(row);
 				var statusClass = row.status === 'resolved' ? 'success' : (row.status === 'retry_requested' ? 'warning' : (row.status === 'discarded' ? 'secondary' : 'danger'));
 				var error = saveIncidentErrorMessage(row);
-				return '<div class="border rounded p-3 mb-2">' +
+				var context = saveIncidentContext(row);
+				var contextLine = context.documentLabel
+					? '<div class="mt-2"><span class="fw-semibold">Working context:</span> ' + escapeAnalyticsHtml(context.documentLabel) + (context.clientName ? ' · ' + escapeAnalyticsHtml(context.clientName) : '') + '</div>'
+					: '<div class="text-muted mt-2"><i class="fas fa-circle-info me-1"></i>Document context was not captured for this older incident.</div>';
+				return '<div class="border rounded p-3 mb-2" id="save-incident-' + escapeAnalyticsHtml(row.operation_id) + '">' +
 					'<div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">' +
 						'<div><div class="fw-bold">' + escapeAnalyticsHtml(row.entity_label || row.entity_type) + ' <span class="badge bg-' + statusClass + '">' + escapeAnalyticsHtml(row.status) + '</span></div>' +
 						'<div class="text-muted mt-1">' + escapeAnalyticsHtml(row.user_email || row.user_id) + ' | ' + escapeAnalyticsHtml(new Date(row.last_failed_at).toLocaleString()) + ' | Attempts: ' + escapeAnalyticsHtml(row.attempts || 0) + '</div></div>' +
 						'<div class="d-flex gap-1 flex-wrap">' +
 						(active && !documentBackup ? '<button type="button" class="btn btn-primary btn-sm" onclick="retrySaveRecoveryIncident(\'' + row.operation_id + '\')"><i class="fas fa-rotate me-1"></i>Retry</button>' : '') +
+						'<button type="button" class="btn btn-outline-primary btn-sm" onclick="openSaveIncidentContact(\'' + row.operation_id + '\')"><i class="fas fa-envelope me-1"></i>Contact User</button>' +
+						(row.resolution_strategy !== 'user_confirmed' ? '<button type="button" class="btn btn-outline-success btn-sm" onclick="confirmSaveRecoveryIncident(\'' + row.operation_id + '\')"><i class="fas fa-user-check me-1"></i>Mark User Confirmed</button>' : '') +
 						'<button type="button" class="btn btn-outline-secondary btn-sm" onclick="exportSaveRecoveryIncident(\'' + row.operation_id + '\')"><i class="fas fa-download me-1"></i>Export</button>' +
-						(active ? '<button type="button" class="btn btn-outline-danger btn-sm" onclick="discardSaveRecoveryIncident(\'' + row.operation_id + '\')"><i class="fas fa-box-archive me-1"></i>Close</button>' : '') +
+						(active ? '<button type="button" class="btn btn-outline-danger btn-sm" onclick="discardSaveRecoveryIncident(\'' + row.operation_id + '\')"><i class="fas fa-box-archive me-1"></i>Close Without Recovery</button>' : '') +
 						'</div>' +
 					'</div>' +
+					contextLine +
+					'<div class="mt-1"><span class="fw-semibold">Resolution:</span> ' + escapeAnalyticsHtml(saveIncidentResolutionLabel(row)) + (row.user_confirmed_at ? ' · User confirmation recorded ' + escapeAnalyticsHtml(new Date(row.user_confirmed_at).toLocaleString()) : '') + '</div>' +
+					(row.admin_contacted_at ? '<div class="text-muted mt-1"><i class="fas fa-envelope-circle-check me-1"></i>Contact recorded ' + escapeAnalyticsHtml(new Date(row.admin_contacted_at).toLocaleString()) + '</div>' : '') +
 					'<div class="text-danger mt-2" style="overflow-wrap:anywhere">' + escapeAnalyticsHtml(error) + '</div>' +
-					(documentBackup ? '<div class="alert alert-info py-2 mt-2 mb-0"><i class="fas fa-shield-halved me-1"></i>This is a backup only. It cannot replay over a newer live quote. Export it for review, then close the incident.</div>' : '') +
+					(documentBackup ? '<div class="alert alert-info py-2 mt-2 mb-0"><i class="fas fa-shield-halved me-1"></i>This retained copy is backup-only. It cannot overwrite newer live information automatically. Export it for comparison, contact the user, and mark confirmed only after they verify the current data.</div>' : '') +
 					'<div class="text-muted mt-1">' + escapeAnalyticsHtml(row.source_page || '') + ' | Revision ' + escapeAnalyticsHtml(row.revision || '') + '</div>' +
 					'<details class="mt-2"><summary class="text-primary" style="cursor:pointer">Inspect retained payload</summary><pre class="bg-light border rounded p-2 mt-2 mb-0" style="max-height:320px;overflow:auto;white-space:pre-wrap">' + escapeAnalyticsHtml(JSON.stringify(row.payload || {}, null, 2)) + '</pre></details>' +
 				'</div>';
 			}).join('');
+			focusRequestedSaveIncident();
+		}
+
+		function focusRequestedSaveIncident() {
+			var operationId = new URLSearchParams(window.location.search || '').get('saveIncident');
+			if (!operationId) return;
+			var card = document.getElementById('save-incident-' + operationId);
+			if (!card) return;
+			card.classList.add('border-primary', 'border-2');
+			setTimeout(function() { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50);
 		}
 
 		async function loadSaveRecoveryIncidents() {
@@ -4012,11 +4087,11 @@ Sarah Jones, 905-555-5678"></textarea>
 			}
 		}
 
-		async function callSaveRecoveryAdmin(action, operationId) {
+		async function callSaveRecoveryAdmin(action, operationId, extra) {
 			var response = await fetch(SUPABASE_URL + '/functions/v1/save-recovery', {
 				method: 'POST',
 				headers: await getSupabaseFunctionAuthHeaders(),
-				body: JSON.stringify({ action: action, operationId: operationId })
+				body: JSON.stringify(Object.assign({ action: action, operationId: operationId }, extra || {}))
 			});
 			var data = await response.json().catch(function() { return {}; });
 			if (!response.ok || data.error) throw new Error(data.error || 'Recovery action failed.');
@@ -4051,8 +4126,71 @@ Sarah Jones, 905-555-5678"></textarea>
 			URL.revokeObjectURL(url);
 		}
 
+		function openSaveIncidentContact(operationId) {
+			var row = saveRecoveryIncidentRows.find(function(item) { return item.operation_id === operationId; });
+			if (!row) return;
+			var draft = saveIncidentMessageDraft(row);
+			var modal = document.createElement('div');
+			modal.className = 'modal fade';
+			modal.tabIndex = -1;
+			modal.innerHTML = '<div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content">' +
+				'<div class="modal-header bg-primary text-white"><h5 class="modal-title"><i class="fas fa-envelope me-2"></i>Contact User About Save Incident</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button></div>' +
+				'<div class="modal-body">' +
+				'<div class="alert alert-info small"><i class="fas fa-circle-info me-1"></i>QuoteDr prepares the message but never sends it automatically. Open the draft, review it, and send it from your email app.</div>' +
+				'<label class="form-label fw-semibold" for="saveIncidentContactTo">To</label><input id="saveIncidentContactTo" class="form-control mb-3" readonly>' +
+				'<label class="form-label fw-semibold" for="saveIncidentContactSubject">Subject</label><input id="saveIncidentContactSubject" class="form-control mb-3">' +
+				'<label class="form-label fw-semibold" for="saveIncidentContactBody">Message</label><textarea id="saveIncidentContactBody" class="form-control" rows="12"></textarea>' +
+				'<div class="form-text">“Mark User Confirmed” should only be used after the user replies or you verify the data with them.</div></div>' +
+				'<div class="modal-footer"><button type="button" class="btn btn-outline-secondary" id="saveIncidentCopyMessage"><i class="fas fa-copy me-1"></i>Copy Message</button><button type="button" class="btn btn-outline-success" id="saveIncidentMarkContacted"><i class="fas fa-envelope-circle-check me-1"></i>Mark Contacted</button><button type="button" class="btn btn-primary" id="saveIncidentOpenEmail"><i class="fas fa-paper-plane me-1"></i>Open Email Draft</button></div>' +
+				'</div></div>';
+			document.body.appendChild(modal);
+			modal.querySelector('#saveIncidentContactTo').value = row.user_email || '';
+			modal.querySelector('#saveIncidentContactSubject').value = draft.subject;
+			modal.querySelector('#saveIncidentContactBody').value = draft.message;
+			var instance = new bootstrap.Modal(modal);
+			modal.querySelector('#saveIncidentCopyMessage').addEventListener('click', async function() {
+				var subject = modal.querySelector('#saveIncidentContactSubject').value;
+				var message = modal.querySelector('#saveIncidentContactBody').value;
+				try { await navigator.clipboard.writeText('Subject: ' + subject + '\n\n' + message); }
+				catch (error) {
+					var helper = document.createElement('textarea');
+					helper.value = 'Subject: ' + subject + '\n\n' + message;
+					document.body.appendChild(helper);
+					helper.select();
+					document.execCommand('copy');
+					helper.remove();
+				}
+				showToast('Message copied. It has not been sent.', 'success');
+			});
+			modal.querySelector('#saveIncidentOpenEmail').addEventListener('click', function() {
+				var to = modal.querySelector('#saveIncidentContactTo').value;
+				var subject = modal.querySelector('#saveIncidentContactSubject').value;
+				var message = modal.querySelector('#saveIncidentContactBody').value;
+				window.location.href = 'mailto:' + encodeURIComponent(to) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(message);
+			});
+			modal.querySelector('#saveIncidentMarkContacted').addEventListener('click', async function() {
+				try {
+					await callSaveRecoveryAdmin('contacted', operationId);
+					showToast('Contact recorded. This does not mark the incident resolved.', 'success');
+					instance.hide();
+					await loadSaveRecoveryIncidents();
+				} catch (error) { qdAlert(error.message || 'Could not record contact.'); }
+			});
+			modal.addEventListener('hidden.bs.modal', function() { modal.remove(); });
+			instance.show();
+		}
+
+		async function confirmSaveRecoveryIncident(operationId) {
+			if (!await qdConfirm('Only mark this confirmed after the user has checked their current information and said it is correct.', { title: 'Record User Confirmation', okText: 'Mark User Confirmed', okClass: 'btn-success', type: 'warning' })) return;
+			try {
+				await callSaveRecoveryAdmin('confirm', operationId, { note: 'User confirmed the current data is correct.' });
+				showToast('User confirmation recorded and incident marked resolved.', 'success');
+				await loadSaveRecoveryIncidents();
+			} catch (error) { qdAlert(error.message || 'Could not record user confirmation.'); }
+		}
+
 		async function discardSaveRecoveryIncident(operationId) {
-			if (!await qdConfirm('Close this incident without replaying its retained payload?', { title: 'Close Save Incident', okText: 'Close Incident', okClass: 'btn-danger', type: 'warning' })) return;
+			if (!await qdConfirm('Close this incident without applying its retained recovery copy? This does not mean the user confirmed their current information.', { title: 'Close Without Recovery', okText: 'Close Without Recovery', okClass: 'btn-danger', type: 'warning' })) return;
 			try {
 				await callSaveRecoveryAdmin('discard', operationId);
 				await loadSaveRecoveryIncidents();
@@ -4357,6 +4495,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (tab) return tab;
 			var hash = (window.location.hash || '').replace(/^#/, '');
 			if (hash === 'portal-theme') return 'portal';
+			if (hash === 'save-incidents') return 'save-incidents';
 			if (hash.indexOf('tab-') === 0) return hash.replace(/^tab-/, '');
 			return '';
 		}

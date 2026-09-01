@@ -73,6 +73,14 @@ export const AI_USAGE_LIMITS = Object.freeze({
     maxInputChars: 30000,
     maxOutputTokens: 8000,
   }),
+  supplier_import: Object.freeze({
+    feature: 'supplier_import',
+    label: 'AI supplier price import',
+    hourlyLimit: 10,
+    dailyLimit: 40,
+    maxInputChars: 8200000,
+    maxOutputTokens: 8000,
+  }),
   quote_import: Object.freeze({
     feature: 'quote_import',
     label: 'Legacy quote import',

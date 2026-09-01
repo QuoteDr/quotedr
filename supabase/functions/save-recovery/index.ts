@@ -43,6 +43,10 @@ const replayTables = new Set([
 ]);
 
 const blockedKey = /token|secret|password|authorization|stripe.*key|quickbooks.*token|access[_-]?key/i;
+const allowedResolutionStrategies = new Set([
+  "cloud_saved_after_retry", "superseded_by_cloud", "kept_cloud", "kept_device",
+  "restored_as_new", "portal_locked", "admin_replay", "user_confirmed", "closed_without_recovery"
+]);
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -90,21 +94,34 @@ function escapeHtml(value: unknown) {
     .replace(/'/g, "&#039;");
 }
 
+function recoveryDocumentLabel(record: Record<string, unknown>) {
+  const context = (record.document_context || {}) as Record<string, unknown>;
+  const name = text(context.documentName, 300);
+  const number = text(context.documentNumber, 160);
+  if (name && number) return `${name} (${number})`;
+  return name || number || "";
+}
+
 async function sendIncidentEmail(record: Record<string, unknown>, userEmail: string) {
   if (!RESEND_API_KEY || !ALERT_EMAIL) return false;
   const error = (record.last_error || {}) as Record<string, unknown>;
-  const subject = `[QuoteDr save recovery] ${text(record.entity_type, 80)} failed for ${userEmail}`;
+  const documentLabel = recoveryDocumentLabel(record);
+  const subjectContext = documentLabel ? ` - ${documentLabel}` : "";
+  const incidentUrl = `https://quotedr.io/settings.html?tab=save-incidents&saveIncident=${encodeURIComponent(text(record.operation_id, 160))}`;
+  const subject = `[QuoteDr save recovery] ${text(record.entity_label || record.entity_type, 80)}${subjectContext} - ${userEmail}`;
   const html = `<div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;padding:24px;color:#17283e">
     <h2 style="margin:0 0 18px;color:#b42318">A user's save needs recovery</h2>
     <table style="width:100%;border-collapse:collapse">
       <tr><td style="padding:8px;background:#f5f7fa;font-weight:700;width:160px">User</td><td style="padding:8px">${escapeHtml(userEmail)}</td></tr>
       <tr><td style="padding:8px;background:#f5f7fa;font-weight:700">Data</td><td style="padding:8px">${escapeHtml(record.entity_label || record.entity_type)}</td></tr>
+      ${documentLabel ? `<tr><td style="padding:8px;background:#f5f7fa;font-weight:700">Document context</td><td style="padding:8px">${escapeHtml(documentLabel)}</td></tr>` : ""}
       <tr><td style="padding:8px;background:#f5f7fa;font-weight:700">Page</td><td style="padding:8px">${escapeHtml(record.source_page)}</td></tr>
       <tr><td style="padding:8px;background:#f5f7fa;font-weight:700">Attempts</td><td style="padding:8px">${escapeHtml(record.attempts)}</td></tr>
       <tr><td style="padding:8px;background:#f5f7fa;font-weight:700">Error</td><td style="padding:8px">${escapeHtml(error.message || "Unknown save error")}</td></tr>
       <tr><td style="padding:8px;background:#f5f7fa;font-weight:700">Operation</td><td style="padding:8px">${escapeHtml(record.operation_id)}</td></tr>
     </table>
     <p style="margin-top:20px">The failed payload is retained in QuoteDr's admin Save Incidents panel.</p>
+    <p><a href="${escapeHtml(incidentUrl)}" style="display:inline-block;padding:10px 16px;border-radius:6px;background:#1a56a0;color:#fff;text-decoration:none;font-weight:700">Open Save Incident</a></p>
   </div>`;
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -258,7 +275,7 @@ serve(async (req) => {
       }
       const { data: existing } = await service
         .from("save_recovery_records")
-        .select("operation_id,first_failed_at,alert_sent_at")
+        .select("operation_id,first_failed_at,alert_sent_at,document_context,admin_contacted_at")
         .eq("operation_id", operationId)
         .maybeSingle();
       const now = new Date().toISOString();
@@ -274,6 +291,7 @@ serve(async (req) => {
         save_action: ["upsert", "insert", "update", "delete"].includes(operation.saveAction) ? operation.saveAction : "upsert",
         payload: sanitize(operation.payload || {}),
         recovery_target: operation.target ? sanitize(operation.target) : null,
+        document_context: sanitize(operation.context || existing?.document_context || {}),
         status: "pending",
         attempts: Math.max(0, Number(operation.attempts) || 0),
         last_error: sanitize(operation.lastError || {}),
@@ -283,6 +301,11 @@ serve(async (req) => {
         first_failed_at: existing?.first_failed_at || now,
         last_failed_at: now,
         alert_sent_at: existing?.alert_sent_at || null,
+        resolution_strategy: "",
+        resolution_source: "",
+        resolution_note: "",
+        admin_contacted_at: existing?.admin_contacted_at || null,
+        user_confirmed_at: null,
         resolved_at: null,
         updated_at: now,
       };
@@ -299,8 +322,19 @@ serve(async (req) => {
     if (action === "resolve") {
       const operationId = text(body.operationId, 160);
       const now = new Date().toISOString();
+      const requestedStrategy = text(body.strategy, 80);
+      const strategy = allowedResolutionStrategies.has(requestedStrategy) ? requestedStrategy : "cloud_saved_after_retry";
+      const requestedSource = text(body.source, 40);
+      const source = ["user", "admin", "system"].includes(requestedSource) ? requestedSource : "system";
       const { error } = await service.from("save_recovery_records")
-        .update({ status: "resolved", resolved_at: now, updated_at: now })
+        .update({
+          status: "resolved",
+          resolution_strategy: strategy,
+          resolution_source: source,
+          resolution_note: text(body.note, 1000),
+          resolved_at: now,
+          updated_at: now,
+        })
         .eq("operation_id", operationId)
         .eq("user_id", user.id);
       if (error) throw error;
@@ -323,7 +357,13 @@ serve(async (req) => {
       }
       try {
         const data = await replayTarget(record);
-        await service.from("save_recovery_records").update({ status: "resolved", resolved_at: now, updated_at: now }).eq("operation_id", operationId);
+        await service.from("save_recovery_records").update({
+          status: "resolved",
+          resolution_strategy: "admin_replay",
+          resolution_source: "admin",
+          resolved_at: now,
+          updated_at: now,
+        }).eq("operation_id", operationId);
         return json({ success: true, state: "resolved", data });
       } catch (replayError) {
         await service.from("save_recovery_records").update({
@@ -337,10 +377,49 @@ serve(async (req) => {
       }
     }
 
+    if (action === "confirm") {
+      if (!isAdminEmail(user.email)) return json({ error: "Admin access required" }, 403);
+      const operationId = text(body.operationId, 160);
+      const now = new Date().toISOString();
+      const { data, error } = await service.from("save_recovery_records").update({
+        status: "resolved",
+        resolution_strategy: "user_confirmed",
+        resolution_source: "admin",
+        resolution_note: text(body.note, 1000) || "User confirmed the current data is correct.",
+        user_confirmed_at: now,
+        resolved_at: now,
+        updated_at: now,
+      }).eq("operation_id", operationId).select("operation_id").maybeSingle();
+      if (error) throw error;
+      if (!data) return json({ error: "Save incident not found" }, 404);
+      return json({ success: true, state: "resolved" });
+    }
+
+    if (action === "contacted") {
+      if (!isAdminEmail(user.email)) return json({ error: "Admin access required" }, 403);
+      const operationId = text(body.operationId, 160);
+      const now = new Date().toISOString();
+      const { data, error } = await service.from("save_recovery_records")
+        .update({ admin_contacted_at: now, updated_at: now })
+        .eq("operation_id", operationId)
+        .select("operation_id")
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return json({ error: "Save incident not found" }, 404);
+      return json({ success: true, contactedAt: now });
+    }
+
     if (action === "discard") {
       const operationId = text(body.operationId, 160);
       const isAdmin = isAdminEmail(user.email);
-      let query = service.from("save_recovery_records").update({ status: "discarded", resolved_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("operation_id", operationId);
+      const now = new Date().toISOString();
+      let query = service.from("save_recovery_records").update({
+        status: "discarded",
+        resolution_strategy: "closed_without_recovery",
+        resolution_source: isAdmin ? "admin" : "user",
+        resolved_at: now,
+        updated_at: now,
+      }).eq("operation_id", operationId);
       if (!isAdmin) query = query.eq("user_id", user.id);
       const { error } = await query;
       if (error) throw error;

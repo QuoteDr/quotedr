@@ -98,6 +98,7 @@ export const publicArtifactConfig = Object.freeze({
     'save-coordinator.js',
     'signup-gate.js',
     'supabase-v2.js',
+    'supplier-materials.js',
     'sw.js',
     'typed-signature.js',
 

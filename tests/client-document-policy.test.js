@@ -73,6 +73,21 @@ function quoteFixture() {
         markup: 20,
         materialCost: 45,
         supplierUrl: 'https://supplier.example/cabinet',
+        savedItemId: '11111111-1111-4111-8111-111111111111',
+        savedItemSource: { savedItemId: '11111111-1111-4111-8111-111111111111', name: 'Cabinet installation' },
+        materialTakeoffSnapshot: {
+          savedItemId: '11111111-1111-4111-8111-111111111111',
+          totalCost: 90,
+          priceMode: 'frozen',
+          lines: [{
+            supplierProductId: '22222222-2222-4222-8222-222222222222',
+            supplierSku: 'CES-PRIVATE-100',
+            materialName: 'Private supplier material',
+            unitPrice: 45,
+            extendedCost: 90,
+            productUrl: 'https://supplier.example/private-product'
+          }]
+        },
         profitMargin: 44,
         _coOriginal: { quantity: 2, rate: 80, total: 160, materialCost: 30, supplierUrl: 'https://vendor.example/original' }
       }, {
@@ -232,6 +247,9 @@ test('client projection is non-mutating, redacts every nested internal field, an
   assert.equal(room.items[0]._coOriginal.quantity, 2);
   assert.equal(room.items[0].materialCost, undefined);
   assert.equal(room.items[0].supplierUrl, undefined);
+  assert.equal(room.items[0].savedItemId, undefined);
+  assert.equal(room.items[0].savedItemSource, undefined);
+  assert.equal(room.items[0].materialTakeoffSnapshot, undefined);
 
   const choice = room.items[1].choiceGroup;
   assert.equal(choice.options[1].rate, 169);

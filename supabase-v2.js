@@ -614,6 +614,7 @@ async function qdDurableSupabaseOperation(options) {
             action: options.action || options.target.action || 'upsert',
             payload: options.payload,
             target: options.target,
+            context: options.context || null,
             baseVersion: options.baseVersion || null,
             background: options.background === true,
             holdConflict: options.holdConflict === true,

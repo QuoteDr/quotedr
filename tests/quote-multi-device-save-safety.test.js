@@ -76,7 +76,7 @@ assert(
     recoveryEdge.includes('Quote and invoice incidents cannot be replayed over a live document') &&
     settings.includes('function saveIncidentIsDocumentBackup(row)') &&
     settings.includes('active && !documentBackup') &&
-    settings.includes('This is a backup only. It cannot replay over a newer live quote.'),
+    settings.includes('This retained copy is backup-only. It cannot overwrite newer live information automatically.'),
   'admin recovery must keep quote incidents exportable without allowing destructive replay'
 );
 

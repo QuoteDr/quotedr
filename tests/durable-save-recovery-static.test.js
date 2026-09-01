@@ -12,6 +12,7 @@ const settings = read('settings.html');
 const dashboard = read('dashboard.html');
 const migration = read('supabase/migrations/20260712150000_save_recovery_records.sql');
 const adminEmailMigration = read('supabase/migrations/20260802031656_add_admin_email_routing.sql');
+const contextMigration = read('supabase/migrations/20260901111856_save_recovery_context_resolution.sql');
 const edge = read('supabase/functions/save-recovery/index.ts');
 const emailEdge = read('supabase/functions/send-quote-email/index.ts');
 const qbEdge = read('supabase/functions/qb-sync/index.ts');
@@ -187,6 +188,29 @@ assert(
 );
 
 assert(
+  coordinator.includes('context: recoveryContext(options, payload)') &&
+    coordinator.includes('context: redactSensitive(operation.context || {})') &&
+    coordinator.includes("strategy: 'kept_cloud'") &&
+    coordinator.includes("strategy: 'kept_device'") &&
+    coordinator.includes("'closed_without_recovery'") &&
+    !coordinator.includes('if (!operation || !operation.vaultedAt) return;'),
+  'Recovery captures should retain minimized document context and report explicit user resolution choices even if the vault acknowledgement was interrupted'
+);
+
+assert(
+  settings.includes('Contact User') &&
+    settings.includes('Mark User Confirmed') &&
+    settings.includes('Close Without Recovery') &&
+    settings.includes('A temporary recovery copy was retained.') &&
+    settings.includes('QuoteDr prepares the message but never sends it automatically.') &&
+    settings.includes('Open Email Draft') &&
+    settings.includes("callSaveRecoveryAdmin('contacted'") &&
+    settings.includes("callSaveRecoveryAdmin('confirm'") &&
+    settings.includes("get('saveIncident')"),
+  'Administrators should see context, prepare honest user messages, record contact separately, and require explicit confirmation before resolving an incident'
+);
+
+assert(
   migration.includes('create table if not exists public.save_recovery_records') &&
     migration.includes('alter table public.save_recovery_records enable row level security') &&
     migration.includes("interval '90 days'") &&
@@ -202,13 +226,27 @@ assert(
 );
 
 assert(
+  contextMigration.includes('document_context jsonb') &&
+    contextMigration.includes('resolution_strategy text') &&
+    contextMigration.includes('resolution_source text') &&
+    contextMigration.includes('admin_contacted_at timestamptz') &&
+    contextMigration.includes('user_confirmed_at timestamptz'),
+  'Recovery records should store minimized working context, explicit outcomes, contact, and user confirmation timestamps'
+);
+
+assert(
   edge.includes('authenticatedUser(req)') &&
     edge.includes('validateRecoveryOperation(operation)') &&
     edge.includes('allowedEntityTypes') &&
     edge.includes('replayTables') &&
     edge.includes('QUOTEDR_SAVE_ALERT_EMAIL') &&
     edge.includes('alert_sent_at') &&
-  edge.includes('sanitize(operation.payload') &&
+    edge.includes('sanitize(operation.payload') &&
+    edge.includes('document_context: sanitize(operation.context') &&
+    edge.includes('action === "confirm"') &&
+    edge.includes('action === "contacted"') &&
+    edge.includes('resolution_strategy: "user_confirmed"') &&
+    edge.includes('tab=save-incidents&saveIncident=') &&
     edge.includes('target.dedupe?.filters?.length') &&
     edge.includes('Quote and invoice recovery records are backup-only'),
   'The recovery function should authenticate, validate, redact, deduplicate alerts, replay only allowlisted targets, and never replay document backups'
