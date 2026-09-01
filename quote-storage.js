@@ -1230,6 +1230,14 @@
             if (document.getElementById('clientEmail'))    document.getElementById('clientEmail').value    = data.clientEmail || data.email || '';
             renderTermsCheckboxes(getQuoteTermsForRender(data));
             rooms = data.rooms || [];
+            var roomAiScopeDefault = typeof getRoomAiScopePreferences === 'function'
+                ? getRoomAiScopePreferences().automaticDefault === true
+                : false;
+            rooms.forEach(function(room) {
+                if (!room) return;
+                if (room.aiScopeAutomaticSource === 'account') room.aiScopeAutomatic = roomAiScopeDefault;
+                else if (room.aiScopeAutomatic === undefined) room.aiScopeAutomatic = false;
+            });
             window._zeroUpgradeQuantityWarningsDismissed = data.zeroUpgradeQuantityWarningsDismissed === true;
             window._quoteReviewProfile = data.reviewProfile || null;
             if (data.categoryStyles && typeof categoryStyles !== 'undefined') {
@@ -1331,6 +1339,7 @@
                 clearTimeout(_autoSaveTimer);
                 _autoSaveTimer = setTimeout(function() { doAutoSave(); }, 1000);
             }
+            if (typeof scheduleAutomaticRoomScopes === 'function') scheduleAutomaticRoomScopes();
         }
 
         async function writeToHandle(handle) {

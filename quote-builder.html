@@ -14403,6 +14403,13 @@ Example:
         function renderRooms() {
             const container = document.getElementById('roomsContainer');
             ensureUniqueRoomIds();
+            const roomAiScopeDefault = getRoomAiScopePreferences().automaticDefault === true;
+            rooms.forEach(function(room) {
+                if (room && room.aiScopeAutomatic === undefined) {
+                    room.aiScopeAutomatic = roomAiScopeDefault;
+                    room.aiScopeAutomaticSource = 'account';
+                }
+            });
             const automaticPropertyMarkupRoomsUpdated = window.QuoteDrPropertyMemory && typeof window.QuoteDrPropertyMemory.applyAutomaticMarkupToUnmarkedRooms === 'function'
                 ? window.QuoteDrPropertyMemory.applyAutomaticMarkupToUnmarkedRooms({ render: false, persist: false, undo: false })
                 : 0;
@@ -14535,7 +14542,10 @@ Example:
                 html += '<div class="mt-2 mb-2">';
                 html += '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-1">';
                 html += '<label class="mb-0"><small><i class="fas fa-clipboard-list"></i> <strong>Scope / Notes</strong> <span class="text-muted">(visible to client)</span></small></label>';
+                html += '<div class="d-flex align-items-center gap-1">';
+                html += '<button type="button" class="btn btn-sm ' + (room.aiScopeAutomatic === true ? 'btn-success' : 'btn-outline-secondary') + '" id="aiScopeAutoBtn_' + room.id + '" aria-pressed="' + (room.aiScopeAutomatic === true ? 'true' : 'false') + '" onclick="toggleRoomAiScopeAutomatic(' + room.id + ', this)" title="Keep this room&apos;s scope synchronized with its line items"><i class="fas ' + (room.aiScopeAutomatic === true ? 'fa-toggle-on' : 'fa-toggle-off') + ' me-1"></i>AUTO</button>';
                 html += '<button type="button" class="btn btn-sm btn-outline-primary" id="aiScopeBtn_' + room.id + '" onclick="generateRoomScopeNotes(' + room.id + ', this)" title="Build a client-facing scope from this room&apos;s line items"><i class="fas fa-magic me-1"></i>AI Scope</button>';
+                html += '</div>';
                 html += '</div>';
                 html += '<textarea id="scopeNotes_' + room.id + '" class="form-control form-control-sm" rows="3" placeholder="Describe the scope of work for this room..." spellcheck="true" onchange="updateRoomScopeNotes(' + room.id + ')">' + qdTemplateEscapeHtml(roomNotes) + '</textarea>';
                 html += '</div>';
@@ -14852,20 +14862,184 @@ Example:
                 .trim();
         }
 
-        async function generateRoomScopeNotes(roomId, btnEl) {
+        var _roomAiScopeTimers = {};
+        var _roomAiScopeGenerating = {};
+        var ROOM_AI_SCOPE_PREFERENCE_KEY = 'ald_room_ai_scope_preferences';
+        var _roomAiScopePreferenceRestored = false;
+
+        function getRoomAiScopePreferences() {
+            var stored = {};
+            try { stored = JSON.parse(localStorage.getItem(ROOM_AI_SCOPE_PREFERENCE_KEY) || '{}'); } catch (error) { stored = {}; }
+            return { automaticDefault: stored.automaticDefault === true };
+        }
+
+        function writeRoomAiScopePreferences(preferences) {
+            var normalized = { automaticDefault: !!(preferences && preferences.automaticDefault === true) };
+            localStorage.setItem(ROOM_AI_SCOPE_PREFERENCE_KEY, JSON.stringify(normalized));
+            return normalized;
+        }
+
+        function applyRoomAiScopeAccountPreference(enabled, options) {
+            options = options || {};
+            var changed = false;
+            (rooms || []).forEach(function(room) {
+                if (!room || (!options.applyAll && room.aiScopeAutomaticSource !== 'account')) return;
+                if (room.aiScopeAutomatic !== enabled || room.aiScopeAutomaticSource !== 'account') changed = true;
+                room.aiScopeAutomatic = enabled;
+                room.aiScopeAutomaticSource = 'account';
+                if (!enabled) {
+                    clearTimeout(_roomAiScopeTimers[room.id]);
+                    delete _roomAiScopeTimers[room.id];
+                }
+                updateRoomAiScopeButton(room.id);
+            });
+            if (changed && options.markUnsaved !== false && typeof markUnsaved === 'function') markUnsaved();
+            if (enabled) scheduleAutomaticRoomScopes();
+            return changed;
+        }
+
+        async function restoreRoomAiScopePreferences() {
+            if (_roomAiScopePreferenceRestored) return getRoomAiScopePreferences();
+            _roomAiScopePreferenceRestored = true;
+            try {
+                if (_supabase && _supabase.auth) {
+                    var userResult = await _supabase.auth.getUser();
+                    var user = userResult && userResult.data && userResult.data.user;
+                    if (user) {
+                        var result = await _supabase.from('user_data').select('value').eq('user_id', user.id).eq('key', 'room_ai_scope_preferences').maybeSingle();
+                        if (!result.error && result.data && result.data.value) writeRoomAiScopePreferences(result.data.value);
+                    }
+                }
+            } catch (error) {
+                console.warn('Room AI Scope preference restore failed:', error);
+            }
+            var preferences = getRoomAiScopePreferences();
+            applyRoomAiScopeAccountPreference(preferences.automaticDefault === true);
+            return preferences;
+        }
+
+        function setRoomAiScopeDefault(enabled, options) {
+            options = options || {};
+            var preferences = writeRoomAiScopePreferences({ automaticDefault: enabled === true });
+            applyRoomAiScopeAccountPreference(preferences.automaticDefault, {
+                applyAll: options.applyAll === true,
+                markUnsaved: options.markUnsaved !== false
+            });
+            if (typeof saveUserDataValue === 'function') {
+                saveUserDataValue('room_ai_scope_preferences', preferences, {
+                    entityType: 'quote_preferences',
+                    entityLabel: 'Room AI Scope preferences',
+                    localStorageKey: ROOM_AI_SCOPE_PREFERENCE_KEY,
+                    background: true
+                }).catch(function(error) { console.warn('Room AI Scope preference save failed:', error); });
+            }
+            return preferences;
+        }
+
+        function roomScopeAiFingerprint(payload) {
+            return JSON.stringify(payload || {});
+        }
+
+        function updateRoomAiScopeButton(roomId) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            var button = document.getElementById('aiScopeAutoBtn_' + roomId);
+            if (!room || !button) return;
+            var enabled = room.aiScopeAutomatic === true;
+            button.className = 'btn btn-sm ' + (enabled ? 'btn-success' : 'btn-outline-secondary');
+            button.innerHTML = '<i class="fas ' + (enabled ? 'fa-toggle-on' : 'fa-toggle-off') + ' me-1"></i>AUTO';
+            button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        }
+
+        async function roomAutomaticAiAllowed() {
+            if (window._quotedrActiveProTrials && window._quotedrActiveProTrials.ai_refine) return true;
+            if (typeof isCurrentUserPro === 'function') return !!(await isCurrentUserPro());
+            return true;
+        }
+
+        async function toggleRoomAiScopeAutomatic(roomId) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room) return;
+            var enabling = room.aiScopeAutomatic !== true;
+            var choice = await qdConfirm(enabling
+                ? 'Automatic AI Scope keeps client-facing scope synchronized with line items and may replace manual edits when work changes. Choose this room only, or turn AUTO on for every room in this quote and make it the account-wide default for new rooms and future quotes.'
+                : 'The current scope will stay as-is. Turn AUTO off for this room only, or disable every room in this quote and the account-wide default for new rooms and future quotes.', {
+                title: enabling ? 'Turn On Automatic AI Scope?' : 'Turn Off Automatic AI Scope?',
+                okText: enabling ? 'This Room Only' : 'Turn Off This Room',
+                okClass: 'btn-outline-primary',
+                secondaryText: enabling ? 'Turn AUTO On for All Rooms' : 'Turn Off for All Rooms',
+                secondaryValue: 'all_rooms',
+                secondaryClass: enabling ? 'btn-success' : 'btn-warning',
+                type: enabling ? 'info' : 'warning'
+            });
+            if (choice === false) return;
+            if (enabling && typeof requireProFeature === 'function') {
+                var allowed = await requireProFeature('ai_refine', 'Automatic AI Scope');
+                if (!allowed) return;
+            }
+            if (choice === 'all_rooms') {
+                setRoomAiScopeDefault(enabling, { applyAll: true });
+                if (typeof showToast === 'function') showToast(enabling
+                    ? 'Automatic AI Scope is on for all rooms and future quotes.'
+                    : 'Automatic AI Scope is off for all rooms and future quotes.', 'info');
+                return;
+            }
+            room.aiScopeAutomatic = enabling;
+            room.aiScopeAutomaticSource = 'room';
+            if (!enabling) {
+                clearTimeout(_roomAiScopeTimers[roomId]);
+                delete _roomAiScopeTimers[roomId];
+            }
+            markUnsaved();
+            updateRoomAiScopeButton(roomId);
+            if (enabling) scheduleAutomaticRoomScope(roomId, { immediate: true });
+        }
+
+        function scheduleAutomaticRoomScope(roomId, options) {
+            options = options || {};
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room || room.aiScopeAutomatic !== true || _roomAiScopeGenerating[roomId]) return;
+            var payload = buildRoomScopeAiPayload(room);
+            if (!payload.items.length) return;
+            var fingerprint = roomScopeAiFingerprint(payload);
+            if (room.aiScopeAutoFingerprint === fingerprint && String(room.scopeNotes || '').trim()) return;
+            clearTimeout(_roomAiScopeTimers[roomId]);
+            _roomAiScopeTimers[roomId] = setTimeout(function() {
+                delete _roomAiScopeTimers[roomId];
+                generateRoomScopeNotes(roomId, null, { automatic: true }).catch(function(error) {
+                    console.warn('Automatic room AI Scope failed:', error);
+                });
+            }, options.immediate ? 0 : 1400);
+        }
+
+        function scheduleAutomaticRoomScopes() {
+            if (!Array.isArray(rooms)) return;
+            rooms.forEach(function(room) {
+                if (room && room.aiScopeAutomatic === true) scheduleAutomaticRoomScope(room.id);
+            });
+        }
+
+        async function generateRoomScopeNotes(roomId, btnEl, options) {
+            options = options || {};
+            var automatic = options.automatic === true;
             var room = rooms.find(function(r) { return r.id === roomId; });
             if (!room) return;
             var payload = buildRoomScopeAiPayload(room);
             if (!payload.items.length) {
-                qdAlert('Add items to this room first so AI can build a scope.');
+                if (!automatic) qdAlert('Add items to this room first so AI can build a scope.');
                 return;
             }
-            if (typeof requireProFeature === 'function') {
+            var fingerprint = roomScopeAiFingerprint(payload);
+            if (automatic) {
+                if (room.aiScopeAutomatic !== true || _roomAiScopeGenerating[roomId]) return;
+                if (room.aiScopeAutoFingerprint === fingerprint && String(room.scopeNotes || '').trim()) return;
+                if (!(await roomAutomaticAiAllowed())) return;
+            } else if (typeof requireProFeature === 'function') {
                 var allowed = await requireProFeature('ai_refine', 'AI Scope');
                 if (!allowed) return;
             }
             var btn = btnEl || document.getElementById('aiScopeBtn_' + roomId);
             var originalHtml = btn ? btn.innerHTML : '';
+            _roomAiScopeGenerating[roomId] = true;
             if (btn) {
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Writing...';
@@ -14884,12 +15058,16 @@ Example:
                 if (!generated) throw new Error('AI did not return scope text. Please try again.');
                 var textarea = document.getElementById('scopeNotes_' + roomId);
                 var current = textarea ? textarea.value.trim() : (room.scopeNotes || '').trim();
-                var combined = current ? current + '\n\n' + generated : generated;
+                var combined = (automatic || room.aiScopeAutomatic === true) ? generated : (current ? current + '\n\n' + generated : generated);
                 room.scopeNotes = combined;
+                if (room.aiScopeAutomatic === true) {
+                    room.aiScopeAutoFingerprint = fingerprint;
+                    room.aiScopeAutoGeneratedText = generated;
+                }
                 if (textarea) textarea.value = combined;
                 markUnsaved();
-                if (typeof completeProTrialFeature === 'function') completeProTrialFeature('ai_refine', 'AI Scope');
-                if (typeof qdMaybeShowProUpgradePrompt === 'function') {
+                if (!automatic && typeof completeProTrialFeature === 'function') completeProTrialFeature('ai_refine', 'AI Scope');
+                if (!automatic && typeof qdMaybeShowProUpgradePrompt === 'function') {
                     qdMaybeShowProUpgradePrompt('ai_scope_success', {
                         featureKey: 'ai_refine',
                         featureLabel: 'AI Scope',
@@ -14898,8 +15076,9 @@ Example:
                 }
             } catch (error) {
                 console.error('AI Scope failed:', error);
-                qdAlert(error.message || 'AI Scope failed. Please try again.');
+                if (!automatic) qdAlert(error.message || 'AI Scope failed. Please try again.');
             } finally {
+                delete _roomAiScopeGenerating[roomId];
                 if (btn) {
                     btn.disabled = false;
                     btn.innerHTML = originalHtml;
@@ -19074,6 +19253,7 @@ Example:
         updateQuoteDividerLabels();
         renderRooms();
         restoreChangeOrderScopePreferences().catch(function(){});
+        restoreRoomAiScopePreferences().catch(function(){});
 
         if (typeof renderTemplateDropdown === 'function') renderTemplateDropdown();
         renderTermsCheckboxes();
