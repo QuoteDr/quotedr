@@ -8644,6 +8644,7 @@ Example:
             item.description = savedItem.name || item.description || '';
             item.unitType = savedItem.unitType || savedItem.unit || item.unitType || '';
             item.itemDescription = savedItem.itemDescription || '';
+            syncSavedItemDescriptionIntoChoiceGroup(item, category, savedItem);
             item.materialCost = parseFloat(savedItem.materialCost !== undefined ? savedItem.materialCost : savedItem.material_cost) || 0;
             item.priceTbd = isQuotePriceTbd(savedItem);
             item.pricingMode = item.priceTbd ? 'tbd' : 'fixed';
@@ -9701,6 +9702,7 @@ Example:
                     item.pricingMode = priceTbd ? 'tbd' : 'fixed';
                     item.notes = notes;
                     item.itemDescription = itemDescription;
+                    syncSelectedChoiceGroupItemDescription(item, itemDescription);
                     item.materialCost = materialCost;
                     item.supplierUrl = getLineItemSupplierUrlFromForm();
                     item.laborTime = normalizeLaborTime(item.laborTime);
@@ -10424,6 +10426,44 @@ Example:
             return item;
         }
 
+        function getChoiceGroupOptionItemDescription(option, fallbackDescription) {
+            option = option || {};
+            var optionNameKey = quoteUpgradeRuntimeTextKey(option.name || option.sourceItemName || '');
+            var candidates = [option.itemDescription, option.description];
+            for (var index = 0; index < candidates.length; index++) {
+                var candidate = String(candidates[index] || '').trim();
+                if (!candidate) continue;
+                if (!optionNameKey || quoteUpgradeRuntimeTextKey(candidate) !== optionNameKey) return candidate;
+            }
+            return String(fallbackDescription || '').trim();
+        }
+
+        function syncSavedItemDescriptionIntoChoiceGroup(item, category, savedItem) {
+            if (!item || !item.choiceGroup || !Array.isArray(item.choiceGroup.options) || !savedItem) return item;
+            var savedName = savedItem.name || savedItem.description || savedItem.serviceName || '';
+            var savedDescription = String(savedItem.itemDescription || savedItem.displayDescription || '').trim();
+            if (!savedName || !savedDescription) return item;
+            var savedKey = choiceGroupMatchKey(category || item.category || '', savedName);
+            item.choiceGroup.options.forEach(function(option) {
+                if (!option) return;
+                var optionCategory = option.category || category || item.category || '';
+                var optionName = option.sourceItemName || option.name || option.description || option.serviceName || '';
+                if (choiceGroupMatchKey(optionCategory, optionName) === savedKey) {
+                    option.itemDescription = savedDescription;
+                }
+            });
+            return item;
+        }
+
+        function syncSelectedChoiceGroupItemDescription(item, itemDescription) {
+            if (!item || !item.choiceGroup || !Array.isArray(item.choiceGroup.options)) return item;
+            var description = String(itemDescription || '').trim();
+            getChoiceGroupSelectedOptions(item.choiceGroup).forEach(function(option) {
+                if (option) option.itemDescription = description;
+            });
+            return item;
+        }
+
         function applyChoiceGroupEnhancementsToItem(item, baseState) {
             if (!item || !item.choiceGroup) return baseState;
             var baseQty = parseFloat(item.quantity) || 0;
@@ -10536,7 +10576,7 @@ Example:
                     photoFull: option.photoFull || item._choiceGroupBasePhotoFull || null,
                     photos: normalizeQuoteUpgradePhotos(option).length ? normalizeQuoteUpgradePhotos(option) : (Array.isArray(item._choiceGroupBasePhotos) ? item._choiceGroupBasePhotos.slice() : []),
                     photosFull: normalizeQuoteUpgradePhotosFull(option).length ? normalizeQuoteUpgradePhotosFull(option) : (Array.isArray(item._choiceGroupBasePhotosFull) ? item._choiceGroupBasePhotosFull.slice() : []),
-                    itemDescription: option.itemDescription || option.description || item.itemDescription || '',
+                    itemDescription: getChoiceGroupOptionItemDescription(option, item.itemDescription),
                     laborTime: normalizeLaborTime(option.laborTime || item.laborTime)
                 };
             } else {
@@ -11338,6 +11378,10 @@ Example:
                 var savedMatch = findSavedItemForChoiceGroupOption(next, fallbackCategory);
                 if (!savedMatch || !savedMatch.item) return next;
                 var saved = savedMatch.item;
+                var savedDescription = String(saved.itemDescription || saved.displayDescription || '').trim();
+                if (savedDescription && !getChoiceGroupOptionItemDescription(next, '')) {
+                    next.itemDescription = savedDescription;
+                }
                 if (saved.upgrade && saved.upgrade.name) next.upgrade = cloneSavedItemForQuoteSync(saved.upgrade);
                 if (saved.photo && !next.photo) next.photo = saved.photo;
                 if (saved.photoFull && !next.photoFull) next.photoFull = saved.photoFull;

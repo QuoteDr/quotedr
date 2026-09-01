@@ -71,6 +71,7 @@ const context = {
   getLineItemSupplierUrlFromForm: () => '',
   normalizeLaborTime: value => value || null,
   normalizeQuoteItemUpgradeGroups: () => [],
+  syncSelectedChoiceGroupItemDescription: () => {},
   getSavedItemFingerprintForQuoteSync: () => '',
   applyLineDiscountFields: () => {},
   coRefreshItemDelta: () => {},
