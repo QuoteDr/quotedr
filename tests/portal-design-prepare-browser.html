@@ -1,0 +1,4 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Local design preparation test</title><link rel="stylesheet" href="/portal-designs.css"><style>body{font:16px system-ui;margin:24px}button,input,select,textarea{font:inherit;padding:8px}button{cursor:pointer}</style><h1>Local-only design preparation test</h1><p>No portal or cloud writes. Select a local export to exercise the real upload and preview controls.</p><main id="designs"></main><script type="module">
+import {mountDesignLibrary} from '/portal-designs.js';
+mountDesignLibrary(document.querySelector('#designs'),{isOwner:true,shareBase:location.href,request:async data=>{if(data.action==='list')return {designs:[]};throw new Error('Cloud writes are disabled in this local test.');}});
+</script></html>

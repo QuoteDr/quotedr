@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 118,
-  "totalBytes": 26191115,
-  "treeSha256": "b2d257a108358bdfbb55c84cbf4e2b1599499ccd5f25623a8ee6998f50b4c8dd",
+  "fileCount": 121,
+  "totalBytes": 27600827,
+  "treeSha256": "1e4856c639e41f2da1c692e876180f0ca268705f1c1d8df8650ecc95777ac5fa",
   "files": [
     {
       "path": "404.html",
@@ -157,8 +157,8 @@
     },
     {
       "path": "client-portal.html",
-      "bytes": 225927,
-      "sha256": "33203e55eff238567229c23093be2a901b3a446eb8334fd37d57a3ebe1e30f66"
+      "bytes": 225940,
+      "sha256": "48aa5e4782503d7513d4eb748e867846f43200a114e0dce3ce908c298637531d"
     },
     {
       "path": "community-starter-templates.js",
@@ -301,14 +301,19 @@
       "sha256": "77690a85d00c1549a86f6da2deb3d0cf4f4f14bd298c0cd4a6130358bdd40a4d"
     },
     {
+      "path": "portal-design-prepare.mjs",
+      "bytes": 3952,
+      "sha256": "3da1619a8f3c88f2c908c1bbf006ba2ad281072526c92635ba284cb7968dee62"
+    },
+    {
       "path": "portal-designs.css",
       "bytes": 2597,
       "sha256": "634c8bf250e46ff396beb1c51617a47290dca6365511184099803b07f8289f9d"
     },
     {
       "path": "portal-designs.js",
-      "bytes": 13067,
-      "sha256": "f294da4660c9154b43a102ae94c151d0fec4b3666acff67116ecaa72c0164f0c"
+      "bytes": 13995,
+      "sha256": "8420bb8e541a745ee4b53b28c3beaba507592d026abfaa614093cb75b2ca50b5"
     },
     {
       "path": "portal-theme-studio.html",
@@ -514,6 +519,16 @@
       "path": "typed-signature.js",
       "bytes": 5326,
       "sha256": "69c1d1491bee9ea4a457cf6e077105714ad21c4191f7c06afe9088a198ab554f"
+    },
+    {
+      "path": "vendor/design-runtime-1/LICENSE",
+      "bytes": 5523,
+      "sha256": "c53b5f6e03e5623da2c4246a528df3aea06e1e7f95c08cb4d126dfb981cc3cce"
+    },
+    {
+      "path": "vendor/design-runtime-1/runtime.json",
+      "bytes": 1399296,
+      "sha256": "1e96c8a12696f06c05304439367692c5de25fd01d48ac2ef662a33eb3c590f8d"
     },
     {
       "path": "vendor/pdfjs-6.3.289/LICENSE",

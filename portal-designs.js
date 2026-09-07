@@ -1,4 +1,5 @@
 import { designInput, MAX_DESIGN_BYTES } from './portal-design-policy.mjs';
+import {prepareDesignHtml} from './portal-design-prepare.mjs';
 
 const el = (tag,text,className) => { const node=document.createElement(tag); if(text != null)node.textContent=text; if(className)node.className=className; return node; };
 const button = (text,fn,style='btn btn-outline-primary btn-sm') => { const b=el('button',text,style);b.type='button';b.onclick=fn;return b; };
@@ -11,10 +12,6 @@ export function isolatedDesignHtml(html) {
   // can tighten this policy but cannot relax it.
   const policy="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; font-src data:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'";
   return '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="'+policy+'"><meta name="referrer" content="no-referrer"></head><body>'+html+'</body></html>';
-}
-function validateSelfContained(html) {
-  // Convenience check, NOT a security boundary. The sandbox/CSP enforce isolation.
-  if (/<(?:iframe|frame|object|embed)\b|<script\b[^>]*\bsrc\s*=|<link\b[^>]*stylesheet/i.test(html) || /\bimport\s*(?:\(|[^;\n]*?\bfrom\s*|["'])/.test(html)) throw new Error('This HTML needs external files. Export a self-contained HTML viewer with its libraries and model included, then preview it here.');
 }
 function dialog(title,full=false) {
   const d=el('dialog',null,'qd-design-dialog'+(full?' qd-design-full':''));
@@ -60,7 +57,8 @@ export async function showDesign(read, title) {
       else {await renderDrawingPdf(bytes,body,d);}
       const download=el('a','Download drawing','btn btn-outline-primary');download.href=url;download.download=title+(result.mime==='application/pdf'?'.pdf':result.mime==='image/jpeg'?'.jpg':result.mime==='image/webp'?'.webp':'.png');body.append(download);
     }
-  }catch(error){body.textContent=error.message;body.className='qd-design-error';}
+    return true;
+  }catch(error){body.textContent=error.message;body.className='qd-design-error';return false;}
 }
 
 export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase}) {
@@ -106,22 +104,24 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase}) {
     input('version','Version','text',previous?String(Number(previous.version)+1 || previous.version):'1');
     input('note','Note for the client','textarea',previous?.note||'');
     const label=el('label','Design type');const kind=el('select');label.append(kind);f.append(label);
-    for(const [v,t]of [['link','External design link'],['image','Image rendering'],['pdf','PDF drawing'],['interactive','Self-contained interactive HTML']]){const o=el('option',t);o.value=v;kind.append(o);}kind.value=previous?.kind||'link';
+    for(const [v,t]of [['link','External design link'],['image','Image rendering'],['pdf','PDF drawing'],['interactive','Interactive HTML (automatic preparation)']]){const o=el('option',t);o.value=v;kind.append(o);}kind.value=previous?.kind||'link';
     const url=input('url','HTTPS design link','url');
     if(previous?.kind==='link')request({action:'read',id:previous.id}).then(r=>{if(!url.value)url.value=r.url||'';}).catch(e=>{error.textContent=e.message;});
     const file=input('file','Choose file (maximum 8 MB)','file');
-    const help=el('p','External links keep their provider’s access settings. Interactive HTML runs in an isolated preview without network access. Please preview before publishing.');f.append(help);
+    const help=el('p','QuoteDr prepares supported Three.js 0.160.1 HTML viewers on this device. Other viewers must be self-contained or shared as an External design link. Uploaded HTML runs in an isolated preview without network access. Preview and test the controls before publishing.');f.append(help);
     const reviewed=input('reviewed','I previewed this interactive design and its controls work.','checkbox');
     const error=el('p','', 'qd-design-error');error.setAttribute('role','status');f.append(error);
-    const preview=button('Preview selected file',async()=>{try{const data=await filePayload();await showDesign(async()=>data,fields.title.value||'Design preview');}catch(e){error.textContent=e.message;}});f.append(preview);
+    let preparedFile=null,preparedPayload=null,previewedFile=null;
+    const preview=button('Prepare & preview selected file',async()=>{preview.disabled=true;reviewed.checked=false;reviewed.disabled=true;error.textContent='Preparing viewer…';try{const selected=file.files[0],selectedKind=kind.value;const data=await filePayload();if(selected!==file.files[0]||selectedKind!==kind.value)return;const opened=await showDesign(async()=>data,fields.title.value||'Design preview');if(!opened||selected!==file.files[0]||selectedKind!==kind.value)return;previewedFile=selected;reviewed.disabled=false;error.textContent='Preview opened. Test the model and controls, then confirm below before publishing.';}catch(e){error.textContent=e.message;}finally{preview.disabled=false;}});f.append(preview);
     const save=el('button',previous?'Publish replacement':'Add to portal','btn btn-primary');save.type='submit';f.append(save);
     function changed(){const link=kind.value==='link';url.parentElement.hidden=!link;file.parentElement.hidden=link;reviewed.parentElement.hidden=kind.value!=='interactive';preview.hidden=link;file.accept=kind.value==='interactive'?'.html':kind.value==='pdf'?'.pdf':'.png,.jpg,.jpeg,.webp';reviewed.checked=false;}
-    kind.onchange=changed;file.onchange=()=>{reviewed.checked=false;};changed();
-    async function filePayload(){const selected=file.files[0];if(!selected)throw new Error('Choose a file to preview.');if(selected.size>MAX_DESIGN_BYTES)throw new Error('Choose a file under 8 MB.');const bytes=new Uint8Array(await selected.arrayBuffer());const mime=kind.value==='interactive'?'text/html':selected.type;
-      if(kind.value==='interactive')validateSelfContained(new TextDecoder().decode(bytes));return{kind:kind.value,mime,size:bytes.length,base64:binary64(bytes)};}
+    function resetPreparation(){preparedFile=preparedPayload=previewedFile=null;reviewed.checked=false;reviewed.disabled=true;error.textContent='';}
+    kind.onchange=()=>{changed();resetPreparation();};file.onchange=resetPreparation;changed();resetPreparation();
+    async function filePayload(){const selected=file.files[0],selectedKind=kind.value;if(!selected)throw new Error('Choose a file to preview.');if(selected.size>MAX_DESIGN_BYTES)throw new Error('Choose a file under 8 MB.');if(preparedFile===selected&&preparedPayload?.kind===selectedKind)return preparedPayload;let bytes=new Uint8Array(await selected.arrayBuffer());const mime=selectedKind==='interactive'?'text/html':selected.type;
+      if(selectedKind==='interactive'){const result=await prepareDesignHtml(new TextDecoder().decode(bytes));bytes=new TextEncoder().encode(result.html);}if(selected!==file.files[0]||selectedKind!==kind.value)throw new Error('The selected file changed. Please preview it again.');const payload={kind:selectedKind,mime,size:bytes.length,base64:binary64(bytes)};preparedFile=selected;preparedPayload=payload;return payload;}
     f.onsubmit=async event=>{event.preventDefault();save.disabled=true;error.textContent='Saving…';try{
       const keepFile=previous&&previous.kind===kind.value&&kind.value!=='link'&&!file.files[0];
-      if(kind.value==='interactive'&&!keepFile&&!reviewed.checked)throw new Error('Preview the interactive design and confirm its controls work first.');
+      if(kind.value==='interactive'&&!keepFile&&(!reviewed.checked||previewedFile!==file.files[0]))throw new Error('Preview the interactive design and confirm its controls work first.');
       const data={action:'save',id:previous?.id,baseVersion:previous?.updated_at,title:fields.title.value,project:fields.project.value,version:fields.version.value,note:fields.note.value,kind:kind.value,url:url.value,...(kind.value==='link'?{}:keepFile?{keepFile:true,mime:previous.mime_type,size:previous.size_bytes}:await filePayload())};designInput(data);
       await request(data);d.close();await refresh();status.textContent='Design saved to the portal.';
     }catch(e){error.textContent=e.message;}finally{save.disabled=false;}};
