@@ -55,7 +55,7 @@ assert.match(builder, /<details id="lineItemUpgradePanel"[^>]*>/);
 assert(!/<details id="lineItemUpgradePanel"[^>]*\bopen\b/.test(builder));
 assert(builder.includes('applyLineItemUpgradeDraft(item, previousUpgradeGroups)'));
 assert(builder.includes('quote-items.js?v=2026090701'), 'new HTML must request the matching item-editor script');
-assert(builder.includes('quote-storage.js?v=2026090701'), 'quote storage must use the matching release');
+assert(builder.includes('quote-storage.js?v=2026090702'), 'quote storage must use the matching release');
 assert(builder.includes("typeof window.getLineItemUpgradeDraft !== 'function'"), 'mixed-version pages must warn before opening an incompatible wizard');
 assert(builder.includes('if (window.lineItemUpgradesWereEdited?.()) {\n                savedItem.upgradeGroups = window.getLineItemUpgradeDraft();'));
 console.log('Quote-only upgrade draft isolation, wizard save, removal, reopening and opt-in persistence passed.');

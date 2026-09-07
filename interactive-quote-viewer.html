@@ -2845,7 +2845,16 @@ if (location.search.includes('debug')) {
         };
 
         function quoteViewerCategoryStyle(catName) {
+            // Quote-only choices are stored with rooms, including older saved quotes
+            // whose top-level categoryStyles snapshot did not include them.
+            var roomStyles = {};
+            (quoteData && Array.isArray(quoteData.rooms) ? quoteData.rooms : []).forEach(function(room) {
+                Object.keys(room.quoteCategoryStyles || {}).forEach(function(cat) {
+                    roomStyles[cat] = Object.assign({}, quoteData.categoryStyles && quoteData.categoryStyles[cat] || {}, roomStyles[cat] || {}, room.quoteCategoryStyles[cat]);
+                });
+            });
             var sources = [
+                roomStyles,
                 quoteData && quoteData.categoryStyles,
                 quoteData && quoteData.data && quoteData.data.categoryStyles,
                 window._quoteRow && window._quoteRow.categoryStyles,

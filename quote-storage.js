@@ -499,6 +499,11 @@
             if (typeof categoryStyles !== 'undefined' && categoryStyles && typeof categoryStyles === 'object') {
                 Object.assign(snapshot, categoryStyles);
             }
+            (typeof rooms !== 'undefined' && Array.isArray(rooms) ? rooms : []).forEach(function(room) {
+                Object.keys(room.quoteCategoryStyles || {}).forEach(function(cat) {
+                    snapshot[cat] = Object.assign({}, snapshot[cat] || {}, room.quoteCategoryStyles[cat]);
+                });
+            });
             return JSON.parse(JSON.stringify(snapshot));
         }
 

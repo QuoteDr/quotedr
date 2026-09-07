@@ -6,7 +6,7 @@ const builder = fs.readFileSync('quote-builder.html', 'utf8');
 const storage = fs.readFileSync('quote-storage.js', 'utf8');
 
 assert(
-  builder.includes('categoryStyles: JSON.parse(JSON.stringify(categoryStyles || {}))'),
+  builder.includes('categoryStyles: JSON.parse(JSON.stringify(quoteCategoryStyleSnapshot()))'),
   'Generated invoice data should include a categoryStyles snapshot from quote builder'
 );
 

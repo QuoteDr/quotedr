@@ -1094,8 +1094,13 @@ if (location.search.includes('debug')) {
 
         function invoiceCategoryStyle(catName) {
             var styles = (invoiceData && invoiceData.categoryStyles && typeof invoiceData.categoryStyles === 'object')
-                ? invoiceData.categoryStyles
+                ? Object.assign({}, invoiceData.categoryStyles)
                 : {};
+            (invoiceData && Array.isArray(invoiceData.rooms) ? invoiceData.rooms : []).forEach(function(room) {
+                Object.keys(room.quoteCategoryStyles || {}).forEach(function(cat) {
+                    styles[cat] = Object.assign({}, styles[cat] || {}, room.quoteCategoryStyles[cat]);
+                });
+            });
             var canonical = typeof canonicalCat === 'function' ? canonicalCat(catName) : catName;
             var saved = styles[catName] || styles[canonical] || null;
             if (!saved) {
