@@ -39,6 +39,7 @@
         }
 
         function renderLineItemUpgradePanel() {
+            if (typeof window.calculateMaterialTotal === 'function') window.calculateMaterialTotal();
             const target = document.getElementById('lineItemUpgradeSummary');
             if (!target) return;
             target.innerHTML = lineItemUpgradeDraft.length ? lineItemUpgradeDraft.map(function(group, index) {

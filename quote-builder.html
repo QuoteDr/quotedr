@@ -3868,7 +3868,7 @@ Example:
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label><strong>Quantity:</strong></label>
-                            <input type="number" id="lineQuantity" class="form-control" value="1" step="0.01">
+                            <input type="number" id="lineQuantity" class="form-control" value="1" step="0.01" oninput="calculateMaterialTotal()">
                         </div>
                         <div class="col-md-6 mb-3">
                             <div class="d-flex align-items-center gap-2 mb-1">
@@ -3914,7 +3914,7 @@ Example:
                     <details id="lineItemUpgradePanel" class="border rounded p-3 mb-3">
                         <summary class="fw-bold text-primary">Upgrades &amp; Add-ons (Optional)</summary>
                         <p class="small text-muted mt-2">These upgrades stay with this quote item. Your saved item database only changes if you choose Save To Database or Update Database.</p>
-                        <button type="button" class="btn btn-outline-primary mb-2" data-upgrade-wizard-action="open-new"><i class="fas fa-magic me-1"></i>Upgrade Wizard</button>
+                        <button type="button" class="btn btn-outline-primary mb-2" data-upgrade-wizard-action="open-new" onclick="if (typeof window.getLineItemUpgradeDraft !== 'function') { event.stopPropagation(); qdAlert('This page has an older item editor loaded. Save your current work, then refresh QuoteDr before adding upgrades.', { title: 'Refresh needed', type: 'warning' }); }"><i class="fas fa-magic me-1"></i>Upgrade Wizard</button>
                         <div id="lineItemUpgradeSummary"></div>
                     </details>
 
@@ -3926,7 +3926,7 @@ Example:
                         <div class="collapse mt-2" id="materialCostCollapse">
                             <div class="row g-2 align-items-center bg-light p-3 rounded">
                                 <div class="col-md-6">
-                                    <label><strong>Material Cost ($):</strong><button type="button" class="qd-inline-help-btn" title="Help with material costs" aria-label="Help with material costs" onclick="QuoteDrModalHelp.openInline('materialCost'); return false;"><i class="fas fa-question"></i></button></label>
+                                    <label for="lineMaterialCost"><strong>Base Material Cost ($/unit):</strong><button type="button" class="qd-inline-help-btn" title="Help with material costs" aria-label="Help with material costs" onclick="QuoteDrModalHelp.openInline('materialCost'); return false;"><i class="fas fa-question"></i></button></label>
                                     <div class="input-group">
                                         <input type="number" id="lineMaterialCost" class="form-control" value="0" step="0.01" placeholder="per unit"
                                                oninput="calculateMaterialTotal()">
@@ -3936,9 +3936,11 @@ Example:
                                     </div>
                                 </div>
                                 <div class="col-md-6 text-end">
-                                    <label><strong>Total Material Cost:</strong></label>
+                                    <label><strong>Total Materials — Selected Items:</strong></label>
                                     <div id="materialTotalDisplay" class="fw-bold text-primary">$0.00</div>
                                 </div>
+                                <div class="col-12 small" id="lineMaterialBreakdown"></div>
+                                <div class="col-12 form-text">Base cost excludes upgrades. Selected add-on costs are listed separately below; edit their costs in the Upgrade Wizard. Material costs are internal and not shown to clients.</div>
                             </div>
                         </div>
                     </div>
@@ -4803,21 +4805,29 @@ Example:
             return '';
         }
 
+        function hasRecordedItemUpgradeBase(item) {
+            return !!item && (item._itemUpgradeBaseCaptured === true ||
+                (item.upgraded === true && item._baseRate !== undefined && item._baseRate !== null && Number.isFinite(Number(item._baseRate))));
+        }
+
         function ensureItemUpgradeBaseState(item) {
             if (!item || item._itemUpgradeBaseCaptured) return;
-            item._baseRate = parseFloat(item.rate || 0) || 0;
+            // Legacy upgrades already recorded their base, but did not set the newer marker.
+            // Never recapture an upgrade-inclusive rate as the base during conversion.
+            var legacyBase = hasRecordedItemUpgradeBase(item);
+            item._baseRate = legacyBase ? Number(item._baseRate) : (parseFloat(item.rate || 0) || 0);
             item._basePriceTbd = isQuotePriceTbd(item);
-            item._baseMaterialCost = parseFloat(item.materialCost || 0) || 0;
+            item._baseMaterialCost = legacyBase ? (item._baseMaterialCost ?? item.materialCost ?? 0) : (parseFloat(item.materialCost || 0) || 0);
             item._baseQuantity = parseFloat(item.quantity || 0) || 0;
-            item._baseUnitType = item.unitType || item.unit || '';
-            item._baseSupplierUrl = item.supplierUrl || '';
+            item._baseUnitType = (legacyBase && item._baseUnitType) || item.unitType || item.unit || '';
+            item._baseSupplierUrl = legacyBase ? (item._baseSupplierUrl ?? item.supplierUrl ?? '') : (item.supplierUrl || '');
             item._basePhoto = item.photo || '';
             item._basePhotoFull = item.photoFull || null;
             item._basePhotos = Array.isArray(item.photos) ? item.photos.slice() : (item.photo ? [item.photo] : []);
             item._basePhotosFull = Array.isArray(item.photosFull) ? item.photosFull.slice() : (item.photoFull ? [item.photoFull] : []);
-            item._baseItemDescription = item.itemDescription || '';
+            item._baseItemDescription = legacyBase ? (item._baseItemDescription ?? item.itemDescription ?? '') : (item.itemDescription || '');
             item._baseDescription = item.description || item.name || '';
-            item._baseLaborTime = normalizeLaborTime(item.laborTime);
+            item._baseLaborTime = normalizeLaborTime(legacyBase ? (item._baseLaborTime ?? item.laborTime) : item.laborTime);
             item._itemUpgradeBaseCaptured = true;
         }
 
@@ -8244,6 +8254,7 @@ Example:
             document.getElementById('lineNotes').value = '';
             document.getElementById('lineMaterialCost').value = '0';
             document.getElementById('materialTotalDisplay').textContent = '$0.00';
+            calculateMaterialTotal();
             const linkBtn = document.getElementById('supplierLinkBtn');
             if (linkBtn) linkBtn.style.display = 'none';
             const qs = document.getElementById('itemQuickSearch');
@@ -9279,7 +9290,7 @@ Example:
             // Set editing flag
             window.resetLineItemUpgradeDraft?.(item);
             // Edit the base item, not a rate already increased by selected add-ons.
-            if (item._itemUpgradeBaseCaptured === true) {
+            if (hasRecordedItemUpgradeBase(item)) {
                 populateLineUnitTypeDropdown(item._baseUnitType || item.unitType);
                 document.getElementById('lineQuantity').value = getQuoteItemUpgradeBaseQuantity(item);
                 document.getElementById('lineRate').value = item._baseRate ?? item.rate;
@@ -9289,6 +9300,7 @@ Example:
                 calculateMaterialTotal();
             }
             editingItemIndex = itemIndex;
+            calculateMaterialTotal();
             checkIfNewItem();
 
             // Show modal
@@ -10283,7 +10295,7 @@ Example:
                     item.materialCost = upgradeMaterialCost;
                 }
             } else {
-                item.rate = item._baseRate || item.rate;
+                item.rate = item._baseRate ?? item.rate;
                 if (item._baseMaterialCost !== undefined) item.materialCost = item._baseMaterialCost;
                 if (item._baseUnitType !== undefined) item.unitType = item._baseUnitType;
                 if (item._baseSupplierUrl !== undefined) item.supplierUrl = item._baseSupplierUrl;
@@ -13715,7 +13727,7 @@ Example:
                     var rate = parseFloat(item.rate) || 0;
                     var mat = parseFloat(item.materialCost) || 0;
                     roomRevenue += quoteItemMarkedAmount(room, item, itemChargedTotal(item));
-                    roomMaterial += mat * qty;
+                    roomMaterial += getQuoteItemMaterialBreakdown(item).total;
                 });
                 var roomProfit = roomRevenue - roomMaterial;
                 var roomMargin = roomRevenue > 0 ? (roomProfit / roomRevenue * 100) : 0;
@@ -13803,11 +13815,46 @@ Example:
             if (modalEl && window.bootstrap) new bootstrap.Modal(modalEl).show();
         }
 
+        function getQuoteItemMaterialBreakdown(item) {
+            const quantity = getQuoteItemUpgradeBaseQuantity(item);
+            const baseCost = Number(hasRecordedItemUpgradeBase(item) ? (item._baseMaterialCost ?? item.materialCost) : item.materialCost) || 0;
+            const baseTotal = quantity * baseCost;
+            let total = baseTotal;
+            let baseIncluded = true;
+            const rows = [];
+            getSelectedItemUpgradeOptions(item).forEach(function(option) {
+                if (isQuoteItemConsultationUpgradeOption(option)) return;
+                const optionQuantity = getQuoteItemUpgradeOptionQuantity(item, option);
+                const cost = Number(option.materialCost ?? option.material_cost) || 0;
+                const amount = optionQuantity * cost;
+                const replacement = option.upgradeType === 'replacement';
+                if (replacement) {
+                    baseIncluded = false;
+                    rows.forEach(function(row) { row.included = false; });
+                    total = amount;
+                } else total += amount;
+                rows.push({name: option.name || 'Upgrade', quantity: optionQuantity, cost: cost, amount: amount, replacement: replacement, included: true});
+            });
+            return {baseTotal: baseTotal, baseIncluded: baseIncluded, rows: rows, total: total};
+        }
+
         function calculateMaterialTotal() {
             const quantity = parseFloat(document.getElementById('lineQuantity').value) || 0;
             const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
-            const totalMaterialCost = quantity * materialCost;
-            document.getElementById('materialTotalDisplay').textContent = qdFormatMoney(totalMaterialCost);
+            const room = rooms.find(function(candidate) { return candidate.id === parseInt(document.getElementById('currentRoomId')?.value); });
+            const original = editingItemIndex !== null ? room?.items?.[editingItemIndex] : null;
+            const preview = {
+                quantity: quantity, materialCost: materialCost,
+                unitType: document.getElementById('lineUnitType')?.value || '',
+                upgradeGroups: mergeQuoteItemUpgradeGroupRuntimeState(window.getLineItemUpgradeDraft?.() || [], normalizeQuoteItemUpgradeGroups(original || {}))
+            };
+            clearInvalidItemUpgradeSelections(preview);
+            const breakdown = getQuoteItemMaterialBreakdown(preview);
+            document.getElementById('materialTotalDisplay').textContent = qdFormatMoney(breakdown.total);
+            const target = document.getElementById('lineMaterialBreakdown');
+            if (target) target.innerHTML = '<div>Base materials: ' + qdFormatMoney(breakdown.baseTotal) + (breakdown.baseIncluded ? '' : ' (replaced by selected upgrade)') + '</div>' +
+                breakdown.rows.map(function(row) { return '<div>' + qdTemplateEscapeHtml(row.name) + (row.replacement ? ' — replacement' : ' — add-on') + ': ' + row.quantity + ' × ' + qdFormatMoney(row.cost) + ' = ' + qdFormatMoney(row.amount) + (row.included ? '' : ' (replaced)') + '</div>'; }).join('') +
+                (breakdown.rows.length ? '' : '<div class="text-muted">No add-ons selected. Choose defaults on the quote builder.</div>');
         }
 
         function isLineProfitDetailsVisible() {
@@ -14880,11 +14927,11 @@ Example:
                                 } else {
                                     var profitQuantity = parseFloat(item.quantity);
                                     if (!isFinite(profitQuantity)) profitQuantity = 1;
-                                    var lineMaterialCost = (parseFloat(item.materialCost) || 0) * profitQuantity;
+                                    var lineMaterialCost = getQuoteItemMaterialBreakdown(item).total;
                                     var lineProfit = displayTotal - lineMaterialCost;
                                     var lineMargin = displayTotal > 0 ? (lineProfit / displayTotal * 100) : 0;
                                     var lineProfitText = qdFormatMoney(lineProfit);
-                                    html += '<td class="quote-item-profit-cell"><strong class="' + (lineProfit >= 0 ? 'text-success' : 'text-danger') + '">' + lineProfitText + '</strong><div class="small text-muted">' + lineMargin.toFixed(0) + '% margin</div></td>';
+                                    html += '<td class="quote-item-profit-cell"><strong class="' + (lineProfit >= 0 ? 'text-success' : 'text-danger') + '">' + lineProfitText + '</strong><div class="small text-muted">' + lineMargin.toFixed(0) + '% margin</div><div class="small text-muted">Materials (selected): ' + qdFormatMoney(lineMaterialCost) + '</div></td>';
                                 }
                             }
                             let upgradeBtn = '';
@@ -19310,7 +19357,7 @@ Example:
         // Save/load/session core moved to quote-storage.js
     </script>
     <script src="change-orders.js?v=1778152100"></script>
-    <script src="quote-storage.js?v=2026082001"></script>
+    <script src="quote-storage.js?v=2026090701"></script>
     <script src="property-memory.js?v=2026081001"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
@@ -19416,7 +19463,7 @@ Example:
     </script>
     <script src="quote-review-construction-knowledge.js?v=2026080201"></script>
     <script src="quote-starter-item-library.js?v=2026080201"></script>
-    <script src="quote-items.js?v=2026083004"></script>
+    <script src="quote-items.js?v=2026090701"></script>
     <script src="quote-import.js?v=2026082003"></script>
     <script src="supplier-materials.js?v=2026090101"></script>
     <script>
