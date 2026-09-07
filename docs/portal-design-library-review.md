@@ -1,6 +1,27 @@
-# Portal Designs & Renderings — local review
+# Portal Designs & Renderings — release and review
 
-Status: implemented locally, not deployed. No DNS, live database, or customer records changed.
+Status: deployed September 6, 2026 (September 7 UTC), with owner-approved manual
+authenticated testing remaining. No DNS or existing customer records changed.
+
+## Released
+
+- Feature commit `f48d8f9`, fast-forwarded onto freshly fetched origin/main.
+- Migration `20260907021911_portal_design_library.sql` applied and recorded.
+- `portal-designs` ACTIVE v1; `verify-portal-pin` ACTIVE v35, existing JWT setting
+  retained. Live design management without authentication returns 401; an unknown
+  design link returns 404. This is not an authenticated upload test.
+- All three tables have RLS enabled and deny direct anon/authenticated reads;
+  service-role reads are granted. Storage bucket is private, 8 MB maximum.
+  Advisor's three informational no-policy entries are intentional: browser
+  roles cannot access these tables, all authorization is through the function.
+- Exact portal page and module bytes matched the built artifact on
+  quotedr.pages.dev, quotedr.io and myprojectview.ca. Policy/CSS/PDF runtime bytes
+  also matched on myprojectview.ca. The production PIN page rendered in browser.
+- Portal noindex/nofollow/noarchive headers verified. Private model, backend
+  source and review-document paths return 404.
+- Artifact tree `73859640d3e7fc4c021341280526a7a686e1c8574e6d99190918968eab5f188a`.
+- No native mobile build required. Client closet upload has not been performed;
+  the private local model is not part of the public web deployment.
 
 ### Deployment attempt — September 6, 2026
 
@@ -97,7 +118,7 @@ export adjustment. The closet's prepared single-file package needs no network.
 Prior private file objects are retained for recovery; automated retention cleanup
 and a full version-history interface are not part of this first release.
 
-## Separate deployment units (approved; verification pending)
+## Separate deployment units (released)
 
 1. Migration: `20260907021911_portal_design_library.sql`.
 2. Edge Functions: `portal-designs` (new), `verify-portal-pin` (updated).
