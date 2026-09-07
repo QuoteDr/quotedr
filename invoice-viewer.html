@@ -1450,8 +1450,42 @@ if (location.search.includes('debug')) {
         }
 
         function getInvoiceItemDescription(item, originalUpgradeItem, isUpgraded) {
-            if (isUpgraded) return getInvoiceUpgradeDescription(item, originalUpgradeItem);
-            return item.itemDescription || item.displayDescription || item.actualDescription || '';
+            var description = item.itemDescription || item.displayDescription || item.actualDescription || '';
+            // Grouped upgrades already carry the resolved base/replacement plus selected add-ons.
+            // The legacy `upgrade` mirror is only one option, not the whole selected scope.
+            if (Array.isArray(item.upgradeGroups) && item.upgradeGroups.length) return description;
+            if (!isUpgraded) return description;
+            var type = getInvoiceUpgradeType(item, originalUpgradeItem);
+            if (type === 'consultation') return description;
+            var upgradeDescription = getInvoiceUpgradeDescription(item, originalUpgradeItem);
+            if (type === 'add_on') {
+                var base = item._baseItemDescription !== undefined ? item._baseItemDescription
+                    : (originalUpgradeItem ? originalUpgradeItem.itemDescription : description);
+                // Older exports may already contain the combined description.
+                if (item._baseItemDescription === undefined && !originalUpgradeItem &&
+                    upgradeDescription && description.endsWith('\n\n' + upgradeDescription)) return description;
+                return [base, upgradeDescription].filter(function(part, index, parts) {
+                    return String(part || '').trim() && parts.indexOf(part) === index;
+                }).join('\n\n');
+            }
+            return upgradeDescription;
+        }
+
+        function getInvoiceUpgradeType(item, originalUpgradeItem) {
+            var upgrade = item.upgrade || (originalUpgradeItem && originalUpgradeItem.upgrade) || {};
+            var type = String(upgrade.type || upgrade.upgradeType || upgrade.mode || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            if (type === 'add_on' || type === 'addon') return 'add_on';
+            if (type === 'consultation' || type === 'requires_consultation') return 'consultation';
+            return 'replacement';
+        }
+
+        function getInvoiceItemName(item, originalUpgradeItem, isUpgraded) {
+            var name = item.description || item.name || 'Item';
+            if (!isUpgraded || (Array.isArray(item.upgradeGroups) && item.upgradeGroups.length)) return name;
+            if (getInvoiceUpgradeType(item, originalUpgradeItem) !== 'replacement') {
+                return item._baseDescription || (originalUpgradeItem && (originalUpgradeItem.description || originalUpgradeItem.name)) || name;
+            }
+            return item.upgrade && item.upgrade.name || name;
         }
 
         function getHiddenProfileFields(profile) {
@@ -2120,7 +2154,7 @@ if (location.search.includes('debug')) {
                     const isUpgraded = !!item.upgraded || !!originalUpgradeItem;
                     const activeRate = invoiceLineRate(item, room);
                     const itemTotal = invoiceLineTotal(item, room);
-                    const displayName = isUpgraded && item.upgrade ? item.upgrade.name : (item.description || item.name || 'Item');
+                    const displayName = getInvoiceItemName(item, originalUpgradeItem, isUpgraded);
                     const displayDesc = getInvoiceItemDescription(item, originalUpgradeItem, isUpgraded);
                     const choiceGroupSelection = item.choiceGroupSelection || null;
                     const lineItemHighlight = getInvoiceLineItemHighlight(item);
