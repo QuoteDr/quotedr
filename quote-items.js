@@ -23,6 +23,43 @@
         var manageCategorySortable = null;
         var manageNewItemWizardUpgradeGroups = [];
         var manageUpgradeWizardState = null;
+        var lineItemUpgradeDraft = [];
+        var lineItemUpgradeDraftChanged = false;
+
+        function resetLineItemUpgradeDraft(item) {
+            lineItemUpgradeDraft = cloneManageUpgradeGroups(normalizeManageItemUpgradeGroups(JSON.parse(JSON.stringify(item || {}))));
+            lineItemUpgradeDraftChanged = false;
+            const panel = document.getElementById('lineItemUpgradePanel');
+            if (panel) panel.open = false;
+            renderLineItemUpgradePanel();
+        }
+
+        function getLineItemUpgradeDraft() {
+            return cloneManageUpgradeGroups(lineItemUpgradeDraft);
+        }
+
+        function renderLineItemUpgradePanel() {
+            const target = document.getElementById('lineItemUpgradeSummary');
+            if (!target) return;
+            target.innerHTML = lineItemUpgradeDraft.length ? lineItemUpgradeDraft.map(function(group, index) {
+                return '<div class="border rounded p-2 mb-2"><div class="d-flex justify-content-between gap-2 flex-wrap"><strong>' + manageItemsEscape(group.name || 'Upgrade Options') + '</strong><div>' +
+                    '<button type="button" class="btn btn-sm btn-outline-primary" data-upgrade-wizard-action="edit-existing" data-upgrade-group-id="' + manageItemsAttr(group.id) + '">Edit in Wizard</button> ' +
+                    '<button type="button" class="btn btn-sm btn-outline-danger" onclick="removeLineItemUpgradeGroup(' + index + ')">Remove group</button></div></div>' +
+                    '<div class="small text-muted">' + (group.type === 'multiple' ? 'Pick Multiple' : 'Pick One') + '</div>' +
+                    '<ul class="mb-0">' + (group.options || []).map(function(option) { return '<li>' + manageItemsEscape(option.name) + '</li>'; }).join('') + '</ul></div>';
+            }).join('') : '<div class="small text-muted">No upgrades yet. Use the wizard to add optional upgrades or stackable add-ons.</div>';
+        }
+
+        function removeLineItemUpgradeGroup(index) {
+            lineItemUpgradeDraft.splice(index, 1);
+            lineItemUpgradeDraftChanged = true;
+            renderLineItemUpgradePanel();
+        }
+
+        window.resetLineItemUpgradeDraft = resetLineItemUpgradeDraft;
+        window.getLineItemUpgradeDraft = getLineItemUpgradeDraft;
+        window.lineItemUpgradesWereEdited = function() { return lineItemUpgradeDraftChanged; };
+        window.removeLineItemUpgradeGroup = removeLineItemUpgradeGroup;
         var manageUpgradeWizardCloseConfirmed = false;
         var manageUpgradeWizardClosePromptOpen = false;
         var MANAGE_ITEM_PHOTO_LIMIT = 3;
@@ -1070,7 +1107,7 @@
             }
         }
 
-        function getManageUpgradeWizardOptionTemplate(baseUnitType, index) {
+        function getManageUpgradeWizardOptionTemplate(baseUnitType, index, groupType) {
             return {
                 id: manageUpgradeGroupId('upo'),
                 name: '',
@@ -1079,7 +1116,7 @@
                 materialCost: 0,
                 supplierUrl: '',
                 description: '',
-                upgradeType: index === 0 ? 'replacement' : 'add_on',
+                upgradeType: groupType === 'multiple' || index > 0 ? 'add_on' : 'replacement',
                 requiresConsultation: false,
                 sourceItemName: '',
                 category: '',
@@ -1101,7 +1138,7 @@
             };
             const optionCount = setupType === 'simple' || setupType === 'multiple' ? 1 : 2;
             for (let i = 0; i < optionCount; i++) {
-                group.options.push(getManageUpgradeWizardOptionTemplate(baseUnitType, i));
+                group.options.push(getManageUpgradeWizardOptionTemplate(baseUnitType, i, group.type));
             }
             return group;
         }
@@ -1111,6 +1148,9 @@
         }
 
         function getManageUpgradeWizardContextFromButton(button) {
+            if (button?.closest('#lineItemUpgradePanel')) {
+                return { context: 'quoteLine', rowKey: '', baseUnitType: document.getElementById('lineUnitType')?.value || '', groups: getLineItemUpgradeDraft() };
+            }
             const detailsRow = button ? button.closest('.item-details-row') : null;
             if (detailsRow) {
                 return {
@@ -1519,7 +1559,11 @@
                 groups.push(group);
             }
             try {
-                if (manageUpgradeWizardState.context === 'row') {
+                if (manageUpgradeWizardState.context === 'quoteLine') {
+                    lineItemUpgradeDraft = cloneManageUpgradeGroups(groups);
+                    lineItemUpgradeDraftChanged = true;
+                    renderLineItemUpgradePanel();
+                } else if (manageUpgradeWizardState.context === 'row') {
                     const detailsRow = getManageDetailsRowByKey(manageUpgradeWizardState.rowKey);
                     if (detailsRow) {
                         refreshManageUpgradeGroupsEditor(detailsRow, groups);
@@ -1571,7 +1615,7 @@
             }
             if (action === 'add-option') {
                 collectManageUpgradeWizardForm();
-                manageUpgradeWizardState.group.options.push(getManageUpgradeWizardOptionTemplate(manageUpgradeWizardState.baseUnitType, manageUpgradeWizardState.group.options.length));
+                manageUpgradeWizardState.group.options.push(getManageUpgradeWizardOptionTemplate(manageUpgradeWizardState.baseUnitType, manageUpgradeWizardState.group.options.length, manageUpgradeWizardState.group.type));
                 markManageUpgradeWizardDirty();
                 showManageUpgradeWizard();
                 return;

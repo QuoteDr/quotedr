@@ -2066,6 +2066,18 @@
             resize: vertical;
             min-height: 58px;
         }
+        /* Give Add/Edit Item descriptions room to write without removing manual resizing. */
+        #lineItemDescription {
+            height: 9rem;
+            min-height: 4rem;
+            resize: vertical;
+            overflow: auto;
+        }
+        @media (min-width: 992px) {
+            #lineItemDescription {
+                height: 16rem;
+            }
+        }
         .manage-starter-meta {
             display: flex;
             align-items: center;
@@ -3841,7 +3853,7 @@ Example:
                                 <button type="button" class="btn btn-sm btn-outline-primary refine-desc-btn" style="font-size:0.75rem;padding:2px 8px;"><i class="fas fa-wand-magic-sparkles me-1"></i>AI Refine</button>
                             </div>
                         </div>
-                        <textarea id="lineItemDescription" class="form-control item-description-textarea" rows="2" placeholder="Describe the reusable scope shown to clients. This saves with the item database, unlike the job note below." spellcheck="true"></textarea>
+                        <textarea id="lineItemDescription" class="form-control item-description-textarea" rows="6" placeholder="Describe the reusable scope shown to clients. This saves with the item database, unlike the job note below." spellcheck="true"></textarea>
                     </div>
 
                     <div class="row">
@@ -3898,6 +3910,13 @@ Example:
                         </div>
                         <div class="form-text">Leave this off to discount only the base line item. Selected upgrades and add-ons remain full price.</div>
                     </div>
+
+                    <details id="lineItemUpgradePanel" class="border rounded p-3 mb-3">
+                        <summary class="fw-bold text-primary">Upgrades &amp; Add-ons (Optional)</summary>
+                        <p class="small text-muted mt-2">These upgrades stay with this quote item. Your saved item database only changes if you choose Save To Database or Update Database.</p>
+                        <button type="button" class="btn btn-outline-primary mb-2" data-upgrade-wizard-action="open-new"><i class="fas fa-magic me-1"></i>Upgrade Wizard</button>
+                        <div id="lineItemUpgradeSummary"></div>
+                    </details>
 
                     <!-- Material Costs Section -->
                     <div class="mb-3">
@@ -8205,6 +8224,7 @@ Example:
         function addLine(roomId) {
             quoteReviewLineItemReturnContext = null;
             resetLineItemEditState();
+            window.resetLineItemUpgradeDraft?.({});
             document.getElementById('currentRoomId').value = roomId;
             // Re-inject custom items into pricingDatabase in case Supabase load was async
             if (typeof customItems === 'object' && typeof _injectItemsIntoPricingDB === 'function') {
@@ -8339,6 +8359,9 @@ Example:
         function autoFillPricing() {
             const serviceSelect = document.getElementById('lineService');
             const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
+            const sourceCategory = normalizeLineItemCategoryValue(document.getElementById('lineCategory'));
+            const sourceItem = pricingDatabase[sourceCategory]?.find(function(item) { return item.name === selectedOption?.value; });
+            window.resetLineItemUpgradeDraft?.(sourceItem || {});
 
             if (selectedOption && selectedOption.value && selectedOption.value !== 'custom' && selectedOption.value !== '__add_new_service__') {
                 setLineItemNameFromService(selectedOption.text);
@@ -9254,6 +9277,17 @@ Example:
             }
 
             // Set editing flag
+            window.resetLineItemUpgradeDraft?.(item);
+            // Edit the base item, not a rate already increased by selected add-ons.
+            if (item._itemUpgradeBaseCaptured === true) {
+                populateLineUnitTypeDropdown(item._baseUnitType || item.unitType);
+                document.getElementById('lineQuantity').value = getQuoteItemUpgradeBaseQuantity(item);
+                document.getElementById('lineRate').value = item._baseRate ?? item.rate;
+                document.getElementById('lineMaterialCost').value = item._baseMaterialCost ?? item.materialCost;
+                document.getElementById('lineItemDescription').value = item._baseItemDescription ?? item.itemDescription ?? '';
+                setLinePriceTbdState(item._basePriceTbd === true);
+                calculateMaterialTotal();
+            }
             editingItemIndex = itemIndex;
             checkIfNewItem();
 
@@ -9511,6 +9545,10 @@ Example:
             if (existingSavedItem.laborTime || existingItem?.laborTime) savedItem.laborTime = normalizeLaborTime(existingSavedItem.laborTime || existingItem.laborTime);
             if (existingSavedItem.upgrade || existingItem?.upgrade) savedItem.upgrade = cloneSavedItemForQuoteSync(existingSavedItem.upgrade || existingItem.upgrade);
             if (Array.isArray(existingSavedItem.upgradeGroups) || Array.isArray(existingItem?.upgradeGroups)) savedItem.upgradeGroups = cloneSavedItemForQuoteSync(Array.isArray(existingSavedItem.upgradeGroups) ? existingSavedItem.upgradeGroups : existingItem.upgradeGroups);
+            if (window.lineItemUpgradesWereEdited?.()) {
+                savedItem.upgradeGroups = window.getLineItemUpgradeDraft();
+                savedItem.upgrade = null;
+            }
             if (category) savedItem.category = category;
             return savedItem;
         }
@@ -9659,6 +9697,23 @@ Example:
             });
         }
 
+        function applyLineItemUpgradeDraft(item, previousGroups) {
+            if (!window.getLineItemUpgradeDraft) return;
+            item.upgradeGroups = mergeQuoteItemUpgradeGroupRuntimeState(window.getLineItemUpgradeDraft(), previousGroups || []);
+            if (window.lineItemUpgradesWereEdited?.()) item.upgrade = null;
+            clearInvalidItemUpgradeSelections(item);
+            if (item.upgradeGroups.length) applyItemUpgradeGroupsToItem(item);
+            else item.upgraded = false;
+            if (window.lineItemUpgradesWereEdited?.() && item.choiceGroup) {
+                const selected = getChoiceGroupSelectedOptions(item.choiceGroup)[0];
+                if (selected) {
+                    selected.upgradeGroups = cloneSavedItemForQuoteSync(item.upgradeGroups);
+                    selected.upgrade = null;
+                    selected.quoteUpgradeOverride = true;
+                }
+            }
+        }
+
         async function confirmAddLine() {
             const roomId = parseInt(document.getElementById('currentRoomId').value);
             if (!validateAddLineItemRequiredFields()) return;
@@ -9695,6 +9750,7 @@ Example:
                 if (editingItemIndex !== null && rooms[roomIndex].items[editingItemIndex]) {
                     const item = rooms[roomIndex].items[editingItemIndex];
                     const savedItemForEdit = pricingDatabase[category]?.find(i => i.name === document.getElementById('lineService').value);
+                    const previousUpgradeGroups = normalizeQuoteItemUpgradeGroups(item);
                     if (window._quoteDocumentType === 'change_order') item._coRemoved = false;
                     item.description = description;
                     item.category = category;
@@ -9733,6 +9789,7 @@ Example:
                         item.savedItemFingerprint = getSavedItemFingerprintForQuoteSync(savedItemForEdit);
                     }
                     item.total = priceTbd ? 0 : (quantity * rate);
+                    applyLineItemUpgradeDraft(item, previousUpgradeGroups);
                     delete item._undiscountedTotal;
                     applyLineDiscountFields(item);
                     coRefreshItemDelta(item);
@@ -9760,8 +9817,8 @@ Example:
                         photos: Array.isArray(dbItem?.photos) ? dbItem.photos : (dbItem?.photo ? [dbItem.photo] : []),
                         photoFull: dbItem?.photoFull || null,
                         photosFull: Array.isArray(dbItem?.photosFull) ? dbItem.photosFull : [],
-                        upgrade: dbItem?.upgrade || null,
-                        upgradeGroups: normalizeQuoteItemUpgradeGroups(dbItem || {}),
+                        upgrade: window.lineItemUpgradesWereEdited?.() ? null : (dbItem?.upgrade || null),
+                        upgradeGroups: window.getLineItemUpgradeDraft ? window.getLineItemUpgradeDraft() : normalizeQuoteItemUpgradeGroups(dbItem || {}),
                         selectedUpgradeOptionIds: [],
                         upgraded: false,
                         optional: false,
@@ -9774,6 +9831,7 @@ Example:
                     applyLineDiscountFields(newItem);
                     const itemsToAdd = await autoGroupQuoteItem(newItem, rooms[roomIndex]);
                     for (const itemToAdd of itemsToAdd) {
+                        if (window.lineItemUpgradesWereEdited?.()) applyLineItemUpgradeDraft(itemToAdd, []);
                         if (window.QuoteDrSupplierMaterials?.attachSnapshotToItem) {
                             await window.QuoteDrSupplierMaterials.attachSnapshotToItem(itemToAdd);
                         }
@@ -9811,6 +9869,7 @@ Example:
                     if (savedDbChoice === 'update_saved_item') {
                         const savedUpdateResult = await saveEditedLineItemToDatabase(previousSavedItemSource, editedSavedItemData);
                         if (savedUpdateResult && savedUpdateResult.item) {
+                            const previousUpgradeGroups = normalizeQuoteItemUpgradeGroups(editedQuoteItem);
                             editedQuoteItem.serviceName = savedUpdateResult.item.name || editedQuoteItem.serviceName;
                             editedQuoteItem.photo = savedUpdateResult.item.photo || editedQuoteItem.photo || '';
                             editedQuoteItem.photoFull = savedUpdateResult.item.photoFull || editedQuoteItem.photoFull || null;
@@ -9820,6 +9879,7 @@ Example:
                             editedQuoteItem.selectedUpgradeOptionIds = [];
                             editedQuoteItem.savedItemSource = savedItemQuoteSource(savedUpdateResult.category, savedUpdateResult.item);
                             editedQuoteItem.savedItemFingerprint = getSavedItemFingerprintForQuoteSync(savedUpdateResult.item);
+                            applyLineItemUpgradeDraft(editedQuoteItem, previousUpgradeGroups);
                             renderRooms();
                         }
                     }
@@ -10266,6 +10326,7 @@ Example:
                 laborTime: normalizeLaborTime(item.laborTime),
                 upgrade: item.upgrade ? cloneSavedItemForQuoteSync(item.upgrade) : null,
                 upgradeGroups: normalizeQuoteItemUpgradeGroups(item),
+                quoteUpgradeOverride: item.quoteUpgradeOverride === true,
                 quantityMode: item.quantityMode || 'inherit',
                 quantityOverride: item.quantityOverride || ''
             };
@@ -11460,12 +11521,12 @@ Example:
                 if (savedDescription && !getChoiceGroupOptionItemDescription(next, '')) {
                     next.itemDescription = savedDescription;
                 }
-                if (saved.upgrade && saved.upgrade.name) next.upgrade = cloneSavedItemForQuoteSync(saved.upgrade);
+                if (!next.quoteUpgradeOverride && saved.upgrade && saved.upgrade.name) next.upgrade = cloneSavedItemForQuoteSync(saved.upgrade);
                 if (saved.photo && !next.photo) next.photo = saved.photo;
                 if (saved.photoFull && !next.photoFull) next.photoFull = saved.photoFull;
                 if (Array.isArray(saved.photosFull) && !Array.isArray(next.photosFull)) next.photosFull = saved.photosFull;
                 var savedUpgradeGroups = normalizeQuoteItemUpgradeGroups(saved);
-                if (savedUpgradeGroups.length) {
+                if (!next.quoteUpgradeOverride && savedUpgradeGroups.length) {
                     next.upgradeGroups = mergeQuoteItemUpgradeGroupRuntimeState(savedUpgradeGroups, next.upgradeGroups || []);
                 }
                 if (!next.category && savedMatch.category) next.category = savedMatch.category;

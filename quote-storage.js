@@ -455,7 +455,7 @@
             item.choiceGroup.options.forEach(function(option) {
                 if (!option) return;
                 var saved = findSavedItemForChoiceOption(option, item.category);
-                if (saved && saved.upgrade && saved.upgrade.name && !(option.upgrade && option.upgrade.name)) {
+                if (!option.quoteUpgradeOverride && saved && saved.upgrade && saved.upgrade.name && !(option.upgrade && option.upgrade.name)) {
                     option.upgrade = cloneQuoteStorageValue(saved.upgrade);
                 }
                 if (saved && saved.photo && !option.photo) {
@@ -463,7 +463,7 @@
                 }
                 var savedUpgradeGroups = quoteStorageSavedItemUpgradeGroups(saved);
                 var optionRuntimeGroups = Array.isArray(option.upgradeGroups) ? option.upgradeGroups : [];
-                var mergedUpgradeGroups = savedUpgradeGroups.length
+                var mergedUpgradeGroups = !option.quoteUpgradeOverride && savedUpgradeGroups.length
                     ? mergeQuoteStorageUpgradeGroupRuntimeState(savedUpgradeGroups, optionRuntimeGroups)
                     : cloneQuoteStorageValue(optionRuntimeGroups);
                 if (selectedChoiceOptionIds.indexOf(option.id) !== -1 && liveUpgradeGroups.length) {
