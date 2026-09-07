@@ -49,8 +49,8 @@ assert(
 
 assert(
   confirmBlock.includes('!isLineItemOneTimeCategory()') &&
-    builder.includes('Use Once categories are not saved to your item database.'),
-  'Use Once categories should not trigger or allow reusable item/category saves by accident'
+    builder.includes("title: 'Save Category and Item', okText: 'Save Both'"),
+  'Use Once categories should skip automatic prompts and require explicit confirmation before promotion'
 );
 
 assert(

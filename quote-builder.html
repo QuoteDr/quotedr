@@ -3293,8 +3293,12 @@ if (location.search.includes('debug')) {
                 <div class="modal-body">
                     <div class="small text-muted mb-3" id="quoteCategoryPickerContext"></div>
                     <label class="form-label fw-semibold" for="quoteCategoryPickerSelect">Choose one of your saved categories</label>
-                    <select class="form-select" id="quoteCategoryPickerSelect"></select>
+                    <select class="form-select" id="quoteCategoryPickerSelect" onchange="populateQuoteCategoryIcons()"></select>
                     <div class="small text-muted mt-2">Every line item under this category heading will move to the selected category.</div>
+                    <label class="form-label fw-semibold mt-3" for="quoteCategoryIconSearch">Category icon</label>
+                    <input id="quoteCategoryIconSearch" class="form-control mb-2" placeholder="Search icons…" oninput="filterQuoteCategoryIcons(this.value)">
+                    <div id="quoteCategoryIconGrid" class="d-flex flex-wrap gap-2" style="max-height:180px;overflow:auto" role="group" aria-label="Category icon"></div>
+                    <div id="quoteCategoryIconScope" class="small text-muted mt-2"></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-primary me-auto" onclick="createAndAssignQuoteCategory()">
@@ -8011,7 +8015,7 @@ Example:
             sel.dataset.oneTimeCategory = cleanName;
             clearAddLineItemValidationField('lineCategory');
             const saveNewItemBtn = document.getElementById('saveNewItemBtn');
-            if (saveNewItemBtn) saveNewItemBtn.style.display = 'none';
+            if (saveNewItemBtn) saveNewItemBtn.style.display = '';
         }
 
         function handleNewCategoryPromptResult(result) {
@@ -9836,7 +9840,7 @@ Example:
                 found = categoryItems.some(function(item) { return item && item.name && item.name.toLowerCase() === desc; });
             } catch(e) {}
             saveNewItemBtn.style.display = '';
-            saveNewItemBtn.disabled = !desc || isLineItemOneTimeCategory();
+            saveNewItemBtn.disabled = !desc;
             saveNewItemBtn.dataset.databaseState = found ? 'existing' : 'new';
             saveNewItemBtn.innerHTML = found
                 ? '<i class="fas fa-database me-1"></i>Update Database'
@@ -9856,11 +9860,9 @@ Example:
             if (!validateAddLineItemRequiredFields()) return false;
             const copilotContext = typeof quoteReviewLineItemContext !== 'undefined' ? quoteReviewLineItemContext : null;
             if (isLineItemOneTimeCategory()) {
-                qdAlert('Use Once categories are not saved to your item database. To save this item for reuse, choose Save in the New Category prompt or select a saved category first.', {
-                    title: 'Use Once Category',
-                    type: 'info'
-                });
-                return false;
+                if (!await qdConfirm('Save this quote-only category and this item to your database for future use? Your current quote will stay unchanged.', {
+                    title: 'Save Category and Item', okText: 'Save Both', type: 'info'
+                })) return false;
             }
             const desc = document.getElementById('lineDescription').value.trim();
             const itemDescription = document.getElementById('lineItemDescription').value.trim();
@@ -9912,6 +9914,15 @@ Example:
                     localStorage.setItem('ald_custom_items_updated_at', new Date().toISOString());
                 }
                 savedLocally = true;
+                // Only promote the category after the local database snapshot succeeds.
+                const categorySelect = document.getElementById('lineCategory');
+                delete categorySelect.dataset.oneTimeCategory;
+                Array.from(categorySelect.options).forEach(function(option) {
+                    if (option.value === category) {
+                        delete option.dataset.oneTimeCategory;
+                        option.textContent = category;
+                    }
+                });
                 if (copilotContext && !copilotContext.savedRecorded) {
                     copilotContext.savedRecorded = true;
                     await recordQuoteReviewStarterAction('saved', copilotContext);
@@ -11137,6 +11148,62 @@ Example:
 
         var activeQuoteCategoryChange = null;
 
+        function quoteCategoryStyleSnapshot() {
+            const styles = Object.assign({}, categoryStyles || {});
+            (rooms || []).forEach(function(room) {
+                Object.keys(room.quoteCategoryStyles || {}).forEach(function(cat) {
+                    styles[cat] = Object.assign({}, styles[cat] || {}, room.quoteCategoryStyles[cat]);
+                });
+            });
+            return styles;
+        }
+
+        function populateQuoteCategoryIcons() {
+            if (!activeQuoteCategoryChange) return;
+            const cat = document.getElementById('quoteCategoryPickerSelect').value;
+            const icon = (quoteCategoryStyleSnapshot()[cat] || {}).icon || 'fa-tag';
+            activeQuoteCategoryChange.icon = icon;
+            activeQuoteCategoryChange.initialIcon = icon;
+            const saved = Object.prototype.hasOwnProperty.call(pricingDatabase || {}, cat);
+            document.getElementById('quoteCategoryIconScope').textContent = saved
+                ? 'Applying an icon updates this saved category for future use. Existing sent quotes are not changed.'
+                : 'This icon stays with this quote. The category will not be added to your database.';
+            const grid = document.getElementById('quoteCategoryIconGrid');
+            grid.innerHTML = CAT_ICONS.map(function(choice) {
+                return '<button type="button" class="btn btn-outline-primary" title="' + catPickerEscape(choice.label) + '" aria-label="' + catPickerEscape(choice.label) + '" aria-pressed="' + (choice.fa === icon) + '" data-quote-category-icon="' + catPickerEscape(choice.fa) + '" data-search="' + catPickerEscape((choice.label + ' ' + (choice.tags || '')).toLowerCase()) + '">' + renderCategoryIconMarkup(choice.fa) + '</button>';
+            }).join('');
+            grid.onclick = function(event) {
+                const button = event.target.closest('[data-quote-category-icon]');
+                if (!button || !activeQuoteCategoryChange) return;
+                activeQuoteCategoryChange.icon = button.dataset.quoteCategoryIcon;
+                grid.querySelectorAll('button').forEach(function(b) { b.setAttribute('aria-pressed', String(b === button)); b.classList.toggle('active', b === button); });
+            };
+            document.getElementById('quoteCategoryIconSearch').value = '';
+        }
+
+        function filterQuoteCategoryIcons(value) {
+            document.querySelectorAll('[data-quote-category-icon]').forEach(function(button) {
+                button.classList.toggle('d-none', !button.dataset.search.includes(String(value || '').trim().toLowerCase()));
+            });
+        }
+
+        function applyQuoteCategoryIcon(cat, icon) {
+            if (!CAT_ICONS.some(function(choice) { return choice.fa === icon; })) return;
+            const saved = Object.prototype.hasOwnProperty.call(pricingDatabase || {}, cat);
+            _pushUndo();
+            if (saved) {
+                categoryStyles[cat] = Object.assign({}, categoryStyles[cat] || {}, {icon: icon});
+                (rooms || []).forEach(function(room) { if (room.quoteCategoryStyles) delete room.quoteCategoryStyles[cat]; });
+                saveCategoryStyle(cat);
+            } else {
+                // Room data already travels with quote saves, drafts and templates.
+                (rooms || []).forEach(function(room) {
+                    room.quoteCategoryStyles = Object.assign({}, room.quoteCategoryStyles || {}, {[cat]: {icon: icon}});
+                });
+            }
+            finishRoomBulkItemAction();
+        }
+
         function replaceQuoteCategoryOrder(room, oldCategory, newCategory) {
             if (!room || !Array.isArray(room.categoryOrder)) return;
             var seen = Object.create(null);
@@ -11225,6 +11292,7 @@ Example:
                 context.textContent = oldCategory + ' in ' + (room.name || getQuoteDividerLabels().singular) + ' contains ' + itemCount + ' line item' + (itemCount === 1 ? '' : 's') + '.';
             }
             populateQuoteCategoryPicker(oldCategory);
+            populateQuoteCategoryIcons();
             var modalEl = document.getElementById('quoteCategoryPickerModal');
             if (modalEl && window.bootstrap && bootstrap.Modal) {
                 bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -11243,6 +11311,9 @@ Example:
             var select = document.getElementById('quoteCategoryPickerSelect');
             if (!activeQuoteCategoryChange || !select || !select.value) return;
             reassignQuoteCategory(activeQuoteCategoryChange.roomId, activeQuoteCategoryChange.oldCategory, select.value);
+            if (activeQuoteCategoryChange.icon !== activeQuoteCategoryChange.initialIcon) {
+                applyQuoteCategoryIcon(select.value, activeQuoteCategoryChange.icon);
+            }
             closeQuoteCategoryPicker();
         }
 
@@ -14630,7 +14701,7 @@ Example:
                         const catDisplay = canonicalCat(cat);
 
                         html += '<div class="cat-group-block" data-cat="' + qdTemplateEscapeHtml(cat) + '">';
-                        var catStyle = categoryStyles[cat] || {};
+                        var catStyle = quoteCategoryStyleSnapshot()[cat] || {};
                         var catIcon = catStyle.icon || 'fa-tag';
                         var catBg = catStyle.color || '#f0f4ff';
                         var catTheme = getCategoryStyleTheme(catBg);
@@ -15722,7 +15793,7 @@ Example:
                 clientNumber: window._selectedQuoteClient?.clientNumber || window._loadedQuoteData?.clientNumber || window._loadedQuoteData?.client_number || null,
                 quoteNumber: document.getElementById('quoteNumber')?.value || '',
                 rooms: JSON.parse(JSON.stringify(rooms || [])),
-                categoryStyles: JSON.parse(JSON.stringify(categoryStyles || {})),
+                categoryStyles: JSON.parse(JSON.stringify(quoteCategoryStyleSnapshot())),
                 quoteAdjustment: getQuoteClientAdjustment(),
                 paymentsReceived: getQuotePaymentsReceived(),
                 priceTbdSelectionCount: countQuoteTbdSelections(),
