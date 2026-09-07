@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { currentDesignPortal, digest, issueDesignSession } from '../_shared/portal-design-session.mjs';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,6 +37,20 @@ Deno.serve(async (req) => {
     const normalizedPortalId = String(portalId ?? '').trim();
     const enteredPin = String(pin ?? '').trim();
 
+    // Portal-scoped PINs now mint a verifiable, expiring grant for private designs.
+    // Legacy name/email-only links retain their existing verification below.
+    if (normalizedPortalId) {
+      const gate = await supabase.rpc('portal_design_pin_attempt', {
+        p_scope: await digest(String(contractorId) + ':' + normalizedPortalId)
+      });
+      if (gate.error) throw new Error('Portal PIN service is temporarily unavailable');
+      if (!gate.data) return new Response(JSON.stringify({valid:false,error:'Too many attempts. Please wait 15 minutes before trying again.'}), {status:429,headers:{...corsHeaders,'Content-Type':'application/json','Cache-Control':'no-store'}});
+      const portal = await currentDesignPortal(supabase,contractorId,normalizedPortalId);
+      const valid = !!portal?.pin && /^\d{4}$/.test(enteredPin) && portal.pin === enteredPin;
+      const session = valid ? await issueDesignSession(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),contractorId,normalizedPortalId,portal.pin) : null;
+      return new Response(JSON.stringify({valid,session,...(!portal?.pin ? {noPinSet:true} : {})}), {headers:{...corsHeaders,'Content-Type':'application/json','Cache-Control':'no-store'}});
+    }
+
     // Fetch quotes for this contractor, then match the client server-side.
     // This keeps the stored PIN private while tolerating older quote payload keys.
     const query = supabase
@@ -65,6 +80,15 @@ Deno.serve(async (req) => {
       );
     });
 
+    // Legacy name/email routes must not become an unlimited PIN-guessing oracle
+    // for a protected portal. Count against the same canonical portal scope.
+    const scopes = [...new Set(matchingQuotes.map(quote => String(quote.data?.portal_id || ('legacy:' + quote.id))))];
+    for (const scope of scopes) {
+      const gate = await supabase.rpc('portal_design_pin_attempt', { p_scope:await digest(String(contractorId) + ':' + scope) });
+      if (gate.error) throw new Error('Portal PIN service is temporarily unavailable');
+      if (!gate.data) return new Response(JSON.stringify({valid:false,error:'Too many attempts. Please wait 15 minutes before trying again.'}), {status:429,headers:{...corsHeaders,'Content-Type':'application/json','Cache-Control':'no-store'}});
+    }
+
     if (matchingQuotes.length > 0) {
       for (const quote of matchingQuotes) {
         if (quote.data && quote.data.portal_pin) {
@@ -82,7 +106,7 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), {
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : 'PIN verification failed' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }

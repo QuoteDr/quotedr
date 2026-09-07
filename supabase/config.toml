@@ -32,6 +32,12 @@ verify_jwt = false
 [functions.client-document]
 verify_jwt = false
 
+[functions.portal-designs]
+verify_jwt = false
+
+[functions.verify-portal-pin]
+verify_jwt = true
+
 [functions.send-feedback-email]
 verify_jwt = true
 

@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 112,
-  "totalBytes": 23051123,
-  "treeSha256": "486a0f968a3765bc89704c9f0a2fb416821aeffebb4c63b4c0656f4967837dd1",
+  "fileCount": 118,
+  "totalBytes": 26170726,
+  "treeSha256": "73859640d3e7fc4c021341280526a7a686e1c8574e6d99190918968eab5f188a",
   "files": [
     {
       "path": "404.html",
@@ -12,8 +12,8 @@
     },
     {
       "path": "_headers",
-      "bytes": 1502,
-      "sha256": "54192085c1e601f1b303f718bc1fb74509a03b4a1a2e54277c08ee1bd2abb4be"
+      "bytes": 1742,
+      "sha256": "62dfd8cba7219ad16062c8151236f84580013dccbb17db7b2025b93da9f08422"
     },
     {
       "path": "_redirects",
@@ -157,8 +157,8 @@
     },
     {
       "path": "client-portal.html",
-      "bytes": 222790,
-      "sha256": "799e21abe4b1470d4b070317bcedb45725ccb2a2ac4029a02d6d6ca81718bf75"
+      "bytes": 225927,
+      "sha256": "33203e55eff238567229c23093be2a901b3a446eb8334fd37d57a3ebe1e30f66"
     },
     {
       "path": "community-starter-templates.js",
@@ -294,6 +294,21 @@
       "path": "onboarding.html",
       "bytes": 72772,
       "sha256": "b8b8f889dbe53d5ac2cb173d7c5ba29176ee087ef1448128e7bb7efe57967e27"
+    },
+    {
+      "path": "portal-design-policy.mjs",
+      "bytes": 1515,
+      "sha256": "77690a85d00c1549a86f6da2deb3d0cf4f4f14bd298c0cd4a6130358bdd40a4d"
+    },
+    {
+      "path": "portal-designs.css",
+      "bytes": 2597,
+      "sha256": "634c8bf250e46ff396beb1c51617a47290dca6365511184099803b07f8289f9d"
+    },
+    {
+      "path": "portal-designs.js",
+      "bytes": 13067,
+      "sha256": "f294da4660c9154b43a102ae94c151d0fec4b3666acff67116ecaa72c0164f0c"
     },
     {
       "path": "portal-theme-studio.html",
@@ -499,6 +514,21 @@
       "path": "typed-signature.js",
       "bytes": 5326,
       "sha256": "69c1d1491bee9ea4a457cf6e077105714ad21c4191f7c06afe9088a198ab554f"
+    },
+    {
+      "path": "vendor/pdfjs-6.3.289/LICENSE",
+      "bytes": 10174,
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+    },
+    {
+      "path": "vendor/pdfjs-6.3.289/pdf.mjs",
+      "bytes": 860384,
+      "sha256": "495588717f62303a839e91a5343deebf1b41f52e2f9f6361e73dee6ea6a4355e"
+    },
+    {
+      "path": "vendor/pdfjs-6.3.289/pdf.worker.mjs",
+      "bytes": 2228489,
+      "sha256": "f2870db902eaff8397442c912b69459980ac91f6f4b5ed827167b12cf7057930"
     },
     {
       "path": "videos/tutorials/ai-voice-quote.mp4",

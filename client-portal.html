@@ -2331,6 +2331,7 @@
   </header>
 
   <main class="container mt-4">
+    <section id="portalDesignLibrary" aria-label="Designs and renderings"></section>
     <!-- Summary Cards -->
     <div class="row mb-4 portal-summary-row">
       <div class="col-md-3 col-sm-6">
@@ -2646,6 +2647,8 @@
     }
 
     const portalShortToken = portalShortTokenFromLocation();
+    const portalDesignShare = urlParams.get('design') || '';
+    let portalDesignController = null;
     const clientEmail = urlParams.get('email');
     const clientName = urlParams.get('client'); // backward compat
     let contractorId = urlParams.get('contractor');
@@ -2817,6 +2820,17 @@
         return;
       }
 
+      if (portalDesignShare) {
+        try {
+          const result = await portalDesignRequest({action:'resolve',shareToken:portalDesignShare});
+          contractorId = result.contractorId;
+          portalId = result.portalId;
+          portalResolvedClientName = result.name;
+        } catch(error) {
+          document.getElementById('pinError').textContent = error.message;
+          return;
+        }
+      }
       if ((!clientName && !clientEmail && !portalQuoteId && !portalId && !portalShortToken) || (!contractorId && !portalShortToken)) {
         alert('Missing client or contractor parameters');
         return;
@@ -2848,7 +2862,32 @@
       // Load quotes
       await loadQuotes();
 
+      if (portalId) {
+        const css = document.createElement('link');css.rel='stylesheet';css.href='portal-designs.css';document.head.append(css);
+        const designs = await import('./portal-designs.js');
+        portalDesignController = designs.mountDesignLibrary(document.getElementById('portalDesignLibrary'), {
+          request:portalDesignRequest, isOwner:portalIsAdminView,
+          reunlock:function(){sessionStorage.removeItem(portalDesignSessionKey());document.getElementById('pinGate').style.display='flex';document.getElementById('portalContent').style.display='none';syncPinInputs('');document.getElementById('pin0').focus();},
+          shareBase:['localhost','127.0.0.1'].includes(location.hostname)?location.origin+'/client-portal.html':'https://myprojectview.ca/client-portal.html'
+        });
+        await portalDesignController.refresh();
+      }
+
       if (portalIsAdminView) hidePinGate();
+      else restorePortalUnlockState();
+    }
+
+    function portalDesignSessionKey(){return 'qd_design_session_'+contractorId+'_'+portalId;}
+    async function portalDesignRequest(body){
+      let bearer=supabaseKey;
+      if(portalIsAdminView){const auth=await _sbClient.auth.getSession();bearer=auth.data?.session?.access_token||supabaseKey;}
+      const response=await fetch(supabaseUrl+'/functions/v1/portal-designs',{
+        method:'POST',headers:{'Content-Type':'application/json',apikey:supabaseKey,Authorization:'Bearer '+bearer},
+        body:JSON.stringify({contractorId,portalId,ownerMode:portalIsAdminView,session:sessionStorage.getItem(portalDesignSessionKey()),...body})
+      });
+      const result=await response.json();
+      if(!response.ok||result.error)throw new Error(result.error||'Design library unavailable. Please try again.');
+      return result;
     }
 
     async function secureClientDocumentRequest(body) {
@@ -3466,6 +3505,12 @@
     // Load quotes for this client from this contractor
     async function loadQuotes() {
       try {
+        if (portalDesignShare) {
+          portalQuotesCache=[];
+          noQuotesEl.classList.add('d-none');
+          document.querySelectorAll('.portal-summary-row,.portal-premium-feature-row,.portal-documents-row,.quote-viewer-balance-panel').forEach(el=>el.style.display='none');
+          return;
+        }
         if (portalToken && portalAnchorId) {
           const portalResult = portalBootstrapResult || await secureClientDocumentRequest({
             action: 'portal',
@@ -5566,7 +5611,7 @@
       const cpPortal = _cp.get('portal') || portalId || '';
       const cpQuoteId = _cp.get('quote') || portalAnchorId || '';
       const unlockKey = `portal_unlocked_${cpEmail || cpName || cpPortal}_${resolvedContractorId}_${cpPortal}`;
-      if (sessionStorage.getItem(unlockKey)) {
+      if (sessionStorage.getItem(unlockKey) && sessionStorage.getItem(portalDesignSessionKey())) {
         hidePinGate();
         return;
       }
@@ -5585,7 +5630,11 @@
         const result = await res.json();
         if (result.valid) {
           sessionStorage.setItem(unlockKey, 'true');
+          if (result.session) sessionStorage.setItem(portalDesignSessionKey(),result.session);
           hidePinGate();
+          if (portalDesignController) await portalDesignController.refresh();
+        } else if (res.status === 429) {
+          document.getElementById('pinError').textContent = result.error || 'Too many attempts. Please try again in 15 minutes.';
         } else if (result.noPinSet) {
           document.getElementById('pinError').textContent = 'This portal has not been activated yet. Contact your contractor.';
         } else {
@@ -5622,7 +5671,7 @@
       if ((!_email && !_name && !_lp.get('quote') && !_portal && !portalShortToken) || !_cid) return;
 
       const unlockKey = `portal_unlocked_${_email || _name || _portal}_${_cid}_${_portal}`;
-      if (sessionStorage.getItem(unlockKey)) {
+      if (sessionStorage.getItem(unlockKey) && (!portalDesignShare || sessionStorage.getItem(portalDesignSessionKey()))) {
         hidePinGate();
       }
     }

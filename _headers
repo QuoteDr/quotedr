@@ -19,5 +19,16 @@
   Cache-Control: no-cache, no-store, must-revalidate
   Service-Worker-Allowed: /
 
+/client-portal.html
+  X-Robots-Tag: noindex, nofollow, noarchive
+  Referrer-Policy: no-referrer
+
+/client-portal
+  X-Robots-Tag: noindex, nofollow, noarchive
+  Referrer-Policy: no-referrer
+
+/*.mjs
+  Cache-Control: no-cache, must-revalidate
+
 /*.css
   Cache-Control: no-cache, must-revalidate
