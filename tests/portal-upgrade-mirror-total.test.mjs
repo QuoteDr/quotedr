@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import {calculateClientDocumentTotals, sanitizeClientDocumentRow} from '../supabase/functions/_shared/client-document-policy.mjs';
+const mirror = {id:'mirror', name:'Mirror', type:'add_on', upgradeType:'add_on', rate:400};
+const item = {description:'Door', quantity:1, rate:2500, total:2500, _baseRate:2100, upgraded:true,
+  upgrade:mirror, upgradeGroups:[{id:'addons', selectedOptionIds:['mirror'], options:[mirror]}]};
+const data = {taxEnabled:true, taxRate:0.13, rooms:[{items:[item, {quantity:1,rate:2675,total:2675}]}]};
+const total = () => calculateClientDocumentTotals(data).documentTotal;
+assert.equal(total(),5847.75,'mirrored $400 add-on must not add another $452 with tax');
+assert.equal(sanitizeClientDocumentRow({data}).total,5847.75,'portal card projection agrees');
+item.upgradeGroups[0].selectedOptionIds=[];
+assert.equal(total(),5395.75,'deselected group ignores stale legacy mirror');
+item.upgradeGroups[0].selectedOptionIds=['mirror'];
+const extra={id:'soft-close',upgradeType:'add_on',rate:450};
+item.upgradeGroups[0].options.push(extra);
+item.upgradeGroups[0].selectedOptionIds.push(extra.id);
+assert.equal(total(),6356.25,'multiple add-ons counted once each');
+mirror.upgradeType='replacement';
+assert.equal(total(),3983.25,'replacement replaces base, next add-on added once');
+mirror.upgradeType='add_on';
+delete item.upgradeGroups;
+assert.equal(total(),5847.75,'legacy-only add-on remains supported');
+mirror.upgradeType='replacement';
+assert.equal(total(),3474.75,'legacy-only replacement remains supported');
+console.log('Portal upgrade mirror totals passed');

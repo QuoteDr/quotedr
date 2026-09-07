@@ -273,7 +273,9 @@ function activeItemTotal(item, options = {}) {
     }
   } else {
     total = baseTotal;
-    if (item.upgraded === true && isRecord(item.upgrade)) {
+    // Modern groups own the selections; `upgrade` may mirror their first
+    // option for older clients and must not be charged a second time.
+    if (item.upgraded === true && isRecord(item.upgrade) && !effectiveUpgradeGroups(item, null).length) {
       const type = normalizeUpgradeType(item.upgrade.upgradeType || item.upgrade.type || item.upgrade.mode);
       if (!hasBaseState && item.upgrade.total !== undefined && item.upgrade.total !== null && item.upgrade.total !== '') {
         total = finiteNumber(item.upgrade.total, 0);

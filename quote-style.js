@@ -1570,7 +1570,8 @@
             return getQuoteAdminPreviewUrl(await saveQuoteForPortalSharing());
         }
 
-        async function previewInteractiveQuote() {
+        async function previewInteractiveQuote(options) {
+            options = options || {};
             if (rooms.length === 0) {
                 alert('Please add at least one room before previewing a quote.');
                 return;
@@ -1585,6 +1586,7 @@
                 var previewUrl = new URL(viewerUrl, window.location.href);
                 previewUrl.searchParams.set('preview', '1');
                 previewUrl.searchParams.set('admin_preview', '1');
+                if (options.print === true) previewUrl.searchParams.set('print', '1');
                 if (typeof saveSessionQuote === 'function') saveSessionQuote();
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:green;"><i class="fas fa-check"></i> Opening preview...</span>';
                 if (typeof qdToast === 'function') {
