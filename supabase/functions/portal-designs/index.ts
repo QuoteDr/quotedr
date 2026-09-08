@@ -5,16 +5,24 @@ import { designInput, MAX_DESIGN_BYTES } from '../../../portal-design-policy.mjs
 const headers = { 'Access-Control-Allow-Origin':'*', 'Access-Control-Allow-Headers':'authorization,apikey,content-type,x-client-info', 'Cache-Control':'private, no-store', 'X-Robots-Tag':'noindex, nofollow', 'Content-Type':'application/json' };
 const json = (data:unknown, status=200) => new Response(JSON.stringify(data), {status,headers});
 const randomToken = () => Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>b.toString(16).padStart(2,'0')).join('');
-const publicFields = 'id,project,title,note,version,kind,mime_type,size_bytes,visible,created_at,updated_at';
+const publicFields = 'id,project,title,note,version,kind,mime_type,size_bytes,thumbnail_path,visible,created_at,updated_at';
+const MAX_THUMBNAIL_BYTES = 1536 * 1024;
+const thumbnailMime = new Set(['image/png','image/jpeg','image/webp']);
+const encode = async (blob:Blob) => {
+  const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';
+  for(let i=0;i<bytes.length;i+=16384)binary+=String.fromCharCode(...bytes.subarray(i,i+16384));
+  return btoa(binary);
+};
 
 export async function handleDesignRequest(req:Request) {
   if (req.method === 'OPTIONS') return new Response('ok',{headers});
   if (req.method !== 'POST') return json({error:'POST required'},405);
   try {
     // Bound both the declared and actual body; never download a caller-supplied URL.
-    if (Number(req.headers.get('content-length')) > MAX_DESIGN_BYTES*1.4) return json({error:'File too large'},413);
+    const maxRequestBytes=MAX_DESIGN_BYTES*1.4+MAX_THUMBNAIL_BYTES*1.4+8192;
+    if (Number(req.headers.get('content-length')) > maxRequestBytes) return json({error:'File too large'},413);
     const raw = await req.text();
-    if (raw.length > MAX_DESIGN_BYTES*1.4) return json({error:'File too large'},413);
+    if (raw.length > maxRequestBytes) return json({error:'File too large'},413);
     const body = JSON.parse(raw);
     const db = serviceClient();
     const action = String(body.action || 'list');
@@ -56,17 +64,20 @@ export async function handleDesignRequest(req:Request) {
       if(quoteResult.error)throw quoteResult.error;
       const quote=quoteResult.data;
       if(!quote || quote.data?.portal_id!==portalId)return json({error:'Choose a quote in this portal.'},400);
-      if(body.id){
-        const design=await db.from('portal_designs').select('id,visible').eq('id',body.id).eq('library_id',library.id).maybeSingle();
+      const ids=Array.isArray(body.designIds)?body.designIds:(body.id?[body.id]:[]);
+      if(ids.length>20 || new Set(ids).size!==ids.length || ids.some(id=>typeof id!=='string'))return json({error:'Choose up to 20 distinct designs.'},400);
+      for(const id of ids){
+        const design=await db.from('portal_designs').select('id,visible').eq('id',id).eq('library_id',library.id).maybeSingle();
         if(design.error)throw design.error;
         if(!design.data?.visible)return json({error:'Publish the design before attaching it.'},400);
       }
       // Compare the attachment revision, independently of quote edits.
       const current=await db.from('quote_design_links').select('*').eq('document_id',quote.id).maybeSingle();
       if(current.error)throw current.error;
+      if(!Array.isArray(body.designIds) && (current.data?.design_ids?.length||0)>1)return json({error:'Refresh to manage this quote’s multiple attachments.'},409);
       if((current.data?.updated_at||null)!==(body.baseVersion||null))return json({error:'The attached design changed. Refresh and try again.'},409);
-      const values={document_id:quote.id,design_id:body.id,require_review:body.requireReview===true,updated_at:new Date().toISOString()};
-      const change=!body.id
+      const values={document_id:quote.id,design_id:ids[0],design_ids:ids,require_review:body.requireReview===true,updated_at:new Date().toISOString()};
+      const change=!ids.length
         ? await db.from('quote_design_links').delete().eq('document_id',quote.id).eq('updated_at',body.baseVersion).select('document_id')
         : current.data
           ? await db.from('quote_design_links').update(values).eq('document_id',quote.id).eq('updated_at',body.baseVersion).select('document_id')
@@ -95,7 +106,8 @@ export async function handleDesignRequest(req:Request) {
         if(quotes.error)throw quotes.error;
         if(quotes.data?.length){const links=await db.from('quote_design_links').select('*').in('document_id',quotes.data.map(q=>q.id));if(links.error)throw links.error;attachments=links.data||[];}
       }
-      return json({designs:rows.data || [],attachments});
+      const designs=(rows.data||[]).map(({thumbnail_path,...row})=>({...row,has_thumbnail:Boolean(thumbnail_path)||row.kind==='image'}));
+      return json({designs,attachments});
     }
     let previous = null;
     if (body.id) {
@@ -114,6 +126,15 @@ export async function handleDesignRequest(req:Request) {
       for (let i=0;i<bytes.length;i+=16384) binary += String.fromCharCode(...bytes.subarray(i,i+16384));
       return json({base64:btoa(binary),mime:previous.mime_type,kind:previous.kind});
     }
+    if(action==='thumbnail'&&previous){
+      const path=previous.thumbnail_path||(previous.kind==='image'?previous.storage_path:null);
+      if(!path)return json({error:'Thumbnail not available'},404);
+      const file=await db.storage.from('portal-designs').download(path);
+      if(file.error)throw file.error;
+      if(path===previous.thumbnail_path&&file.data.size>MAX_THUMBNAIL_BYTES)throw new Error('Thumbnail exceeds size limit');
+      if(path===previous.storage_path&&file.data.size>MAX_DESIGN_BYTES)throw new Error('Design exceeds size limit');
+      return json({base64:await encode(file.data),mime:path===previous.thumbnail_path?previous.thumbnail_mime:previous.mime_type});
+    }
     if (action === 'visibility' && previous) {
       const changed = await db.from('portal_designs').update({visible:body.visible === true,updated_at:new Date().toISOString()}).eq('id',previous.id).eq('library_id',library.id).eq('updated_at',body.baseVersion).select('id');
       if (changed.error) throw changed.error;
@@ -128,6 +149,16 @@ export async function handleDesignRequest(req:Request) {
     const id = previous?.id || crypto.randomUUID();
     let path:string|null = keepFile ? previous.storage_path : null;
     let uploadedNew = false;
+    let thumbnailPath:string|null=body.removeThumbnail===true?null:(previous?.thumbnail_path||null);
+    let thumbnailMimeType:string|null=body.removeThumbnail===true?null:(previous?.thumbnail_mime||null);
+    let thumbnailSize:number|null=body.removeThumbnail===true?null:(previous?.thumbnail_size_bytes||null);
+    let uploadedThumbnail=false;
+    let thumbnailBytes:Uint8Array|null=null;
+    if(body.thumbnailBase64!=null){
+      if(!thumbnailMime.has(body.thumbnailMime)||!Number.isInteger(body.thumbnailSize)||body.thumbnailSize<1||body.thumbnailSize>MAX_THUMBNAIL_BYTES||typeof body.thumbnailBase64!=='string'||body.thumbnailBase64.length>MAX_THUMBNAIL_BYTES*1.4)return json({error:'Thumbnail must be a PNG, JPEG, or WebP image under 1.5 MB.'},400);
+      thumbnailBytes=Uint8Array.from(atob(body.thumbnailBase64),c=>c.charCodeAt(0));
+      if(thumbnailBytes.length!==body.thumbnailSize)return json({error:'Thumbnail size mismatch'},400);
+    }
     if (values.kind !== 'link' && !keepFile) {
       if (typeof body.base64 !== 'string' || body.base64.length > MAX_DESIGN_BYTES*1.4) return json({error:'Invalid file'},400);
       const bytes = Uint8Array.from(atob(body.base64),c=>c.charCodeAt(0));
@@ -137,12 +168,19 @@ export async function handleDesignRequest(req:Request) {
       if (uploaded.error) throw uploaded.error;
       uploadedNew = true;
     }
-    const row = {...values, id, library_id:library.id, storage_path:path, external_url:values.external_url || null, visible:true, updated_at:new Date().toISOString()};
+    if(thumbnailBytes){
+      thumbnailPath=owner+'/'+library.id+'/'+id+'/thumbnail-'+crypto.randomUUID();
+      const uploaded=await db.storage.from('portal-designs').upload(thumbnailPath,thumbnailBytes,{contentType:body.thumbnailMime,upsert:false});
+      if(uploaded.error){if(uploadedNew&&path)await db.storage.from('portal-designs').remove([path]);throw uploaded.error;}
+      thumbnailMimeType=body.thumbnailMime;thumbnailSize=thumbnailBytes.length;uploadedThumbnail=true;
+    }
+    const row = {...values, id, library_id:library.id, storage_path:path,thumbnail_path:thumbnailPath,thumbnail_mime:thumbnailMimeType,thumbnail_size_bytes:thumbnailSize,external_url:values.external_url || null, visible:true, updated_at:new Date().toISOString()};
     const saved = previous
       ? await db.from('portal_designs').update(row).eq('id',id).eq('library_id',library.id).eq('updated_at',body.baseVersion).select('id')
       : await db.from('portal_designs').insert(row).select('id');
     if (saved.error || !saved.data?.length) {
       if (uploadedNew && path) await db.storage.from('portal-designs').remove([path]);
+      if(uploadedThumbnail&&thumbnailPath)await db.storage.from('portal-designs').remove([thumbnailPath]);
       return json({error:saved.error ? 'Design could not be saved. Your original is unchanged.' : 'This design changed in another window. Refresh before replacing.'},saved.error ? 500 : 409);
     }
     // Old private objects retained for recovery, never served by the read endpoint.

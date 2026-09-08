@@ -1,5 +1,13 @@
 # Design-first quotes — local implementation
 
+## Ordered attachments and thumbnails
+
+Local follow-up adds up to 20 ordered designs per quote, explicit replace-all, per-file removal and per-file review receipts/activity. Existing single attachments are retained. Reordering or replacing resets review; missing/withdrawn designs are skipped. Each viewing-problem fallback advances one step. Accepted documents retain access.
+
+Design cards support private image thumbnails. New image renderings generate a reduced thumbnail from the uploaded rendering automatically; interactive models, PDFs and links can use a separately chosen screenshot without altering the source design. Existing image renderings fall back to their private original image until replaced with a reduced thumbnail.
+
+Deploy migration `20260908015507_quote_design_sequence.sql` before updating portal-designs, client-document, document-payment and send-quote-email (all shared-helper consumers), then the web artifact. SQL execution remains a release check; local mocked handler tests and browser sequence tests passed. The client portal now handles redacted/missing totals without NaN.
+
 Owners can attach a published portal design to a quote and optionally require design review before pricing. Clients explicitly continue to the quote, or use the viewing-problem fallback. This is a presentation flow, not approval of the design or a DRM system. Previously delivered copies cannot be recalled.
 
 Activity records design title/version, opens, foreground visible-time increments, continuation and viewing problems. Owner previews are excluded. External links record opens but not duration. Duration is approximate: interrupted connections or closing the browser can lose the final increment.
@@ -20,3 +28,5 @@ Local checks include handler/access/receipt tests, browser flow with mocked API 
 Feature commit `ab3a073` fast-forwarded main after a fresh fetch and rebase. Migration applied and RLS/role privileges verified. Active function versions: portal-designs 2, client-document 50, document-payment 31, send-quote-email 41; source matches local files and JWT settings are unchanged. The four changed JS/CSS assets match the built artifact on quotedr.pages.dev, quotedr.io and myprojectview.ca.
 
 The authenticated owner portal loads its existing design and correct quote total, and the attachment dialog lists the quote and review checkbox. No attachment was saved and no client settings were changed. The full live client continuation/activity walkthrough remains owner testing; desktop/mobile behaviour was verified locally with mocked API. Migration filename is aligned to the version assigned by the production migration API to avoid a duplicate future push.
+
+The ordered-attachment and thumbnail follow-up used migration `20260908015507_quote_design_sequence.sql`. Production columns, constraints, RLS and denied direct browser access were verified before deploying portal-designs 3, client-document 51, document-payment 32 and send-quote-email 42. Function JWT settings were preserved. The thumbnail card and picker were verified in a synthetic local browser portal without cloud writes.

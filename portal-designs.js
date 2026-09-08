@@ -4,6 +4,20 @@ import {prepareDesignHtml} from './portal-design-prepare.mjs';
 const el = (tag,text,className) => { const node=document.createElement(tag); if(text != null)node.textContent=text; if(className)node.className=className; return node; };
 const button = (text,fn,style='btn btn-outline-primary btn-sm') => { const b=el('button',text,style);b.type='button';b.onclick=fn;return b; };
 const binary64 = bytes => {let s='';for(let i=0;i<bytes.length;i+=16384)s+=String.fromCharCode(...bytes.subarray(i,i+16384));return btoa(s);};
+const imageMimes=new Set(['image/png','image/jpeg','image/webp']);
+async function thumbnailPayload(file){
+  if(!file||!imageMimes.has(file.type))throw new Error('Choose a PNG, JPEG, or WebP thumbnail.');
+  const source=URL.createObjectURL(file);
+  try{
+    const image=new Image();image.decoding='async';image.src=source;await image.decode();
+    const scale=Math.min(1,960/Math.max(image.naturalWidth,image.naturalHeight));
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+    canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',.82));
+    if(!blob||blob.size>1536*1024)throw new Error('The thumbnail could not be reduced below 1.5 MB. Choose a smaller screenshot.');
+    const bytes=new Uint8Array(await blob.arrayBuffer());return{thumbnailBase64:binary64(bytes),thumbnailMime:blob.type,thumbnailSize:bytes.length};
+  }finally{URL.revokeObjectURL(source);}
+}
 
 export function isolatedDesignHtml(html) {
   // Do NOT parse uploaded HTML in the parent document: even an inert DOMParser
@@ -39,7 +53,7 @@ async function renderDrawingPdf(bytes,body,d){
 export async function showDesign(read, title, options={}) {
   const d=dialog(title,true);const body=el('div','Loading design…');d.append(body);
   d.addEventListener('close',()=>options.onClose?.(),{once:true});
-  const addContinue=()=>{if(options.onContinue)d.append(button('Continue to quote',()=>{d.close();options.onContinue();},'btn btn-primary'));};
+  const addContinue=()=>{if(options.onContinue)d.append(button(options.continueLabel||'Continue to quote',()=>{d.close();options.onContinue();},'btn btn-primary'));};
   try {
     const result=await read(); if(!d.isConnected)return;
     body.replaceChildren();
@@ -88,10 +102,11 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
     grid.replaceChildren();filter.hidden=rows.length===0;
     for(const row of rows.filter(r=>!filter.value||r.project===filter.value)){
       const card=el('article',null,'qd-design-card'+(!row.visible?' is-withdrawn':''));
+      if(row.has_thumbnail){const image=el('img');image.className='qd-design-thumbnail';image.alt='Preview of '+row.title;image.loading='lazy';card.append(image);request({action:'thumbnail',id:row.id}).then(result=>{if(!image.isConnected)return;image.src='data:'+result.mime+';base64,'+result.base64;}).catch(()=>image.remove());}
       card.append(el('div',row.kind==='interactive'?'◈ Interactive preview':row.kind==='link'?'↗ Design link':row.kind==='pdf'?'▤ Drawing / PDF':'▧ Rendering','qd-design-icon'),el('div',row.project,'qd-design-meta'),el('h3',row.title),el('p',row.note,'qd-design-note'),el('p','Version '+row.version+' · '+new Date(row.updated_at).toLocaleDateString()+(!row.visible?' · Withdrawn':''),'qd-design-meta'));
       const a=el('div',null,'qd-design-actions');a.append(button('Open design',()=>onOpenDesign?onOpenDesign(row,()=>showDesign(()=>request({action:'read',id:row.id}),row.title)):showDesign(()=>request({action:'read',id:row.id}),row.title),'btn btn-primary btn-sm'));
       if(isOwner && row.visible)a.append(button('Attach to quote',()=>attach(row)));
-      if(isOwner)for(const link of attachments.filter(a=>a.design_id===row.id)){const quote=getQuotes().find(q=>q.id===link.document_id);card.append(el('p',(quote?.data?.fileName||quote?.quote_number||'Quote')+(link.require_review?' · Design before pricing':' · Attached design'),'qd-design-meta'));}
+      if(isOwner)for(const link of attachments.filter(a=>(a.design_ids||[a.design_id]).includes(row.id))){const quote=getQuotes().find(q=>q.id===link.document_id);card.append(el('p',(quote?.data?.fileName||quote?.quote_number||'Quote')+' · Position '+((link.design_ids||[link.design_id]).indexOf(row.id)+1)+(link.require_review?' · Design before pricing':' · Attached design'),'qd-design-meta'));}
       if(isOwner)a.append(button('Replace / edit',()=>edit(row)),button(row.visible?'Withdraw':'Publish again',guarded(async()=>{
         if(!window.confirm(row.visible?'Withdraw this design from the client portal? Already opened or downloaded copies cannot be recalled.':'Make this design visible to the client again?'))return;
         await request({action:'visibility',id:row.id,baseVersion:row.updated_at,visible:!row.visible});await refresh();
@@ -105,12 +120,19 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
     const empty=el('option','Choose a quote');empty.value='';select.append(empty);
     for(const q of quotes){const o=el('option',(q.data?.quoteTitle||q.data?.fileName||q.data?.file_name||q.client_name||'Quote')+' · '+(q.quote_number||''));o.value=q.id;select.append(o);}
     const reviewLabel=el('label','Show design before pricing '),review=el('input');review.type='checkbox';reviewLabel.append(review);
-    const note=el('p','Clients can continue after opening the design, or report a viewing problem and continue. This does not approve the design or quote.');
+    const note=el('p','Clients review attached files in the order below before pricing when enabled. Each file has a viewing-problem fallback. Removing a file here does not delete it from the portal.');
     const error=el('p');error.setAttribute('role','status');
-    select.onchange=()=>{review.checked=attachments.find(a=>a.document_id===select.value)?.require_review===true;};
-    const save=button('Save attachment',()=>change(row.id)),remove=button('Remove attachment',()=>change(null));
-    async function change(id){if(!select.value){error.textContent='Choose a quote.';return;}save.disabled=remove.disabled=true;try{await request({action:'attach_quote',documentId:select.value,id,requireReview:review.checked,baseVersion:attachments.find(a=>a.document_id===select.value)?.updated_at||null});await refresh();await onQuotesChanged();d.close();}catch(e){error.textContent=e.message;}finally{save.disabled=remove.disabled=false;}}
-    d.append(label,reviewLabel,note,save,remove,error);
+    let ordered=[];const list=el('ol'),available=el('select');available.setAttribute('aria-label','Design to add');
+    for(const item of rows.filter(r=>r.visible)){const o=el('option',item.title);o.value=item.id;available.append(o);}available.value=row.id;
+    function paint(){list.replaceChildren();ordered.forEach((id,i)=>{const li=el('li',rows.find(r=>r.id===id)?.title||'Unavailable design');
+      const up=button('Move up',()=>{[ordered[i-1],ordered[i]]=[ordered[i],ordered[i-1]];paint();});up.disabled=i===0;
+      const down=button('Move down',()=>{[ordered[i+1],ordered[i]]=[ordered[i],ordered[i+1]];paint();});down.disabled=i===ordered.length-1;
+      li.append(up,down,button('Remove',()=>{ordered.splice(i,1);paint();}));list.append(li);});}
+    select.onchange=()=>{const link=attachments.find(a=>a.document_id===select.value);review.checked=link?.require_review===true;ordered=link?(link.design_ids||[link.design_id]).slice():[];if(!ordered.includes(row.id))ordered.push(row.id);paint();};
+    const add=button('Add selected file',()=>{if(available.value&&!ordered.includes(available.value)){ordered.push(available.value);paint();}});
+    const replace=button('Replace all with selected file',()=>{if(available.value&&window.confirm('Replace this quote’s entire attachment list with the selected file? The other files will remain in the portal.')){ordered=[available.value];paint();}});
+    const save=button('Save attachments',async()=>{if(!select.value){error.textContent='Choose a quote.';return;}save.disabled=true;try{await request({action:'attach_quote',documentId:select.value,designIds:ordered,requireReview:review.checked,baseVersion:attachments.find(a=>a.document_id===select.value)?.updated_at||null});await refresh();await onQuotesChanged();d.close();}catch(e){error.textContent=e.message;}finally{save.disabled=false;}});
+    d.append(label,reviewLabel,note,list,available,add,replace,save,error);
   }
   function edit(previous){
     const d=dialog(previous?'Replace design':'Add design');const f=el('form');d.append(f);
@@ -125,6 +147,11 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
     const url=input('url','HTTPS design link','url');
     if(previous?.kind==='link')request({action:'read',id:previous.id}).then(r=>{if(!url.value)url.value=r.url||'';}).catch(e=>{error.textContent=e.message;});
     const file=input('file','Choose file (maximum 8 MB)','file');
+    const thumbnail=input('thumbnail','Card thumbnail screenshot (optional)','file');thumbnail.accept='.png,.jpg,.jpeg,.webp';
+    const thumbnailHelp=el('small',previous?.has_thumbnail?'Choose a new screenshot to replace the current thumbnail. Leave blank to keep it.':'Photo renderings use their image automatically. For interactive models or PDFs, choose a screenshot clients will see on the card.');thumbnail.parentElement.append(thumbnailHelp);
+    const thumbnailPreview=el('img');thumbnailPreview.className='qd-design-thumbnail-preview';thumbnailPreview.hidden=true;thumbnailPreview.alt='Selected thumbnail preview';f.append(thumbnailPreview);
+    let thumbnailPreviewUrl='';d.addEventListener('close',()=>{if(thumbnailPreviewUrl)URL.revokeObjectURL(thumbnailPreviewUrl);},{once:true});
+    thumbnail.onchange=()=>{if(thumbnailPreviewUrl)URL.revokeObjectURL(thumbnailPreviewUrl);thumbnailPreviewUrl='';const chosen=thumbnail.files[0];thumbnailPreview.hidden=!chosen;if(chosen){thumbnailPreviewUrl=URL.createObjectURL(chosen);thumbnailPreview.src=thumbnailPreviewUrl;}};
     const help=el('p','QuoteDr prepares supported Three.js 0.160.1 HTML viewers on this device. Other viewers must be self-contained or shared as an External design link. Uploaded HTML runs in an isolated preview without network access. Preview and test the controls before publishing.');f.append(help);
     const reviewed=input('reviewed','I previewed this interactive design and its controls work.','checkbox');
     const error=el('p','', 'qd-design-error');error.setAttribute('role','status');f.append(error);
@@ -139,7 +166,8 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
     f.onsubmit=async event=>{event.preventDefault();save.disabled=true;error.textContent='Saving…';try{
       const keepFile=previous&&previous.kind===kind.value&&kind.value!=='link'&&!file.files[0];
       if(kind.value==='interactive'&&!keepFile&&(!reviewed.checked||previewedFile!==file.files[0]))throw new Error('Preview the interactive design and confirm its controls work first.');
-      const data={action:'save',id:previous?.id,baseVersion:previous?.updated_at,title:fields.title.value,project:fields.project.value,version:fields.version.value,note:fields.note.value,kind:kind.value,url:url.value,...(kind.value==='link'?{}:keepFile?{keepFile:true,mime:previous.mime_type,size:previous.size_bytes}:await filePayload())};designInput(data);
+      const chosenThumbnail=thumbnail.files[0]||(kind.value==='image'&&file.files[0]?file.files[0]:null);
+      const data={action:'save',id:previous?.id,baseVersion:previous?.updated_at,title:fields.title.value,project:fields.project.value,version:fields.version.value,note:fields.note.value,kind:kind.value,url:url.value,...(kind.value==='link'?{}:keepFile?{keepFile:true,mime:previous.mime_type,size:previous.size_bytes}:await filePayload()),...(chosenThumbnail?await thumbnailPayload(chosenThumbnail):{})};designInput(data);
       await request(data);d.close();await refresh();status.textContent='Design saved to the portal.';
     }catch(e){error.textContent=e.message;}finally{save.disabled=false;}};
   }

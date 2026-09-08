@@ -47,6 +47,26 @@ assert.equal(tables.portal_document_events.at(-1).event_type,'design_viewing_pro
 owner=true;const count=tables.portal_document_events.length;await handler({}, {...base,revision:state.revision,operation:'open'});assert.equal(tables.portal_document_events.length,count,'Owner preview is excluded');
 assert((await quoteDesignState(db,row,viewer)).receipt.opened_at,'Reopening after fallback supports timing');
 tables.portal_designs[0].visible=false;assert.equal(await quoteDesignState(db,row,viewer),null,'Withdrawal releases quote');
+tables.portal_designs[0].visible=true;owner=false;
+tables.portal_designs.push({...tables.portal_designs[0],id:'photo',title:'Photo render',kind:'image'});
+tables.quote_design_links[0].design_ids=['photo','design'];
+tables.quote_design_links[0].updated_at='sequence1';
+state=await quoteDesignState(db,row,viewer);
+assert.deepEqual(publicDesignReview(state).designs.map(d=>d.id),['photo','design']);
+const photo=state.states[0],model=state.states[1];
+assert.notEqual(photo.revision,model.revision,'Same timestamps cannot share receipts');
+await handler({}, {...base,designId:'photo',revision:photo.revision,operation:'open'});
+await handler({}, {...base,designId:'photo',revision:photo.revision,operation:'continue'});
+assert((await quoteDesignState(db,row,viewer)).locked,'One review does not unlock two designs');
+assert.equal((await quoteDesignState(db,row,viewer)).design.id,'design');
+assert.equal((await handler({}, {...base,designId:'foreign',revision:photo.revision,operation:'open'})).status,409);
+await handler({}, {...base,designId:'design',revision:model.revision,operation:'problem'});
+assert.equal((await quoteDesignState(db,row,viewer)).locked,false);
+tables.quote_design_links[0].updated_at='sequence2';tables.quote_design_links[0].design_ids=['design','photo'];
+assert((await quoteDesignState(db,row,viewer)).locked,'Changing order resets review');
+tables.portal_designs[0].visible=false;
+assert.deepEqual(publicDesignReview(await quoteDesignState(db,row,viewer)).designs.map(d=>d.id),['photo'],'Withdrawn files skipped');
+tables.portal_designs.pop();assert.equal(await quoteDesignState(db,row,viewer),null,'No surviving files releases quote');
 // Foreground time and background/suspend behaviour use the real timer.
 let now=0,tick,hiddenHandler;const values=[];const doc={hidden:false,addEventListener:(_,fn)=>hiddenHandler=fn,removeEventListener:()=>{}};
 const stop=visibleDesignTimer(n=>values.push(n),doc,()=>now,fn=>{tick=fn;return 1;},()=>{});

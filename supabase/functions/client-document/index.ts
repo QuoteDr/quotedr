@@ -958,7 +958,7 @@ async function designReviewRequest(req:Request,body:Record<string,unknown>) {
   const {target}=await assertTokenAccess(documentId,token,normalizeId(body.portalAnchorId));
   const db=adminClient(), viewer=reviewViewer(body.designViewerId);
   if(!viewer)return json({error:'Refresh the page to start a design review.'},400);
-  const state=await quoteDesignState(db,target,viewer);
+  const state=await quoteDesignState(db,target,viewer,body.designId);
   if(!state || state.revision!==body.revision)return json({error:'This design changed. Refresh the quote to review the latest version.'},409);
   const operation=String(body.operation||''), user=await userFromAuthHeader(req);
   const owner=user?.id===target.user_id;

@@ -1,4 +1,4 @@
-import {showDesign} from './portal-designs.js?v=2026090703';
+import {showDesign} from './portal-designs.js?v=2026090801';
 function css(){if(!document.querySelector('[data-design-review-css]')){const link=document.createElement('link');link.rel='stylesheet';link.href=new URL('./portal-designs.css',import.meta.url);link.dataset.designReviewCss='';document.head.append(link);}}
 function button(text,click){const b=document.createElement('button');b.type='button';b.className='btn btn-outline-primary';b.textContent=text;b.onclick=click;return b;}
 // Measure foreground time, not attention. Heartbeat deltas are bounded so suspend
@@ -12,32 +12,42 @@ export function visibleDesignTimer(send,doc=document,clock=()=>performance.now()
   doc.addEventListener('visibilitychange',visibility);
   return ()=>{if(stopped)return;stopped=true;sample();flush();cancel(timer);doc.removeEventListener('visibilitychange',visibility);};
 }
-export async function openAttachedDesign(design,request,onContinue){
+export async function openAttachedDesign(design,request,onContinue,continueLabel){
   css();const sessionId=crypto.randomUUID();
-  const base={revision:design.revision,sessionId};let stop=()=>{},closed=false;
+  const base={designId:design.id,revision:design.revision,sessionId};let stop=()=>{},closed=false;
   const ok=await showDesign(async()=>{const data=await request({...base,operation:'open'});
     // External pages cannot be timed reliably from the portal.
     if(!closed&&!data.url)stop=visibleDesignTimer(durationSeconds=>request({...base,operation:'duration',durationSeconds}).catch(()=>{}));
     return data;
-  },design.title,{onClose:()=>{closed=true;stop();},onContinue:onContinue?()=>onContinue(sessionId):undefined});
+  },design.title,{onClose:()=>{closed=true;stop();},onContinue:onContinue?()=>onContinue(sessionId):undefined,continueLabel});
   return {ok,sessionId};
 }
-export function reviewBeforeQuote(design,request){
+export async function reviewBeforeQuote(review,request){
+  const pending=(review.designs||[review]).filter(d=>d.locked);
+  for(let i=0;i<pending.length;i++)await reviewOneDesign(pending[i],request,i+1,pending.length);
+}
+function reviewOneDesign(design,request,position,total){
   css();return new Promise((resolve,reject)=>{
     const d=document.createElement('dialog');d.className='qd-design-dialog';
-    const heading=document.createElement('h2');heading.textContent='Explore your design';
+    const heading=document.createElement('h2');heading.textContent='Explore your design'+(total>1?' — '+position+' of '+total:'');
     const text=document.createElement('p');text.textContent='Take a look at '+design.title+' before continuing to your quote. Viewing the design does not approve the work.';
     const error=document.createElement('p');error.setAttribute('role','status');
     let sessionId=crypto.randomUUID(),done=false,busy=false;
-    const next=button('Continue to quote',()=>finish('continue'));next.disabled=true;
-    const open=button('Open design',async()=>{open.disabled=true;try{const result=await openAttachedDesign(design,request,id=>{sessionId=id;finish('continue');});sessionId=result.sessionId;next.disabled=!result.ok;}catch(e){error.textContent=e.message;}finally{open.disabled=false;}});
-    const problem=button('Design won’t open — continue to quote',()=>finish('problem'));
-    async function finish(operation){if(busy)return;busy=true;next.disabled=problem.disabled=true;try{await request({operation,revision:design.revision,sessionId});done=true;d.close();resolve();}catch(e){error.textContent=e.message;}finally{busy=false;next.disabled=false;problem.disabled=false;}}
+    const continueLabel=position<total?'Next design':'Continue to quote';
+    const next=button(continueLabel,()=>finish('continue'));next.disabled=true;
+    const open=button('Open design',async()=>{open.disabled=true;try{const result=await openAttachedDesign(design,request,id=>{sessionId=id;finish('continue');},continueLabel);sessionId=result.sessionId;next.disabled=!result.ok;}catch(e){error.textContent=e.message;}finally{open.disabled=false;}});
+    const problem=button('Design won’t open — '+(position<total?'next design':'continue to quote'),()=>finish('problem'));
+    async function finish(operation){if(busy)return;busy=true;next.disabled=problem.disabled=true;try{await request({operation,designId:design.id,revision:design.revision,sessionId});done=true;d.close();resolve();}catch(e){error.textContent=e.message;}finally{busy=false;next.disabled=false;problem.disabled=false;}}
     d.append(heading,text,open,next,problem,error);document.body.append(d);
     d.addEventListener('close',()=>{d.remove();if(!done)reject(new Error('Design review closed. Reopen the quote to continue.'));},{once:true});d.showModal();
   });
 }
 export function addAttachedDesignButton(design,request){
   if(!design || document.getElementById('qdAttachedDesign'))return;
-  const b=button('View attached design',()=>openAttachedDesign(design,request));b.id='qdAttachedDesign';b.style.cssText='position:fixed;bottom:16px;left:16px;z-index:1040;background:white';document.body.append(b);
+  const b=button('View attached designs',()=>{
+    css();const d=document.createElement('dialog');d.className='qd-design-dialog';
+    d.append(button('Close',()=>d.close()));
+    for(const item of design.designs||[design])d.append(button(item.title,()=>openAttachedDesign(item,request)));
+    d.addEventListener('close',()=>d.remove(),{once:true});document.body.append(d);d.showModal();
+  });b.id='qdAttachedDesign';b.style.cssText='position:fixed;bottom:16px;left:16px;z-index:1040;background:white';document.body.append(b);
 }

@@ -799,7 +799,7 @@ async function loadSecureClientDocument(documentId, token, portalAnchorId) {
             portalAnchorId: portalAnchorId || ''
         }, false);
         if(data.designReview){
-            const review=await import('./quote-design-review.js');
+            const review=await import('./quote-design-review.js?v=2026090802');
             const request=payload=>callClientDocumentFunction(Object.assign({action:'design_review',documentId,token,portalAnchorId:portalAnchorId||''},payload),false);
             if(data.designReview.locked){await review.reviewBeforeQuote(data.designReview,request);data=await callClientDocumentFunction({action:'view',documentId,token,portalAnchorId:portalAnchorId||''},false);if(data.designReview?.locked)throw new Error('Please refresh to review the latest design.');}
             review.addAttachedDesignButton(data.designReview,request);

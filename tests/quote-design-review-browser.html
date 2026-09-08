@@ -4,8 +4,10 @@
 import {mountDesignLibrary} from '/portal-designs.js';
 import {reviewBeforeQuote,addAttachedDesignButton} from '/quote-design-review.js';
 const design={id:'one',title:'Closet concept',project:'Bedroom',version:'1',kind:'interactive',visible:true,updated_at:'v1',revision:'r1',locked:true};let attachments=[];
-const request=async p=>{if(p.action==='list')return {designs:[design],attachments};if(p.action==='attach_quote'){attachments=[{document_id:p.documentId,design_id:p.id,require_review:p.requireReview,updated_at:'r1'}];return {ok:true};}throw Error('Disabled');};
-mountDesignLibrary(document.querySelector('#library'),{isOwner:true,request,getQuotes:()=>[{id:'q',quote_number:'Q-001',type:'quote',data:{quoteTitle:'Closet quote'}}]});
+const photo={...design,id:'photo',title:'Photo render',kind:'image',has_thumbnail:true,revision:'r2'};
+const thumbnail='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+const request=async p=>{if(p.action==='list')return {designs:[design,photo],attachments};if(p.action==='thumbnail')return {mime:'image/png',base64:thumbnail};if(p.action==='attach_quote'){attachments=[{document_id:p.documentId,design_id:p.designIds[0],design_ids:p.designIds,require_review:p.requireReview,updated_at:'r1'}];return {ok:true};}throw Error('Disabled');};
+mountDesignLibrary(document.querySelector('#library'),{isOwner:true,request,getQuotes:()=>[{id:'q',quote_number:'Q-001',type:'quote',data:{quoteTitle:'Closet quote'}}]}).refresh();
 const reviewRequest=async p=>{document.querySelector('#events').textContent+=JSON.stringify(p)+'\n';if(p.operation==='open')return {kind:'interactive',mime:'text/html',base64:btoa('<h1>Closet concept</h1><button onclick="this.textContent=\'Door open\'">Slide door</button>')};return {ok:true};};
-document.querySelector('#client').onclick=async()=>{try{await reviewBeforeQuote(design,reviewRequest);document.querySelector('#result').textContent='Quote unlocked: $5,847.75';addAttachedDesignButton(design,reviewRequest);}catch(e){document.querySelector('#result').textContent=e.message;}};
+document.querySelector('#client').onclick=async()=>{try{const review={...design,designs:[photo,design]};await reviewBeforeQuote(review,reviewRequest);document.querySelector('#result').textContent='Quote unlocked: $5,847.75';addAttachedDesignButton(review,reviewRequest);}catch(e){document.querySelector('#result').textContent=e.message;}};
 </script></html>
