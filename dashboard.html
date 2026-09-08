@@ -407,6 +407,15 @@
                 </div>
             </div>
 
+            <div id="quoteBulkBar" class="border rounded p-2 mb-3 bg-light" aria-label="Quote selection">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <button id="quoteSelectVisible" class="btn btn-sm btn-outline-primary" onclick="selectVisibleDashboardQuotes()">Select visible</button>
+                    <button id="quoteClearSelection" class="btn btn-sm btn-outline-secondary" onclick="clearDashboardQuoteSelection()" disabled>Clear selection</button>
+                    <span id="quoteSelectionCount" role="status" class="small">0 selected</span>
+                    <button id="quoteBulkJunk" data-account-permission="quotes.delete" class="btn btn-sm btn-outline-danger" onclick="junkSelectedDashboardQuotes()" disabled>Move selected to Junk</button>
+                </div>
+                <div class="small text-muted mt-1">Select documents in List view. Selection is limited to current search/filter results. Junk is recoverable for 30 days.</div>
+            </div>
             <div id="quotesList">
                             <!-- Quotes will be rendered here -->
                         </div>
@@ -1302,8 +1311,59 @@
             return data;
         }
 
+        var dashboardQuoteSelection = new Set();
+        var dashboardBulkBusy = false;
+        function updateDashboardQuoteSelection() {
+            var visible = new Set((window.currentQuotes || []).map(q => q.id));
+            dashboardQuoteSelection.forEach(id => { if (!visible.has(id)) dashboardQuoteSelection.delete(id); });
+            document.getElementById('quoteSelectionCount').textContent = dashboardQuoteSelection.size + ' selected' + (dashboardBulkBusy ? ' — working…' : '');
+            document.getElementById('quoteBulkJunk').disabled = dashboardBulkBusy || !dashboardQuoteSelection.size;
+            document.getElementById('quoteClearSelection').disabled = dashboardBulkBusy || !dashboardQuoteSelection.size;
+            document.getElementById('quoteSelectVisible').disabled = dashboardBulkBusy || !visible.size;
+            document.querySelectorAll('[data-quote-select]').forEach(box => {
+                box.checked = dashboardQuoteSelection.has(box.dataset.quoteSelect);
+                box.disabled = dashboardBulkBusy;
+            });
+        }
+        function toggleDashboardQuoteSelection(id, checked) {
+            if (dashboardBulkBusy) return;
+            if (checked) dashboardQuoteSelection.add(id); else dashboardQuoteSelection.delete(id);
+            updateDashboardQuoteSelection();
+        }
+        function selectVisibleDashboardQuotes() {
+            if (dashboardBulkBusy) return;
+            (window.currentQuotes || []).forEach(q => dashboardQuoteSelection.add(q.id));
+            updateDashboardQuoteSelection();
+        }
+        function clearDashboardQuoteSelection() {
+            if (dashboardBulkBusy) return;
+            dashboardQuoteSelection.clear();updateDashboardQuoteSelection();
+        }
+        async function junkSelectedDashboardQuotes() {
+            if (dashboardBulkBusy) return;
+            updateDashboardQuoteSelection();
+            var ids = Array.from(dashboardQuoteSelection);
+            if (!ids.length) return;
+            dashboardBulkBusy = true;updateDashboardQuoteSelection();
+            var moved = 0, failed = [];
+            try {
+                var rows = ids.map(id => allQuotes.find(q => q.id === id)).filter(Boolean);
+                var names = rows.map(q => (getQuoteTitle(q) || q.client_name || 'Untitled') + ' — ' + (q.quote_number || q.id)).join('\n');
+                if (!await qdConfirm('Move these ' + rows.length + ' documents to Junk?\n\n' + names + '\n\nThis also hides selected documents from client portals, including accepted documents and invoices. Payment records are not cancelled or refunded. Restore within ' + JUNK_RETENTION_DAYS + ' days.', {title:'Move selected to Junk',okText:'Move to Junk',okClass:'btn-danger',type:'danger'})) return;
+                // Sequential writes preserve portal anchors as each document leaves the portal.
+                for (var id of ids) {
+                    try { await moveDashboardQuoteToJunk(id);dashboardQuoteSelection.delete(id);moved++; }
+                    catch (error) { failed.push((rows.find(q => q.id === id)?.quote_number || id) + ': ' + (error.message || error)); }
+                }
+                await qdAlert(moved + ' moved to Junk.' + (failed.length ? '\n' + failed.length + ' could not be moved:\n' + failed.join('\n') : '\nYou can restore them within ' + JUNK_RETENTION_DAYS + ' days.'));
+            } finally {
+                dashboardBulkBusy = false;renderDashboardResults();updateStats(allQuotes);updateJunkBadge();updateDashboardQuoteSelection();
+            }
+        }
+
         function renderQuotes(quotes) {
             window.currentQuotes = quotes; // keep kanban in sync
+            updateDashboardQuoteSelection();
             const el = document.getElementById('quotesList');
             if (!quotes.length) {
                 el.innerHTML = `<div class="text-center py-5">
@@ -1412,9 +1472,12 @@
                                 <option value="approved" ${!isInvalid && status === 'approved' ? 'selected' : ''}>CO Approved</option>
                                 <option value="declined" ${!isInvalid && status === 'declined' ? 'selected' : ''}>Declined</option>
                             </select>
-                            <button data-account-permission="quotes.delete" class="btn btn-outline-danger" onclick="deleteQuote(${jsAttr(q.id)})">
+                            <div class="d-flex align-items-center gap-2" onclick="event.stopPropagation()">
+                            <label class="p-2" title="Select document"><input type="checkbox" class="form-check-input m-0" data-quote-select="${escapeHtml(q.id)}" aria-label="Select ${escapeHtml(displayTitle)} ${escapeHtml(quoteNumber)}" ${dashboardQuoteSelection.has(q.id) ? 'checked' : ''} ${dashboardBulkBusy ? 'disabled' : ''} onchange="toggleDashboardQuoteSelection(${jsAttr(q.id)}, this.checked)"></label>
+                            <button data-account-permission="quotes.delete" class="btn btn-outline-danger" onclick="deleteQuote(${jsAttr(q.id)})" ${dashboardBulkBusy ? 'disabled' : ''}>
                                 <i class="fas fa-trash"></i>
                             </button>
+                            </div>
                         </div>
                     </div>
                     ${isInvalid ? `<div class="alert alert-danger py-2 px-2 mt-2 mb-0 small"><i class="fas fa-ban me-1"></i><strong>No longer valid.</strong> This invoice remains in the client portal for reference only and cannot be paid.</div>` : ''}
@@ -4297,6 +4360,7 @@
         }
 
         async function deleteQuote(quoteId) {
+            if (dashboardBulkBusy) return;
             var quote = allQuotes.find(function(q) { return q.id === quoteId; });
             if (!quote) return;
             if (!await qdConfirm('Move this document to Junk? You can restore it for ' + JUNK_RETENTION_DAYS + ' days before it is permanently deleted.', {
@@ -4306,6 +4370,16 @@
                 type: 'danger'
             })) return;
 
+            try { await moveDashboardQuoteToJunk(quoteId); }
+            catch (error) { await qdAlert('Failed to move document to Junk: ' + (error.message || error)); return; }
+            dashboardQuoteSelection.delete(quoteId);
+            renderDashboardResults();updateStats(allQuotes);updateJunkBadge();
+            qdAlert('Moved to Junk. You can restore it within ' + JUNK_RETENTION_DAYS + ' days.');
+        }
+
+        async function moveDashboardQuoteToJunk(quoteId) {
+            var quote = allQuotes.find(q => q.id === quoteId);
+            if (!quote) throw new Error('Document is no longer available. Refresh and try again.');
             quote = await loadDashboardFullQuote(quote);
             var now = new Date();
             var data;
@@ -4313,8 +4387,7 @@
                 data = await preparePortalDocumentForJunk(quote, dashboardPortalForDocument(quote));
             } catch (portalError) {
                 console.error('Could not preserve client portal before moving document to junk:', portalError);
-                qdAlert('This document was not moved to Junk because its client portal could not be preserved. Refresh and try again.');
-                return;
+                throw new Error('Its client portal could not be preserved. Refresh and try again.');
             }
             data.junk_deleted_at = now.toISOString();
             data.junk_delete_after = new Date(now.getTime() + JUNK_RETENTION_MS).toISOString();
@@ -4323,16 +4396,11 @@
             const { error } = await qdDurableQuoteRowUpdate(quoteId, { data: data, updated_at: now.toISOString() }, 'Move document to Junk');
             if (error) {
                 console.error('Error moving quote to junk:', error);
-                qdAlert('Failed to move document to Junk: ' + (error.message || error));
-                return;
+                throw error;
             }
             quote.data = data;
             junkQuotes.unshift(quote);
             allQuotes = allQuotes.filter(function(q) { return q.id !== quoteId; });
-            renderDashboardResults();
-            updateStats(allQuotes);
-            updateJunkBadge();
-            qdAlert('Moved to Junk. You can restore it within ' + JUNK_RETENTION_DAYS + ' days.');
         }
 
         function openJunkBox() {
