@@ -77,7 +77,7 @@ export async function showDesign(read, title, options={}) {
   }catch(error){body.textContent=error.message;body.className='qd-design-error';return false;}
 }
 
-export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQuotes=()=>[],onQuotesChanged=()=>{},onOpenDesign}) {
+export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQuotes=()=>[],onQuotesChanged=()=>{},onOpenDesign,onAttachmentsChanged=()=>{}}) {
   let rows=[],attachments=[];
   root.className='qd-designs';
   const head=el('header');head.append(el('h2','Designs & Renderings'));
@@ -95,7 +95,7 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
   async function refresh(){
     try{const result=await request({action:'list'});rows=result.designs||[];attachments=result.attachments||[];status.textContent=rows.length?'Design previews do not change or approve your quote.':'No designs shared yet.';
       const value=filter.value;filter.replaceChildren();const all=el('option','All projects');all.value='';filter.append(all);
-      [...new Set(rows.map(r=>r.project))].sort().forEach(p=>{const o=el('option',p);o.value=p;filter.append(o);});filter.value=value;render();
+      [...new Set(rows.map(r=>r.project))].sort().forEach(p=>{const o=el('option',p);o.value=p;filter.append(o);});filter.value=value;render();onAttachmentsChanged();
     }catch(e){grid.replaceChildren();status.replaceChildren(el('span',e.message+' '));if(!isOwner)status.append(button('Unlock designs',reunlock));}
   }
   function render(){
@@ -121,18 +121,39 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
     for(const q of quotes){const o=el('option',(q.data?.quoteTitle||q.data?.fileName||q.data?.file_name||q.client_name||'Quote')+' · '+(q.quote_number||''));o.value=q.id;select.append(o);}
     const reviewLabel=el('label','Show design before pricing '),review=el('input');review.type='checkbox';reviewLabel.append(review);
     const note=el('p','Clients review attached files in the order below before pricing when enabled. Each file has a viewing-problem fallback. Removing a file here does not delete it from the portal.');
-    const error=el('p');error.setAttribute('role','status');
-    let ordered=[];const list=el('ol'),available=el('select');available.setAttribute('aria-label','Design to add');
+    const selectionStatus=el('p',null,'qd-design-meta');selectionStatus.setAttribute('role','status');
+    const error=el('p');error.setAttribute('role','alert');
+    let ordered=[],savedState='';
+    const attachmentState=()=>JSON.stringify({ids:ordered,review:review.checked});
+    function closeAttachments(){
+      if(save.disabled)return;
+      if(select.value&&attachmentState()!==savedState){
+        const prompt=dialog('Attachments haven’t been saved');
+        prompt.append(el('p','You haven’t clicked Save attachments. Your changes will be lost if you leave now.'));
+        const actions=el('div',null,'qd-design-actions');
+        actions.append(button('Keep editing',()=>prompt.close(),'btn btn-primary'),button('Leave without saving',()=>{prompt.close();d.close();}));
+        prompt.append(actions);return;
+      }
+      d.close();
+    }
+    d.querySelector('header button').onclick=closeAttachments;
+    d.addEventListener('cancel',event=>{event.preventDefault();closeAttachments();});
+    const list=el('ol'),available=el('select');available.setAttribute('aria-label','Design to add');
     for(const item of rows.filter(r=>r.visible)){const o=el('option',item.title);o.value=item.id;available.append(o);}available.value=row.id;
     function paint(){list.replaceChildren();ordered.forEach((id,i)=>{const li=el('li',rows.find(r=>r.id===id)?.title||'Unavailable design');
       const up=button('Move up',()=>{[ordered[i-1],ordered[i]]=[ordered[i],ordered[i-1]];paint();});up.disabled=i===0;
       const down=button('Move down',()=>{[ordered[i+1],ordered[i]]=[ordered[i],ordered[i+1]];paint();});down.disabled=i===ordered.length-1;
-      li.append(up,down,button('Remove',()=>{ordered.splice(i,1);paint();}));list.append(li);});}
-    select.onchange=()=>{const link=attachments.find(a=>a.document_id===select.value);review.checked=link?.require_review===true;ordered=link?(link.design_ids||[link.design_id]).slice():[];if(!ordered.includes(row.id))ordered.push(row.id);paint();};
-    const add=button('Add selected file',()=>{if(available.value&&!ordered.includes(available.value)){ordered.push(available.value);paint();}});
+      li.append(up,down,button('Remove',()=>{ordered.splice(i,1);paint();}));list.append(li);});
+      const selected=rows.find(r=>r.id===available.value);const alreadyAdded=Boolean(available.value&&ordered.includes(available.value));
+      add.disabled=!available.value||alreadyAdded;add.textContent=alreadyAdded?'Already in attachment list':'Add selected file';
+      selectionStatus.textContent=!select.value?'Choose a quote first.':alreadyAdded?(selected?.title||'This design')+' is already in the list. Choose the pricing option, then click Save attachments.':'Click Add selected file to include '+(selected?.title||'this design')+'.';
+    }
+    select.onchange=()=>{const link=attachments.find(a=>a.document_id===select.value);review.checked=link?.require_review===true;ordered=link?(link.design_ids||[link.design_id]).slice():[];savedState=attachmentState();if(!ordered.includes(row.id))ordered.push(row.id);error.textContent='';paint();};
+    const add=button('Add selected file',()=>{if(available.value&&!ordered.includes(available.value)){ordered.push(available.value);error.textContent='';paint();}});
+    available.onchange=paint;
     const replace=button('Replace all with selected file',()=>{if(available.value&&window.confirm('Replace this quote’s entire attachment list with the selected file? The other files will remain in the portal.')){ordered=[available.value];paint();}});
     const save=button('Save attachments',async()=>{if(!select.value){error.textContent='Choose a quote.';return;}save.disabled=true;try{await request({action:'attach_quote',documentId:select.value,designIds:ordered,requireReview:review.checked,baseVersion:attachments.find(a=>a.document_id===select.value)?.updated_at||null});await refresh();await onQuotesChanged();d.close();}catch(e){error.textContent=e.message;}finally{save.disabled=false;}});
-    d.append(label,reviewLabel,note,list,available,add,replace,save,error);
+    d.append(label,reviewLabel,note,list,available,selectionStatus,add,replace,save,error);paint();
   }
   function edit(previous){
     const d=dialog(previous?'Replace design':'Add design');const f=el('form');d.append(f);
@@ -171,5 +192,11 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
       await request(data);d.close();await refresh();status.textContent='Design saved to the portal.';
     }catch(e){error.textContent=e.message;}finally{save.disabled=false;}};
   }
-  return {refresh};
+  function reviewDesigns(documentId){
+    if(!isOwner)return [];
+    const link=attachments.find(a=>a.document_id===documentId);
+    if(!link?.require_review)return [];
+    return (link.design_ids||[link.design_id]).map(id=>rows.find(r=>r.id===id&&r.visible)).filter(Boolean);
+  }
+  return {refresh,reviewDesigns};
 }

@@ -2864,10 +2864,11 @@
 
       if (portalId) {
         const css = document.createElement('link');css.rel='stylesheet';css.href='portal-designs.css?v=2026090802';document.head.append(css);
-        const designs = await import('./portal-designs.js?v=2026090802');
+        const designs = await import('./portal-designs.js?v=2026090803');
         portalDesignController = designs.mountDesignLibrary(document.getElementById('portalDesignLibrary'), {
           request:portalDesignRequest, isOwner:portalIsAdminView,
           getQuotes:()=>portalQuotesCache,onQuotesChanged:()=>loadQuotes(),
+          onAttachmentsChanged:updateDesignReplayButtons,
           onOpenDesign:async function(design,fallback){
             const quote=portalQuotesCache.find(q=>(q.designReview?.designs||[q.designReview]).some(d=>d?.id===design.id));
             if(portalIsAdminView||!quote||!portalToken)return fallback();
@@ -2884,6 +2885,29 @@
       else restorePortalUnlockState();
     }
 
+    function updateDesignReplayButtons(){
+      document.querySelectorAll('[data-replay-design]').forEach(button=>{
+        button.hidden=!portalIsAdminView||!portalDesignController?.reviewDesigns(button.dataset.replayDesign).length;
+      });
+    }
+    async function replayPortalDesignReview(event,documentId){
+      event.preventDefault();event.stopPropagation();
+      if(!portalIsAdminView)return;
+      const button=event.currentTarget;button.disabled=true;
+      try{
+        const designs=portalDesignController?.reviewDesigns(documentId)||[];
+        if(!designs.length)return;
+        const module=await import('./quote-design-review.js?v=2026090802');
+        // Replay uses owner-authorized file reads. Progress is local to this
+        // walkthrough; no client receipts or activity events are changed.
+        await module.reviewBeforeQuote({designs:designs.map(d=>({...d,locked:true}))},async payload=>{
+          if(payload.operation==='open')return portalDesignRequest({action:'read',id:payload.designId});
+          return {ok:true};
+        });
+      }catch(error){
+        if(error.message!=='Design review closed. Reopen the quote to continue.')alert(error.message);
+      }finally{button.disabled=false;}
+    }
     function portalDesignSessionKey(){return 'qd_design_session_'+contractorId+'_'+portalId;}
     async function portalDesignRequest(body){
       let bearer=supabaseKey;
@@ -5234,7 +5258,8 @@
       }).format(quote.total) : 'Unavailable';
       const designLocked=quote.designReview?.locked===true && (!portalIsAdminView || quote.total==null);
       const adminActivityMarkup = portalIsAdminView
-        ? `<button type="button" class="btn btn-outline-primary btn-sm" onclick="togglePortalDocumentActivity(event, '${escapeHtml(quote.id)}')">
+        ? `<button type="button" class="btn btn-outline-primary btn-sm" data-replay-design="${escapeHtml(quote.id)}" ${portalDesignController?.reviewDesigns(quote.id).length?'':'hidden'} onclick="replayPortalDesignReview(event, '${escapeHtml(quote.id)}')" title="Restart your admin walkthrough. Client review progress is unchanged.">Replay design review</button>
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="togglePortalDocumentActivity(event, '${escapeHtml(quote.id)}')">
               <i class="fas fa-chart-line me-1"></i> Activity
             </button>
             <a href="dashboard.html" class="btn btn-outline-dark btn-sm">
