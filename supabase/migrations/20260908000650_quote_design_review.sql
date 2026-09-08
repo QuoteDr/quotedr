@@ -1,3 +1,4 @@
+-- Version matches the migration recorded by the production migration API.
 create table public.quote_design_links (
   document_id uuid primary key references public.quotes(id) on delete cascade,
   design_id uuid not null references public.portal_designs(id) on delete cascade,
