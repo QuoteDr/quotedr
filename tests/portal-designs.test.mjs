@@ -19,7 +19,7 @@ assert.equal(designInput({kind:'link',title:'A',url:'https://example.com/view'})
 // The session validator and current-portal resolver are the real implementations.
 let storageReads=0, authPermission='';
 const tables={
-  quotes:[],
+  quotes:[],quote_design_links:[],
   user_data:[{user_id:owner,key:'client_portals',value:[{id:portal,name:'Design-only project',pin:'1847',updatedAt:new Date().toISOString()}]}],
   portal_design_libraries:[{id:'lib-a',user_id:owner,portal_id:portal,share_token:'a'.repeat(48)}],
   portal_designs:[
@@ -33,8 +33,11 @@ class Query{
   select(fields){this.fields=fields;return this;}eq(k,v){this.filters.push([k,v]);return this;}order(){return this;}maybeSingle(){this.one=true;return this;}single(){this.one=true;return this;}
   update(value){this.mode='update';this.value=value;return this;}insert(value){this.mode='insert';this.value=value;return this;}
   upsert(value){this.mode='insert';this.value=value;return this;}
+  in(k,values){this.inFilter=[k,values];return this;}delete(){this.mode='delete';return this;}
   then(resolve){let rows=tables[this.table].filter(r=>this.filters.every(([k,v])=>k==='data->>portal_id'?r.data?.portal_id===v:r[k]===v));
     if(this.mode==='update')rows.forEach(r=>Object.assign(r,this.value));
+    if(this.inFilter)rows=rows.filter(r=>this.inFilter[1].includes(r[this.inFilter[0]]));
+    if(this.mode==='delete')tables[this.table]=tables[this.table].filter(r=>!rows.includes(r));
     if(this.mode==='insert'){const r={id:'generated-library',...this.value};tables[this.table].push(r);rows=[r];}
     const output=rows.map(r=>this.fields&&this.fields!=='*'?Object.fromEntries(this.fields.split(',').map(k=>[k,r[k]])):{...r});
     return Promise.resolve({data:this.one?output[0]||null:output,error:null}).then(resolve);
@@ -70,6 +73,18 @@ response=await call({...save,id:savedId,baseVersion:saved.updated_at,keepFile:tr
 response=await call({action:'save',ownerMode:true,title:'Provider design',kind:'link',url:'https://example.com/model'},true);assert.equal(response.status,200);
 assert.equal((await call({...save,kind:'image',mime:'image/svg+xml'},true)).status,400);
 assert.equal((await call({action:'list',ownerMode:true,contractorId:'22222222-2222-4222-8222-222222222222'},true)).status,403);
+tables.quotes.push({id:'attached-quote',user_id:owner,type:'quote',data:{portal_id:portal}},{id:'different-portal',user_id:owner,data:{portal_id:'elsewhere'}});
+const attach={action:'attach_quote',ownerMode:true,id:savedId,documentId:'attached-quote',requireReview:true};
+assert.equal((await call(attach)).status,403);
+assert.equal((await call({...attach,documentId:'different-portal'},true)).status,400);
+assert.equal((await call({...attach,id:'other'},true)).status,400);
+assert.equal((await call(attach,true)).status,200);
+assert(tables.quote_design_links[0].require_review);
+assert.equal((await call(attach,true)).status,409,'Stale attachment update is rejected');
+const attachmentVersion=tables.quote_design_links[0].updated_at;
+assert.equal((await call({...attach,id:null,baseVersion:attachmentVersion},true)).status,200);
+assert.equal(tables.quote_design_links.length,0);
+tables.quotes=[];
 tables.user_data[0].value[0].pin='2345';assert.equal((await call({action:'list',session:token})).status,401,'PIN reset invalidates old grants');
 tables.user_data[0].value=[];assert.equal((await call({action:'list',session:token})).status,404,'Deleted portal revokes access');
 // Execute the PIN endpoint too, including legacy-oracle throttling.

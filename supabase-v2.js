@@ -748,9 +748,16 @@ async function getSupabaseOptionalUserFunctionHeaders() {
     return headers;
 }
 
+function qdDesignViewerId() {
+    if(window._qdDesignViewerId)return window._qdDesignViewerId;
+    try {var stored=localStorage.getItem('qd_design_viewer');if(/^[a-f0-9-]{36}$/i.test(stored||''))return window._qdDesignViewerId=stored;}catch(e){}
+    var id=crypto.randomUUID();try{localStorage.setItem('qd_design_viewer',id);}catch(e){}
+    return window._qdDesignViewerId=id;
+}
 async function callClientDocumentFunction(body, requireUser) {
-    const headers = requireUser ? await getSupabaseFunctionAuthHeaders() : getSupabasePublicFunctionHeaders();
+    const headers = requireUser ? await getSupabaseFunctionAuthHeaders() : body?.action==='design_review' ? await getSupabaseOptionalUserFunctionHeaders() : getSupabasePublicFunctionHeaders();
     var requestBody = Object.assign({}, body || {});
+    requestBody.designViewerId=qdDesignViewerId();
     if (requireUser) requestBody.accountId = qdActiveAccountId();
     const response = await fetch(CLIENT_DOCUMENT_FUNCTION_URL, {
         method: 'POST',
@@ -785,12 +792,18 @@ async function createSecureClientShareLink(documentId, baseUrl, options) {
 async function loadSecureClientDocument(documentId, token, portalAnchorId) {
     if (!documentId || !token) return { error: 'Missing secure client link token' };
     try {
-        const data = await callClientDocumentFunction({
+        let data = await callClientDocumentFunction({
             action: 'view',
             documentId: documentId,
             token: token,
             portalAnchorId: portalAnchorId || ''
         }, false);
+        if(data.designReview){
+            const review=await import('./quote-design-review.js');
+            const request=payload=>callClientDocumentFunction(Object.assign({action:'design_review',documentId,token,portalAnchorId:portalAnchorId||''},payload),false);
+            if(data.designReview.locked){await review.reviewBeforeQuote(data.designReview,request);data=await callClientDocumentFunction({action:'view',documentId,token,portalAnchorId:portalAnchorId||''},false);if(data.designReview?.locked)throw new Error('Please refresh to review the latest design.');}
+            review.addAttachedDesignButton(data.designReview,request);
+        }
         return {
             data: data.document,
             paymentOptions: data.paymentOptions || null,
@@ -804,6 +817,7 @@ async function loadSecureClientDocument(documentId, token, portalAnchorId) {
 async function callDocumentPaymentFunction(body, requireUser) {
     const headers = requireUser ? await getSupabaseFunctionAuthHeaders() : getSupabasePublicFunctionHeaders();
     var requestBody = Object.assign({}, body || {});
+    requestBody.designViewerId=qdDesignViewerId();
     if (requireUser && !requestBody.accountId) requestBody.accountId = qdActiveAccountId();
     const response = await fetch(DOCUMENT_PAYMENT_FUNCTION_URL, {
         method: 'POST',
@@ -933,6 +947,7 @@ async function qdExecuteSecureClientDocumentUpdate(operation) {
             headers: await getSupabaseOptionalUserFunctionHeaders(),
             body: JSON.stringify(Object.assign({
             action: 'update',
+            designViewerId: qdDesignViewerId(),
             updateAction: envelope.updateAction,
             documentId: envelope.documentId,
             token: envelope.secureToken,
@@ -979,6 +994,7 @@ async function logSecureClientDocumentEvent(documentId, token, eventType, payloa
                 token: token,
                 portalAnchorId: portalAnchorId || '',
                 eventType: eventType,
+                designViewerId: qdDesignViewerId(),
                 sessionId: payload.sessionId || '',
                 durationSeconds: payload.durationSeconds,
                 metadata: payload.metadata || {}

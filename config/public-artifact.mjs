@@ -75,6 +75,7 @@ export const publicArtifactConfig = Object.freeze({
     'property-memory.js',
     'portal-designs.js',
     'portal-design-prepare.mjs',
+    'quote-design-review.js',
     'vendor/design-runtime-1/runtime.json',
     'vendor/design-runtime-1/LICENSE',
     'portal-designs.css',

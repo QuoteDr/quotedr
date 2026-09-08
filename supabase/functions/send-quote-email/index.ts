@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { quoteDesignState } from '../_shared/quote-design-review.mjs';
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
   ACCOUNT_PERMISSION,
@@ -211,7 +212,13 @@ Deno.serve(async (req) => {
       : (isInvoice || requestedDocumentType === "invoice" ? "invoice" : "quote");
     const documentTitle = normalizedDocumentType === "change_order" ? "Change Order" : (normalizedDocumentType === "invoice" ? "Invoice" : "Quote");
     const quoteRef = quoteNumber ? `${documentTitle} #${quoteNumber}` : `Your ${documentTitle}`;
-    const totalStr = total ? `$${parseFloat(total).toFixed(2)}` : "";
+    let designFirst=false;
+    if(isPortalEmail && normalizedDocumentType==='quote' && quoteNumber){
+      const quoteResult=await service.from('quotes').select('*').eq('user_id',accountOwnerId).eq('quote_number',String(quoteNumber)).maybeSingle();
+      if(quoteResult.error)throw quoteResult.error;
+      if(quoteResult.data)designFirst=(await quoteDesignState(service,quoteResult.data,''))?.locked===true;
+    }
+    const totalStr = !designFirst && total ? `$${parseFloat(total).toFixed(2)}` : "";
     const customMessage = message ? `<p style="color:#555; line-height:1.6;">${withBreaks(message)}</p>` : "";
 
     const subject = emailSubject

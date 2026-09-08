@@ -3,3 +3,4 @@
 .qd-design-dialog [hidden],.qd-designs [hidden]{display:none!important}
 .qd-design-dialog,.qd-design-dialog *{box-sizing:border-box}
 @media(max-width:600px){.qd-design-dialog.qd-design-full{width:100%;height:100dvh;max-height:100dvh;margin:0;padding:8px;border-radius:0}.qd-design-dialog.qd-design-full iframe{height:calc(100dvh - 160px)}.qd-design-dialog.qd-design-full header{margin-bottom:8px;min-height:44px}.qd-design-dialog.qd-design-full h2{font-size:1.1rem}}
+@media print { #qdAttachedDesign { display:none!important; } }

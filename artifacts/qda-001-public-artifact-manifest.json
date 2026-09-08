@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 121,
-  "totalBytes": 27600827,
-  "treeSha256": "1e4856c639e41f2da1c692e876180f0ca268705f1c1d8df8650ecc95777ac5fa",
+  "fileCount": 122,
+  "totalBytes": 27610296,
+  "treeSha256": "15994b42959c09e8aebc003ceec3bf269ff0700377c68650db5d36a4519301f9",
   "files": [
     {
       "path": "404.html",
@@ -157,8 +157,8 @@
     },
     {
       "path": "client-portal.html",
-      "bytes": 225940,
-      "sha256": "48aa5e4782503d7513d4eb748e867846f43200a114e0dce3ce908c298637531d"
+      "bytes": 227551,
+      "sha256": "2caea4a64dd5dbc2c8552f979be8e016d54bcadbd6cc2f5bbc8e40347121c4c5"
     },
     {
       "path": "community-starter-templates.js",
@@ -243,12 +243,12 @@
     {
       "path": "interactive-quote-viewer.html",
       "bytes": 368348,
-      "sha256": "ab5579c7db9fad15cba8ee7c4d441f6742ee34af7bde01e70abdc71290d56c12"
+      "sha256": "131474d59d0c1f18ba7ca8ac23376e9e99164647e689f3243eaf980c997b5cc5"
     },
     {
       "path": "invoice-viewer.html",
       "bytes": 139347,
-      "sha256": "3aa884c20413a913224576e6c64d0cbdca83304fc2567609d4697479e56b30a8"
+      "sha256": "fa44a9314c31a8beb23291c98bff301847f6a2329551524a9f04350680e3ab24"
     },
     {
       "path": "labor-tracker.html",
@@ -307,13 +307,13 @@
     },
     {
       "path": "portal-designs.css",
-      "bytes": 2597,
-      "sha256": "634c8bf250e46ff396beb1c51617a47290dca6365511184099803b07f8289f9d"
+      "bytes": 2660,
+      "sha256": "24c8dfcb290682214bd62be2b14ee869ec6625f6d552139dea198fc9b48d4cea"
     },
     {
       "path": "portal-designs.js",
-      "bytes": 13995,
-      "sha256": "8420bb8e541a745ee4b53b28c3beaba507592d026abfaa614093cb75b2ca50b5"
+      "bytes": 16548,
+      "sha256": "ec10d657c69c948c7f27b3a96ee0751777f4c551cb035d46a2fb6b5e700196fc"
     },
     {
       "path": "portal-theme-studio.html",
@@ -379,6 +379,11 @@
       "path": "quote-contact-property-lookup.js",
       "bytes": 13764,
       "sha256": "2977ee7e2344b23a0a22759a0724fea6e7509f07dd28ca4cccc1a76e367d25ff"
+    },
+    {
+      "path": "quote-design-review.js",
+      "bytes": 3928,
+      "sha256": "c6c1eb8d6617c9d84d5962540f3b8bbed2be73808a7dab76272bb5e049771872"
     },
     {
       "path": "quote-dialogs.js",
@@ -487,8 +492,8 @@
     },
     {
       "path": "supabase-v2.js",
-      "bytes": 190263,
-      "sha256": "e5d1428d88f2659c745fb58c8c21d4738563679be8ac7049fd6be1cebd7aca1d"
+      "bytes": 191577,
+      "sha256": "8fdfd0fabad88fb859c5a2e50fdb11324c68709dd546d276d91fdc3b31f21768"
     },
     {
       "path": "supplier-materials.js",

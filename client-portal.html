@@ -2626,7 +2626,7 @@
 <script src="help-content.js?v=2026080801"></script>
 <script src="modal-help.js?v=1777741200"></script>
 <script src="change-orders.js?v=1778060200"></script>
-    <script src="supabase-v2.js?v=2026081801"></script>
+    <script src="supabase-v2.js?v=2026090703"></script>
     <script src="save-coordinator.js?v=2026081801"></script>
 
   <script>
@@ -2864,9 +2864,16 @@
 
       if (portalId) {
         const css = document.createElement('link');css.rel='stylesheet';css.href='portal-designs.css';document.head.append(css);
-        const designs = await import('./portal-designs.js?v=2026090702');
+        const designs = await import('./portal-designs.js?v=2026090703');
         portalDesignController = designs.mountDesignLibrary(document.getElementById('portalDesignLibrary'), {
           request:portalDesignRequest, isOwner:portalIsAdminView,
+          getQuotes:()=>portalQuotesCache,onQuotesChanged:()=>loadQuotes(),
+          onOpenDesign:async function(design,fallback){
+            const quote=portalQuotesCache.find(q=>q.designReview?.id===design.id);
+            if(portalIsAdminView||!quote||!portalToken)return fallback();
+            const module=await import('./quote-design-review.js');
+            return module.openAttachedDesign(quote.designReview,payload=>secureClientDocumentRequest({...payload,action:'design_review',documentId:quote.id,token:portalToken,portalAnchorId}));
+          },
           reunlock:function(){sessionStorage.removeItem(portalDesignSessionKey());document.getElementById('pinGate').style.display='flex';document.getElementById('portalContent').style.display='none';syncPinInputs('');document.getElementById('pin0').focus();},
           shareBase:['localhost','127.0.0.1'].includes(location.hostname)?location.origin+'/client-portal.html':'https://myprojectview.ca/client-portal.html'
         });
@@ -2891,6 +2898,7 @@
     }
 
     async function secureClientDocumentRequest(body) {
+      body=Object.assign({},body,{designViewerId:qdDesignViewerId()});
       let bearer = supabaseKey;
       try {
         const sessionResult = await _sbClient.auth.getSession();
@@ -4744,6 +4752,10 @@
       const type = event?.event_type || '';
       const duration = parseInt(event?.duration_seconds || 0, 10) || 0;
       const labels = {
+        design_opened: 'Opened rendering: ' + (event?.metadata?.design_title || 'Design') + ' · Version ' + (event?.metadata?.design_version || '1'),
+        design_view_duration: 'Rendering visible for ' + formatPortalActivityDuration(duration) + ' · ' + (event?.metadata?.design_title || 'Design'),
+        design_continued: 'Continued from design to quote',
+        design_viewing_problem: 'Reported a design viewing problem and continued to quote',
         document_opened: 'Opened the document',
         document_view_duration: duration ? 'Viewed for ' + formatPortalActivityDuration(duration) : 'Viewed the document',
         pdf_opened: 'Opened Print / Save PDF',
@@ -4796,6 +4808,7 @@
         lastOpened: openEvents[0]?.created_at || '',
         opens: openEvents.length,
         totalSeconds: totalSeconds,
+        renderingSeconds: events.reduce((sum,e)=>sum+(e.event_type==='design_view_duration'?(parseInt(e.duration_seconds||0,10)||0):0),0),
         lastPdf: pdfEvents[0]?.created_at || ''
       };
     }
@@ -4880,6 +4893,7 @@
       panel.innerHTML = '<div class="portal-activity-summary">' +
         '<div class="portal-activity-stat"><strong>' + escapeHtml(formatPortalActivityDate(summary.lastOpened)) + '</strong><span>Last opened</span></div>' +
         '<div class="portal-activity-stat"><strong>' + summary.opens + '</strong><span>Total opens</span></div>' +
+        '<div class="portal-activity-stat"><strong>' + escapeHtml(formatPortalActivityDuration(summary.renderingSeconds)) + '</strong><span>Rendering visible time</span></div>' +
         '<div class="portal-activity-stat"><strong>' + escapeHtml(formatPortalActivityDuration(summary.totalSeconds)) + '</strong><span>Active viewing time</span></div>' +
         '<div class="portal-activity-stat"><strong>' + escapeHtml(formatPortalActivityDate(summary.lastPdf)) + '</strong><span>Last PDF action</span></div>' +
         '</div>' +
@@ -5218,6 +5232,7 @@
         style: 'currency',
         currency: quote.data?.currency || 'CAD'
       }).format(quote.total);
+      const designLocked=!portalIsAdminView && quote.designReview?.locked===true;
       const adminActivityMarkup = portalIsAdminView
         ? `<button type="button" class="btn btn-outline-primary btn-sm" onclick="togglePortalDocumentActivity(event, '${escapeHtml(quote.id)}')">
               <i class="fas fa-chart-line me-1"></i> Activity
@@ -5254,7 +5269,7 @@
 
           <div class="d-flex justify-content-between align-items-center mb-3 portal-doc-footer">
             <div class="portal-doc-total">
-              <h6><span class="portal-doc-total-label">Total: </span>${total}</h6>
+              <h6>${designLocked?'Explore your design to see pricing':'<span class="portal-doc-total-label">Total: </span>'+total}</h6>
               <small class="text-muted">Created: ${date}</small>
               ${portalAddedLabel ? `<small class="text-muted d-block"><i class="fas fa-folder-open me-1"></i>Added to portal: ${escapeHtml(portalAddedLabel)}</small>` : ''}
             </div>
@@ -5262,7 +5277,7 @@
               ${signaturePreviewMarkup}
               <div>
               <a href="${primaryHref}" class="btn btn-outline-primary btn-sm">
-                <i class="fas ${docType.actionIcon} me-1 portal-action-icon"></i><span class="portal-action-full">${docType.actionLabel}</span><span class="portal-action-short">Open</span>
+                <i class="fas ${docType.actionIcon} me-1 portal-action-icon"></i><span class="portal-action-full">${designLocked?'Explore your design':docType.actionLabel}</span><span class="portal-action-short">${designLocked?'Explore design':'Open'}</span>
               </a>
               <button type="button" class="btn btn-outline-secondary btn-sm portal-share-pdf-btn" data-pdf-href="${escapeHtml(portalDocumentPdfHref(quote))}" data-pdf-title="${escapeHtml(portalDocumentTitle(quote))}" data-document-id="${escapeHtml(quote.id)}" onclick="showPortalPdfShareModal(event, this.dataset.pdfHref, this.dataset.pdfTitle, this.dataset.documentId)">
                 <i class="fas fa-file-pdf me-1 portal-action-icon"></i><span class="portal-action-full">Share PDF</span><span class="portal-action-short">PDF</span>

@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Quote design review test</title><link rel="stylesheet" href="/portal-designs.css"><style>body{font:16px system-ui;margin:24px}button,input,select{font:inherit;padding:10px;margin:5px}label{display:block}</style>
+<h1>Local quote / design review</h1><p>No cloud writes. Synthetic quote and rendering.</p><div id="library"></div><button id="client">Test client quote</button><p id="result">Quote price hidden</p><pre id="events"></pre>
+<script type="module">
+import {mountDesignLibrary} from '/portal-designs.js';
+import {reviewBeforeQuote,addAttachedDesignButton} from '/quote-design-review.js';
+const design={id:'one',title:'Closet concept',project:'Bedroom',version:'1',kind:'interactive',visible:true,updated_at:'v1',revision:'r1',locked:true};let attachments=[];
+const request=async p=>{if(p.action==='list')return {designs:[design],attachments};if(p.action==='attach_quote'){attachments=[{document_id:p.documentId,design_id:p.id,require_review:p.requireReview,updated_at:'r1'}];return {ok:true};}throw Error('Disabled');};
+mountDesignLibrary(document.querySelector('#library'),{isOwner:true,request,getQuotes:()=>[{id:'q',quote_number:'Q-001',type:'quote',data:{quoteTitle:'Closet quote'}}]});
+const reviewRequest=async p=>{document.querySelector('#events').textContent+=JSON.stringify(p)+'\n';if(p.operation==='open')return {kind:'interactive',mime:'text/html',base64:btoa('<h1>Closet concept</h1><button onclick="this.textContent=\'Door open\'">Slide door</button>')};return {ok:true};};
+document.querySelector('#client').onclick=async()=>{try{await reviewBeforeQuote(design,reviewRequest);document.querySelector('#result').textContent='Quote unlocked: $5,847.75';addAttachedDesignButton(design,reviewRequest);}catch(e){document.querySelector('#result').textContent=e.message;}};
+</script></html>

@@ -31,7 +31,7 @@ export async function handleDesignRequest(req:Request) {
     const owner = String(body.contractorId || '');
     const portalId = String(body.portalId || '');
     if (!/^[a-f0-9-]{36}$/i.test(owner) || !portalId || portalId.length > 180) return json({error:'Invalid portal'},400);
-    const write = ['save','visibility','share','rotate_share'].includes(action);
+    const write = ['save','visibility','share','rotate_share','attach_quote'].includes(action);
     const ownerMode = body.ownerMode === true;
     if (ownerMode) {
       const auth = await requireAccountPermissionWithDefault(req, body.accountId, write ? ACCOUNT_PERMISSION.QUOTES_SEND : ACCOUNT_PERMISSION.QUOTES_READ);
@@ -51,6 +51,29 @@ export async function handleDesignRequest(req:Request) {
     }
     const library = result.data;
     if (!library) return action === 'list' ? json({designs:[]}) : json({error:'Design not found'},404);
+    if(action === 'attach_quote') {
+      const quoteResult=await db.from('quotes').select('id,user_id,data,status,type').eq('id',body.documentId).eq('user_id',owner).maybeSingle();
+      if(quoteResult.error)throw quoteResult.error;
+      const quote=quoteResult.data;
+      if(!quote || quote.data?.portal_id!==portalId)return json({error:'Choose a quote in this portal.'},400);
+      if(body.id){
+        const design=await db.from('portal_designs').select('id,visible').eq('id',body.id).eq('library_id',library.id).maybeSingle();
+        if(design.error)throw design.error;
+        if(!design.data?.visible)return json({error:'Publish the design before attaching it.'},400);
+      }
+      // Compare the attachment revision, independently of quote edits.
+      const current=await db.from('quote_design_links').select('*').eq('document_id',quote.id).maybeSingle();
+      if(current.error)throw current.error;
+      if((current.data?.updated_at||null)!==(body.baseVersion||null))return json({error:'The attached design changed. Refresh and try again.'},409);
+      const values={document_id:quote.id,design_id:body.id,require_review:body.requireReview===true,updated_at:new Date().toISOString()};
+      const change=!body.id
+        ? await db.from('quote_design_links').delete().eq('document_id',quote.id).eq('updated_at',body.baseVersion).select('document_id')
+        : current.data
+          ? await db.from('quote_design_links').update(values).eq('document_id',quote.id).eq('updated_at',body.baseVersion).select('document_id')
+          : await db.from('quote_design_links').insert(values).select('document_id');
+      if(change.error || !change.data?.length)return json({error:'The attachment could not be saved. Refresh and try again.'},409);
+      return json({ok:true});
+    }
     if (action === 'share' || action === 'rotate_share') {
       if (!/^\d{4}$/.test(portal.pin)) return json({error:'Set a four-digit portal PIN before sharing designs.'},400);
       let token = library.share_token;
@@ -66,7 +89,13 @@ export async function handleDesignRequest(req:Request) {
       if (!ownerMode) query = query.eq('visible',true);
       const rows = await query;
       if (rows.error) throw rows.error;
-      return json({designs:rows.data || []});
+      let attachments=[];
+      if(ownerMode){
+        const quotes=await db.from('quotes').select('id').eq('user_id',owner).eq('data->>portal_id',portalId);
+        if(quotes.error)throw quotes.error;
+        if(quotes.data?.length){const links=await db.from('quote_design_links').select('*').in('document_id',quotes.data.map(q=>q.id));if(links.error)throw links.error;attachments=links.data||[];}
+      }
+      return json({designs:rows.data || [],attachments});
     }
     let previous = null;
     if (body.id) {

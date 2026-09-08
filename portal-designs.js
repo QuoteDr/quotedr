@@ -36,14 +36,16 @@ async function renderDrawingPdf(bytes,body,d){
     await draw();
   }catch(error){box.textContent='Inline PDF preview is unavailable. Use Download drawing to view the file.';}
 }
-export async function showDesign(read, title) {
+export async function showDesign(read, title, options={}) {
   const d=dialog(title,true);const body=el('div','Loading design…');d.append(body);
+  d.addEventListener('close',()=>options.onClose?.(),{once:true});
+  const addContinue=()=>{if(options.onContinue)d.append(button('Continue to quote',()=>{d.close();options.onContinue();},'btn btn-primary'));};
   try {
     const result=await read(); if(!d.isConnected)return;
     body.replaceChildren();
     if(result.url){
       const a=el('a','Open external design','btn btn-primary');a.href=designInput({kind:'link',title,url:result.url}).external_url;a.target='_blank';a.rel='noopener noreferrer';
-      body.append(el('p','This design is hosted by another provider. Its own privacy and sign-in settings apply.'),a);return;
+      body.append(el('p','This design is hosted by another provider. Its own privacy and sign-in settings apply.'),a);addContinue();return true;
     }
     const bytes=Uint8Array.from(atob(result.base64),c=>c.charCodeAt(0));
     if(result.kind==='interactive'){
@@ -57,12 +59,12 @@ export async function showDesign(read, title) {
       else {await renderDrawingPdf(bytes,body,d);}
       const download=el('a','Download drawing','btn btn-outline-primary');download.href=url;download.download=title+(result.mime==='application/pdf'?'.pdf':result.mime==='image/jpeg'?'.jpg':result.mime==='image/webp'?'.webp':'.png');body.append(download);
     }
-    return true;
+    addContinue();return true;
   }catch(error){body.textContent=error.message;body.className='qd-design-error';return false;}
 }
 
-export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase}) {
-  let rows=[];
+export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQuotes=()=>[],onQuotesChanged=()=>{},onOpenDesign}) {
+  let rows=[],attachments=[];
   root.className='qd-designs';
   const head=el('header');head.append(el('h2','Designs & Renderings'));
   const actions=el('div',null,'qd-design-actions');head.append(actions);
@@ -77,7 +79,7 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase}) {
     await navigator.clipboard.writeText(url.href);status.textContent='Client design link copied. Share the existing portal PIN separately.';
   })));}
   async function refresh(){
-    try{const result=await request({action:'list'});rows=result.designs||[];status.textContent=rows.length?'Design previews do not change or approve your quote.':'No designs shared yet.';
+    try{const result=await request({action:'list'});rows=result.designs||[];attachments=result.attachments||[];status.textContent=rows.length?'Design previews do not change or approve your quote.':'No designs shared yet.';
       const value=filter.value;filter.replaceChildren();const all=el('option','All projects');all.value='';filter.append(all);
       [...new Set(rows.map(r=>r.project))].sort().forEach(p=>{const o=el('option',p);o.value=p;filter.append(o);});filter.value=value;render();
     }catch(e){grid.replaceChildren();status.replaceChildren(el('span',e.message+' '));if(!isOwner)status.append(button('Unlock designs',reunlock));}
@@ -87,13 +89,28 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase}) {
     for(const row of rows.filter(r=>!filter.value||r.project===filter.value)){
       const card=el('article',null,'qd-design-card'+(!row.visible?' is-withdrawn':''));
       card.append(el('div',row.kind==='interactive'?'◈ Interactive preview':row.kind==='link'?'↗ Design link':row.kind==='pdf'?'▤ Drawing / PDF':'▧ Rendering','qd-design-icon'),el('div',row.project,'qd-design-meta'),el('h3',row.title),el('p',row.note,'qd-design-note'),el('p','Version '+row.version+' · '+new Date(row.updated_at).toLocaleDateString()+(!row.visible?' · Withdrawn':''),'qd-design-meta'));
-      const a=el('div',null,'qd-design-actions');a.append(button('Open design',()=>showDesign(()=>request({action:'read',id:row.id}),row.title),'btn btn-primary btn-sm'));
+      const a=el('div',null,'qd-design-actions');a.append(button('Open design',()=>onOpenDesign?onOpenDesign(row,()=>showDesign(()=>request({action:'read',id:row.id}),row.title)):showDesign(()=>request({action:'read',id:row.id}),row.title),'btn btn-primary btn-sm'));
+      if(isOwner && row.visible)a.append(button('Attach to quote',()=>attach(row)));
+      if(isOwner)for(const link of attachments.filter(a=>a.design_id===row.id)){const quote=getQuotes().find(q=>q.id===link.document_id);card.append(el('p',(quote?.data?.fileName||quote?.quote_number||'Quote')+(link.require_review?' · Design before pricing':' · Attached design'),'qd-design-meta'));}
       if(isOwner)a.append(button('Replace / edit',()=>edit(row)),button(row.visible?'Withdraw':'Publish again',guarded(async()=>{
         if(!window.confirm(row.visible?'Withdraw this design from the client portal? Already opened or downloaded copies cannot be recalled.':'Make this design visible to the client again?'))return;
         await request({action:'visibility',id:row.id,baseVersion:row.updated_at,visible:!row.visible});await refresh();
       })));
       card.append(a);grid.append(card);
     }
+  }
+  function attach(row){
+    const d=dialog('Attach design to quote'),label=el('label','Quote'),select=el('select');label.append(select);
+    const quotes=getQuotes().filter(q=>!['invoice','change_order'].includes(String(q.type||q.data?.documentType||q.data?.type||'quote').toLowerCase())&&!['invoiced','paid'].includes(String(q.status).toLowerCase()));
+    const empty=el('option','Choose a quote');empty.value='';select.append(empty);
+    for(const q of quotes){const o=el('option',(q.data?.quoteTitle||q.data?.fileName||q.data?.file_name||q.client_name||'Quote')+' · '+(q.quote_number||''));o.value=q.id;select.append(o);}
+    const reviewLabel=el('label','Show design before pricing '),review=el('input');review.type='checkbox';reviewLabel.append(review);
+    const note=el('p','Clients can continue after opening the design, or report a viewing problem and continue. This does not approve the design or quote.');
+    const error=el('p');error.setAttribute('role','status');
+    select.onchange=()=>{review.checked=attachments.find(a=>a.document_id===select.value)?.require_review===true;};
+    const save=button('Save attachment',()=>change(row.id)),remove=button('Remove attachment',()=>change(null));
+    async function change(id){if(!select.value){error.textContent='Choose a quote.';return;}save.disabled=remove.disabled=true;try{await request({action:'attach_quote',documentId:select.value,id,requireReview:review.checked,baseVersion:attachments.find(a=>a.document_id===select.value)?.updated_at||null});await refresh();await onQuotesChanged();d.close();}catch(e){error.textContent=e.message;}finally{save.disabled=remove.disabled=false;}}
+    d.append(label,reviewLabel,note,save,remove,error);
   }
   function edit(previous){
     const d=dialog(previous?'Replace design':'Add design');const f=el('form');d.append(f);

@@ -17,6 +17,7 @@ import {
 } from "../_shared/client-document-policy.mjs";
 import { isProductionClientPortalUrl } from "../_shared/client-portal-url.mjs";
 import { legacyUnlinkedPaidCents } from "../_shared/document-payment-accounting.mjs";
+import { quoteDesignState, publicDesignReview, lockedQuoteSummary, reviewViewer } from "../_shared/quote-design-review.mjs";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://axmoffknvblluibuitrq.supabase.co";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso";
@@ -93,7 +94,7 @@ const ALLOWED_DOCUMENT_EVENT_TYPES = new Set([
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control":"private, no-store" },
   });
 }
 
@@ -952,11 +953,62 @@ async function loadAuthoritativeChangeOrderContext(row: QuoteRow) {
   };
 }
 
+async function designReviewRequest(req:Request,body:Record<string,unknown>) {
+  const documentId=normalizeId(body.documentId), token=String(body.token||'');
+  const {target}=await assertTokenAccess(documentId,token,normalizeId(body.portalAnchorId));
+  const db=adminClient(), viewer=reviewViewer(body.designViewerId);
+  if(!viewer)return json({error:'Refresh the page to start a design review.'},400);
+  const state=await quoteDesignState(db,target,viewer);
+  if(!state || state.revision!==body.revision)return json({error:'This design changed. Refresh the quote to review the latest version.'},409);
+  const operation=String(body.operation||''), user=await userFromAuthHeader(req);
+  const owner=user?.id===target.user_id;
+  const sessionId=sanitizeSessionId(body.sessionId);
+  if(!sessionId)return json({error:'Missing viewing session'},400);
+  async function log(eventType:string,duration:number|null=null){
+    if(owner)return;
+    const inserted=await db.from('portal_document_events').insert({user_id:target.user_id,portal_id:portalId(target)||null,document_id:target.id,
+      event_type:eventType,session_id:sessionId,duration_seconds:duration,metadata:{design_id:state.design.id,design_title:state.design.title,design_version:state.design.version}});
+    if(inserted.error)throw inserted.error;
+  }
+  const receipt={document_id:target.id,viewer_id:viewer,revision:state.revision};
+  if(operation==='open'){
+    // Record the open before serving; continuation is a separate explicit action.
+    const opened=await db.from('quote_design_reviews').upsert({...receipt,opened_at:new Date().toISOString()},{onConflict:'document_id,viewer_id,revision',ignoreDuplicates:true});
+    if(opened.error)throw opened.error;
+    if(state.receipt&&!state.receipt.opened_at){
+      const refreshed=await db.from('quote_design_reviews').update({opened_at:new Date().toISOString()}).eq('document_id',target.id).eq('viewer_id',viewer).eq('revision',state.revision);
+      if(refreshed.error)throw refreshed.error;
+    }
+    await log('design_opened');
+    if(state.design.kind==='link')return json({url:state.design.external_url});
+    const file=await db.storage.from('portal-designs').download(state.design.storage_path);
+    if(file.error)throw file.error;
+    if(file.data.size>8*1024*1024)throw new Error('Design exceeds size limit');
+    const bytes=new Uint8Array(await file.data.arrayBuffer());let binary='';
+    for(let i=0;i<bytes.length;i+=16384)binary+=String.fromCharCode(...bytes.subarray(i,i+16384));
+    return json({base64:btoa(binary),mime:state.design.mime_type,kind:state.design.kind});
+  }
+  if(operation==='duration'){
+    if(!state.receipt?.opened_at)return json({error:'Open the design first.'},400);
+    const seconds=Math.min(30,Math.max(0,Math.floor(Number(body.durationSeconds)||0)));
+    if(seconds)await log('design_view_duration',seconds);
+    return json({ok:true});
+  }
+  if(operation!=='continue' && operation!=='problem')return json({error:'Unsupported design action'},400);
+  if(operation==='continue'&&!state.receipt?.opened_at)return json({error:'Open the design first, or use the viewing-problem option.'},400);
+  const saved=await db.from('quote_design_reviews').upsert({...receipt,opened_at:state.receipt?.opened_at||null,unlocked_at:new Date().toISOString(),outcome:operation==='problem'?'viewing_problem':'continued'},{onConflict:'document_id,viewer_id,revision'});
+  if(saved.error)throw saved.error;
+  await log(operation==='problem'?'design_viewing_problem':'design_continued');
+  return json({ok:true});
+}
+
 async function viewDocument(body: Record<string, unknown>) {
   const documentId = normalizeId(body.documentId || body.id);
   const token = String(body.token || "").trim();
   const portalAnchorId = normalizeId(body.portalAnchorId || body.portal_anchor);
   const { target } = await assertTokenAccess(documentId, token, portalAnchorId);
+  const designState=await quoteDesignState(adminClient(),target,body.designViewerId);
+  if(designState?.locked)return json({designReview:publicDesignReview(designState)});
   const [paymentOptions, branding, changeOrderContext] = await Promise.all([
     loadPaymentOptions(target),
     documentNeedsBrandingFallback(target)
@@ -972,7 +1024,7 @@ async function viewDocument(body: Record<string, unknown>) {
   if (changeOrderContext?.publicContext && document.data && typeof document.data === "object") {
     (document.data as Record<string, unknown>).changeOrderContext = changeOrderContext.publicContext;
   }
-  return json({ document, paymentOptions, branding });
+  return json({ document, paymentOptions, branding, designReview:publicDesignReview(designState) });
 }
 
 async function portalDocuments(body: Record<string, unknown>) {
@@ -996,12 +1048,12 @@ async function portalDocuments(body: Record<string, unknown>) {
     loadPortalBranding(anchor.user_id),
   ]);
   if (error) throw error;
-  const docs = (data as QuoteRow[] || [])
+  const docs = await Promise.all((data as QuoteRow[] || [])
     .filter((row) => portalVisible(row) && samePortalGroup(anchor, row))
-    .map((row) => sanitizeQuoteRow(row));
+    .map(async row => {const state=await quoteDesignState(supabase,row,body.designViewerId);return state?.locked?lockedQuoteSummary(row,state):{...sanitizeQuoteRow(row),designReview:publicDesignReview(state)};}));
   const anchorData = rowData(anchor);
   return json({
-    anchor: portalVisible(anchor) ? compactDocumentResult(anchor) : { id: anchor.id },
+    anchor: { id: anchor.id },
     anchorId: anchor.id,
     contractorId: anchor.user_id,
     portalId: activePortalId,
@@ -1100,6 +1152,7 @@ async function logDocumentEvent(req: Request, body: Record<string, unknown>) {
   if (!ALLOWED_DOCUMENT_EVENT_TYPES.has(eventType)) return json({ error: "Unsupported document activity event" }, 400);
 
   const { target, anchor } = await assertTokenAccess(documentId, token, portalAnchorId);
+  if((await quoteDesignState(adminClient(),target,body.designViewerId))?.locked)return json({error:'Explore the design before opening the quote.',code:'design_review_required'},403);
   if (isAdminPreviewActivityRequest(body)) {
     return json({ result: compactDocumentResult(target), event: null, skipped: "admin_preview_activity" });
   }
@@ -1234,6 +1287,7 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
   const portalAnchorId = normalizeId(body.portalAnchorId || body.portal_anchor);
   const action = String(body.updateAction || body.actionName || "").trim();
   const { target } = await assertTokenAccess(documentId, token, portalAnchorId);
+  if((await quoteDesignState(adminClient(),target,body.designViewerId))?.locked)return json({error:'Explore the design before opening the quote.',code:'design_review_required'},403);
   const signedInUser = await userFromAuthHeader(req);
 
   const supabase = adminClient();
@@ -1472,6 +1526,7 @@ serve(async (req) => {
     const action = String(body.action || "").trim();
     if (action === "create_link") return await createLink(req, body);
     if (action === "view") return await viewDocument(body);
+    if (action === "design_review") return await designReviewRequest(req,body);
     if (action === "portal") return await portalDocuments(body);
     if (action === "portal_assets") return await portalAssets(req, body);
     if (action === "portal_asset_url") return await portalAssetUrl(req, body);

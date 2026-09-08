@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { quoteDesignState } from '../_shared/quote-design-review.mjs';
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
   calculateRecordedPaymentState,
@@ -1222,6 +1223,7 @@ Deno.serve(async (req) => {
     if (action === "resolve_deposit_shortfall") return json(await resolveDepositShortfall(req, admin, body));
 
     const { target, token, portalAnchorId } = await assertDocumentAccess(admin, body);
+    if((await quoteDesignState(admin,target,body.designViewerId))?.locked)throw new PaymentError('Explore the design before opening the quote.',403,'design_review_required');
     activeDocumentId = target.id;
     if (isInvalid(target)) throw new PaymentError("This document is no longer valid and cannot accept payment.", 409, "document_invalid");
     const { settings, connection } = await paymentSettings(admin, target.user_id);
