@@ -14,6 +14,8 @@ export const publicArtifactConfig = Object.freeze({
     'client-portal.html',
     'contact.html',
     'dashboard.html',
+    'quote-profit-report.js',
+    'portal-activity-visits.js',
     'enhanced-material-calculator.html',
     'help.html',
     'home-depot-price-sync.html',

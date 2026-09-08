@@ -1,0 +1,14 @@
+const assert = require('node:assert/strict');
+require('../portal-activity-visits.js');
+const group = globalThis.QuoteDrActivityVisits.designVisits;
+const event = (type,time,seconds=0,design='a',session='s') => ({event_type:type,created_at:`2026-09-08T10:${time}:00Z`,document_id:'q',session_id:session,duration_seconds:seconds,metadata:{design_id:design,design_title:design,design_version:1}});
+const events = [event('design_opened','01'),event('design_view_duration','02',30),event('design_view_duration','03',20),event('design_opened','04'),event('design_view_duration','05',10),event('document_opened','06'),event('document_view_duration','07',90),event('design_opened','08',0,'b'),event('design_view_duration','09',40,'b')];
+const original = JSON.stringify(events);
+const result = group(events.slice().reverse());
+assert.deepEqual(result.filter(e=>e.event_type==='design_view_duration').map(e=>e.duration_seconds),[50,10,40]);
+assert.equal(result.find(e=>e.event_type==='document_view_duration').duration_seconds,90);
+assert.equal(JSON.stringify(events),original);
+assert.equal(group([event('design_view_duration','01',20,'a',''),event('design_view_duration','02',30,'a','')]).length,2,'unknown sessions must not merge');
+assert.equal(group([event('design_opened','01'),event('design_view_duration','02',20,'a','other')]).length,2);
+assert.equal(group([event('design_opened','01'),event('design_continued','02'),event('design_view_duration','03',10)]).length,3);
+console.log('Design activity visit grouping passed');

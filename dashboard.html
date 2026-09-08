@@ -508,6 +508,9 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="quote-dialogs.js?v=2026082001"></script>
     <script src="quote-portal-readiness.js?v=2026082001"></script>
+    <script src="quote-discounts.js"></script>
+    <script src="quote-profit-report.js"></script>
+    <script src="portal-activity-visits.js"></script>
     <script src="help-content.js?v=2026080801"></script>
     <script src="modal-help.js?v=1777741200"></script>
     <script src="change-orders.js?v=1778060200"></script>
@@ -1494,6 +1497,7 @@
                     ${isInvalid ? `<button data-account-permission="quotes.send" class="btn btn-outline-secondary btn-sm w-100 mt-1" onclick="restoreInvalidInvoice(${jsAttr(q.id)})"><i class="fas fa-rotate-left me-1"></i> Restore Invoice</button>` : ''}
                     ${reviewReady && !reviewSentAt ? `<button class="btn btn-outline-success btn-sm w-100 mt-1" onclick="sendGoogleReviewRequest(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fab fa-google me-1"></i> Request Review</button>` : ''}
                     <button data-account-permission="quotes.send" class="btn btn-sm w-100 mt-1 ${portalVisible ? 'btn-success' : 'btn-outline-primary'}" onclick="shareDocumentThroughPortal(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})" title="Ensure this document is in the correct portal and copy the portal link"><i class="fas fa-folder-tree me-1"></i> ${portalVisible ? 'Client Portal' : 'Share via Client Portal'}</button>
+                    <button class="btn btn-outline-secondary btn-sm w-100 mt-1" onclick="openQuoteProfitReport(${jsAttr(q.id)})"><i class="fas fa-chart-line me-1"></i> View Quote &amp; Profit (private)</button>
                     ${portalVisible ? `<button data-account-permission="quotes.send" class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="openClientDocumentPreview(${jsAttr(q.id)}, this)" title="Open this document exactly as the client sees it"><i class="fas fa-eye me-1"></i> Client View</button>` : ''}
                     ${(status === 'sent' || status === 'viewed') ? `<button data-account-permission="quotes.send" class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fas fa-bell me-1"></i> Email Portal Follow-up</button>` : ''}
                 </div>
@@ -1848,6 +1852,15 @@
 
         function handleDashboardQuoteCardClick(event, quoteId) {
             if (dashboardQuoteCardClickShouldOpen(event, quoteId)) openQuote(quoteId);
+        }
+
+        async function openQuoteProfitReport(quoteId) {
+            if (typeof hasFeature !== 'function' || !(await hasFeature('profit_tracking'))) {
+                await qdAlert('Profit tracking is included with QuoteDr Pro.', { title: 'Profit Report' });
+                return;
+            }
+            const quote = (allQuotes || []).find(q => q.id === quoteId);
+            if (quote) QuoteDrProfitReport.open(quote);
         }
 
         async function openQuote(quoteId) {
@@ -3981,6 +3994,7 @@
         }
 
         function dashboardPortalActivityTimeline(events) {
+            if (typeof QuoteDrActivityVisits !== 'undefined') events = QuoteDrActivityVisits.designVisits(events);
             var chronological = (Array.isArray(events) ? events : []).map(function(activityEvent, index) {
                 return { event: activityEvent, index: index };
             }).sort(function(a, b) {
@@ -4025,6 +4039,10 @@
         function dashboardPortalActivityLabel(activityEvent) {
             var duration = parseInt(activityEvent && activityEvent.duration_seconds || 0, 10) || 0;
             var labels = {
+                design_opened: 'Opened design: ' + (activityEvent.metadata?.design_title || 'Design'),
+                design_view_duration: 'Viewed design: ' + (activityEvent.metadata?.design_title || 'Design') + ' for ' + dashboardPortalActivityDuration(duration),
+                design_continued: 'Continued after design: ' + (activityEvent.metadata?.design_title || 'Design'),
+                design_viewing_problem: 'Reported a design viewing problem: ' + (activityEvent.metadata?.design_title || 'Design'),
                 document_opened: 'Opened the document',
                 document_view_duration: duration ? 'Viewed for ' + dashboardPortalActivityDuration(duration) : 'Viewed the document',
                 pdf_opened: 'Opened Print / Save PDF',
@@ -4039,6 +4057,10 @@
 
         function dashboardPortalActivityIcon(activityEvent) {
             var icons = {
+                design_opened: 'fa-image',
+                design_view_duration: 'fa-clock',
+                design_continued: 'fa-arrow-right',
+                design_viewing_problem: 'fa-triangle-exclamation',
                 document_opened: 'fa-eye',
                 document_view_duration: 'fa-clock',
                 pdf_opened: 'fa-file-pdf',
@@ -4062,12 +4084,15 @@
             var timeline = dashboardPortalActivityTimeline(events).slice(0, 20).map(function(activityEvent) {
                 return '<div class="d-flex gap-2 py-2 border-top"><i class="fas ' + dashboardPortalActivityIcon(activityEvent) + ' text-primary mt-1" aria-hidden="true"></i><div><strong class="small">' + escapeHtml(dashboardPortalActivityLabel(activityEvent)) + '</strong><div class="text-muted small">' + escapeHtml(dashboardPortalActivityDate(activityEvent.created_at)) + '</div></div></div>';
             }).join('');
+            var designSeconds = events.reduce((sum,e) => sum + (e.event_type === 'design_view_duration' ? Math.max(0, parseInt(e.duration_seconds,10)||0) : 0), 0);
+            var designOpens = events.filter(e => e.event_type === 'design_opened').length;
             panel.innerHTML = '<div class="row g-2 text-center mb-2">' +
                 '<div class="col-6"><div class="border rounded p-2 h-100"><strong class="d-block">' + escapeHtml(dashboardPortalActivityDate(opened[0] && opened[0].created_at)) + '</strong><span class="text-muted small">Last opened</span></div></div>' +
-                '<div class="col-6"><div class="border rounded p-2 h-100"><strong class="d-block">' + opened.length + '</strong><span class="text-muted small">Total opens</span></div></div>' +
-                '<div class="col-6"><div class="border rounded p-2 h-100"><strong class="d-block">' + escapeHtml(dashboardPortalActivityDuration(totalSeconds)) + '</strong><span class="text-muted small">Viewing time</span></div></div>' +
+                '<div class="col-6"><div class="border rounded p-2 h-100"><strong class="d-block">' + opened.length + '</strong><span class="text-muted small">Document opens</span></div></div>' +
+                '<div class="col-6"><div class="border rounded p-2 h-100"><strong class="d-block">' + escapeHtml(dashboardPortalActivityDuration(totalSeconds)) + '</strong><span class="text-muted small">Document viewing time</span></div></div>' +
                 '<div class="col-6"><div class="border rounded p-2 h-100"><strong class="d-block">' + escapeHtml(dashboardPortalActivityDate(pdfEvents[0] && pdfEvents[0].created_at)) + '</strong><span class="text-muted small">Last PDF action</span></div></div>' +
                 '</div>' +
+                '<p class="small"><strong>Design viewing:</strong> ' + escapeHtml(dashboardPortalActivityDuration(designSeconds)) + ' · ' + designOpens + ' opens</p><p class="small text-muted">Quote/document viewing totals above exclude designs. Time measures page visibility, not attention. Totals cover the activity returned; newest 20 visits/actions shown.</p>' +
                 (timeline || '<div class="text-muted small text-center py-2"><i class="fas fa-circle-info me-1"></i>No client activity has been logged for this document yet.</div>');
         }
 

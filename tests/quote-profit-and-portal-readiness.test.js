@@ -131,6 +131,7 @@ function extractFunction(source, name) {
     quoteOptionalItemIncludedByDefault: (item) => !item.optional || item.optionalSelectedByDefault !== false,
     quoteItemMarkedAmount: (_room, _item, amount) => amount,
     itemChargedTotal: (item) => item.total,
+    getQuoteItemMaterialBreakdown: (item) => ({ total: item.quantity * item.materialCost }),
     qdFormatMoney: (amount) => `$${Number(amount).toFixed(2)}`
   };
   vm.createContext(context);

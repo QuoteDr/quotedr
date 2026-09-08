@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 122,
-  "totalBytes": 27624822,
-  "treeSha256": "69f7ae53315d8d2535d920c62cf71bd4ec35a6ae8d4e8a5d7545a75b66fc745d",
+  "fileCount": 124,
+  "totalBytes": 27636124,
+  "treeSha256": "9b78bf640d85b0bb8e79eea95b9184045f7980e24fa3b28ebfdeca7ad188438c",
   "files": [
     {
       "path": "404.html",
@@ -157,8 +157,8 @@
     },
     {
       "path": "client-portal.html",
-      "bytes": 229431,
-      "sha256": "9af61b78c24429070ed98f4f1547761585ab284fb4c332b865295df5db1a59c9"
+      "bytes": 229595,
+      "sha256": "43a2722e369766c34042d079942457c0f9f4ffe59861deb6aa6dbc99be01e5a0"
     },
     {
       "path": "community-starter-templates.js",
@@ -172,8 +172,8 @@
     },
     {
       "path": "dashboard.html",
-      "bytes": 410493,
-      "sha256": "d3e375e489c321e82a6c1cdeb91a3e218a038a046257b2ab6ada960769f09335"
+      "bytes": 412768,
+      "sha256": "ffdafaee054834d8b36d43ea1d0a912a8b657710364dcb3a46174c1582aacb2b"
     },
     {
       "path": "data/whats-new.json",
@@ -294,6 +294,11 @@
       "path": "onboarding.html",
       "bytes": 72772,
       "sha256": "b8b8f889dbe53d5ac2cb173d7c5ba29176ee087ef1448128e7bb7efe57967e27"
+    },
+    {
+      "path": "portal-activity-visits.js",
+      "bytes": 2058,
+      "sha256": "89dfbe53f8a2e7ca7857b5e52122ae5f5553495743abe5b059fa3eb98423c887"
     },
     {
       "path": "portal-design-policy.mjs",
@@ -419,6 +424,11 @@
       "path": "quote-portal-readiness.js",
       "bytes": 4918,
       "sha256": "e395ecf475db7040e4a491dfc6f5f7114ed8627cad883fb2d8f2996eb0688a06"
+    },
+    {
+      "path": "quote-profit-report.js",
+      "bytes": 6805,
+      "sha256": "4374d4e07ffeb789adee9b5f19014a17e122c47ec0643ac6c915b68e4a4a44a1"
     },
     {
       "path": "quote-review-construction-knowledge.js",

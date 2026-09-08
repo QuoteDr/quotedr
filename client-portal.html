@@ -2626,6 +2626,7 @@
 <script src="help-content.js?v=2026080801"></script>
 <script src="modal-help.js?v=1777741200"></script>
 <script src="change-orders.js?v=1778060200"></script>
+<script src="portal-activity-visits.js"></script>
     <script src="supabase-v2.js?v=2026090802"></script>
     <script src="save-coordinator.js?v=2026081801"></script>
 
@@ -4838,6 +4839,7 @@
     }
 
     function portalDocumentActivityTimeline(events) {
+      if (typeof QuoteDrActivityVisits !== 'undefined') events = QuoteDrActivityVisits.designVisits(events);
       const chronological = (Array.isArray(events) ? events : []).map(function(event, index) {
         return { event: event, index: index };
       }).sort(function(a, b) {
@@ -4916,9 +4918,9 @@
       }).join('');
       panel.innerHTML = '<div class="portal-activity-summary">' +
         '<div class="portal-activity-stat"><strong>' + escapeHtml(formatPortalActivityDate(summary.lastOpened)) + '</strong><span>Last opened</span></div>' +
-        '<div class="portal-activity-stat"><strong>' + summary.opens + '</strong><span>Total opens</span></div>' +
+        '<div class="portal-activity-stat"><strong>' + summary.opens + '</strong><span>Document opens</span></div>' +
         '<div class="portal-activity-stat"><strong>' + escapeHtml(formatPortalActivityDuration(summary.renderingSeconds)) + '</strong><span>Rendering visible time</span></div>' +
-        '<div class="portal-activity-stat"><strong>' + escapeHtml(formatPortalActivityDuration(summary.totalSeconds)) + '</strong><span>Active viewing time</span></div>' +
+        '<div class="portal-activity-stat"><strong>' + escapeHtml(formatPortalActivityDuration(summary.totalSeconds)) + '</strong><span>Document viewing time</span></div>' +
         '<div class="portal-activity-stat"><strong>' + escapeHtml(formatPortalActivityDate(summary.lastPdf)) + '</strong><span>Last PDF action</span></div>' +
         '</div>' +
         (timeline ? '<ul class="portal-activity-timeline">' + timeline + '</ul>' : '<div class="text-muted small"><i class="fas fa-circle-info me-1"></i>No client activity has been logged for this document yet.</div>');
