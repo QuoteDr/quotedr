@@ -1620,6 +1620,39 @@
         setImportStatus('<div class="alert alert-info py-2 small">Browser download attempted. If it does not appear, use Copy JSON instead.</div>');
     }
 
+    function selectedUnsavedImportCandidates() {
+        var parsed = _quoteImportState.parsed;
+        if (!parsed) return [];
+        var library = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
+        return Array.from(document.querySelectorAll('.quote-import-candidate:checked')).map(function(input) {
+            return parsed.savedItemCandidates[parseInt(input.dataset.index, 10)];
+        }).filter(function(item) {
+            return item && !asArray(library[item.category || 'Imported Quote']).some(function(existing) {
+                return String(existing.name || '').trim().toLowerCase() === String(item.name || '').trim().toLowerCase();
+            });
+        });
+    }
+
+    function askToSaveImportCandidates(count) {
+        return new Promise(function(resolve) {
+            var dialog = document.createElement('dialog');
+            dialog.setAttribute('aria-labelledby', 'quoteImportSaveReminderTitle');
+            dialog.style.cssText = 'width:min(520px,calc(100% - 32px));border:1px solid #ccd6e0;border-radius:12px;padding:24px;color:#183047;';
+            dialog.innerHTML = '<h5 id="quoteImportSaveReminderTitle">Save your selected items?</h5>' +
+                '<p>You selected ' + count + ' item' + (count === 1 ? '' : 's') + ' for your reusable item library but haven’t saved them yet. Would you like to save them before applying this import to your quote?</p>' +
+                '<div class="d-flex flex-wrap gap-2"><button type="button" class="btn btn-success" data-choice="save">Save items and continue</button>' +
+                '<button type="button" class="btn btn-outline-primary" data-choice="continue">Continue without saving</button>' +
+                '<button type="button" class="btn btn-outline-secondary" data-choice="cancel">Go back</button></div>';
+            function finish(choice) { dialog.close(); dialog.remove(); resolve(choice); }
+            dialog.addEventListener('cancel', function(event) { event.preventDefault(); finish('cancel'); });
+            dialog.querySelectorAll('[data-choice]').forEach(function(button) {
+                button.addEventListener('click', function() { finish(button.dataset.choice); });
+            });
+            (document.getElementById('quoteImportModal') || document.body).appendChild(dialog);
+            dialog.showModal();
+        });
+    }
+
     async function applyImportedQuote() {
         var parsed = _quoteImportState.parsed;
         if (!parsed || !parsed.quote || !parsed.quote.rooms.length) return;
@@ -1627,6 +1660,17 @@
         if (_quoteImportState.requiresReviewAcknowledgement && !(acknowledged && acknowledged.checked)) {
             setImportStatus('<div class="alert alert-warning py-2 small">Check the highlighted handwriting and arithmetic, then confirm the review checkbox before applying.</div>');
             showQuoteImportRequiredReview();
+            return;
+        }
+        try {
+            var unsaved = selectedUnsavedImportCandidates();
+            if (unsaved.length) {
+                var choice = await askToSaveImportCandidates(unsaved.length);
+                if (choice === 'cancel') return;
+                if (choice === 'save') await saveQuoteImportCandidates();
+            }
+        } catch (error) {
+            setImportStatus('<div class="alert alert-danger py-2 small">Could not check or save your selected items. Your import is still here. ' + escapeHtml(error.message || error) + '</div>');
             return;
         }
         var mode = document.querySelector('input[name="quoteImportApplyMode"]:checked')?.value || 'replace';
@@ -1702,6 +1746,8 @@
             localStorage.removeItem('ald_active_quote_id');
         }
 
+        if (typeof global.recordQuoteImportUndo === 'function') global.recordQuoteImportUndo(deepClone(currentData));
+
         var sourceTotal = parsed.sourceTotals.total || 0;
         var displayedTotal = parseMoney(document.getElementById('grandTotalDisplay')?.textContent || '0') || 0;
         var message = 'Imported quote added. Review totals before sending.';
@@ -1744,7 +1790,7 @@
         });
         localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
         if (typeof global.loadCustomItems === 'function') global.loadCustomItems();
-        if (typeof global.saveCustomItems === 'function') global.saveCustomItems(false);
+        if (typeof global.saveCustomItems === 'function') await global.saveCustomItems(false);
         if (typeof global.updatePricingOptions === 'function') global.updatePricingOptions();
         setImportStatus('<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Saved ' + savedCount + ' new item' + (savedCount === 1 ? '' : 's') + ' to Manage Items.</div>');
     }

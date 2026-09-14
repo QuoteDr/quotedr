@@ -16,6 +16,26 @@
     <link rel="stylesheet" href="brand-theme.css?v=2026073101">
     <script src="recording-privacy.js?v=2026071301"></script>
     <style>
+        #quoteImportModal .modal-dialog {
+            width: calc(100% - 24px);
+            max-width: none;
+            height: calc(100vh - 24px);
+            height: calc(100dvh - 24px);
+            margin: 12px auto;
+        }
+        #quoteImportModal .modal-content { height: 100%; }
+        #quoteImportModal #quoteImportPreview .table-responsive {
+            max-height: 55vh !important;
+            max-height: 55dvh !important;
+        }
+        @media (max-width: 575.98px) {
+            #quoteImportModal .modal-dialog {
+                width: calc(100% - 12px);
+                height: calc(100vh - 12px);
+                height: calc(100dvh - 12px);
+                margin: 6px auto;
+            }
+        }
         :root {
             --change-order-accent: var(--qd-blue, #1a56a0);
             --change-order-surface: rgba(26, 86, 160, 0.08);
@@ -2540,6 +2560,27 @@
     }
 
     /* Fix Google Places autocomplete dropdown appearing behind Bootstrap modal */
+    @media (max-width: 768px), (max-height: 600px) and (orientation: landscape) {
+        #manageItemsModal .modal-body {
+            display: block;
+            overflow-y: auto;
+            min-height: 0;
+        }
+        #manageItemsModal #customItemsList {
+            flex: none;
+            max-height: none !important;
+            overflow-y: visible !important;
+            touch-action: auto !important;
+        }
+        #manageItemsModal .manage-items-add-shell,
+        #manageItemsModal .manage-items-toolbar { position: static; }
+        #manageItemsModal .modal-footer { flex-wrap: wrap !important; }
+        #manageItemsModal .modal-footer .btn { flex-shrink: 1; }
+    }
+    #manageItemsModal .manage-mobile-prices { display: none; }
+    @media (max-width: 768px) and (orientation: portrait) {
+        #manageItemsModal .manage-mobile-prices { display: inline-block; }
+    }
     .pac-container {
         z-index: 99999 !important;
     }
@@ -2687,6 +2728,7 @@ if (location.search.includes('debug')) {
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="startVoiceQuote()"><i class="fas fa-microphone me-2" style="color:#7c3aed"></i>AI Quote</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openAiVoiceTranscriptHistory()"><i class="fas fa-clock-rotate-left me-2" style="color:#7c3aed"></i>AI Voice Transcript History</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteImportModal()"><i class="fas fa-file-import me-2 text-success"></i>Import Old Quote</a></li>
+                            <li><button type="button" class="dropdown-item" id="undoQuoteImportBtn" onclick="undoLastAction()" disabled><i class="fas fa-undo me-2"></i>Undo Import</button></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openFullQuoteSpellcheck()"><i class="fas fa-spell-check me-2 text-primary"></i>Check Entire Quote</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMeasureModal()"><i class="fas fa-satellite me-2 text-primary"></i>Satellite Measure</a></li>
@@ -3310,6 +3352,11 @@ if (location.search.includes('debug')) {
                     <label class="form-label fw-semibold mt-3" for="quoteCategoryIconSearch">Category icon</label>
                     <input id="quoteCategoryIconSearch" class="form-control mb-2" placeholder="Search icons…" oninput="filterQuoteCategoryIcons(this.value)">
                     <div id="quoteCategoryIconGrid" class="d-flex flex-wrap gap-2" style="max-height:180px;overflow:auto" role="group" aria-label="Category icon"></div>
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        <button type="button" class="btn btn-outline-primary" onclick="autoDetectQuoteCategoryIcon()">Auto Detect</button>
+                        <button type="button" class="btn btn-outline-warning" onclick="autoDetectAllQuoteCategoryIcons()">Auto Detect All</button>
+                    </div>
+                    <label class="form-check mt-2"><input type="checkbox" class="form-check-input" id="quoteCategoryUpdateStored"> Also update matching saved categories for future quotes</label>
                     <div id="quoteCategoryIconScope" class="small text-muted mt-2"></div>
                 </div>
                 <div class="modal-footer">
@@ -4166,6 +4213,7 @@ Example:
                     </div>
 
                     <div class="manage-items-toolbar" id="itemListTopAnchor">
+                        <button type="button" class="btn btn-outline-primary btn-sm manage-mobile-prices" onclick="showManageItemsMobilePrices()">Show units &amp; prices</button>
                         <div class="flex-grow-1">
                             <label class="form-label fw-bold mb-1"><i class="fas fa-list-alt text-secondary"></i> All Items</label>
                             <input type="text" id="itemSearchFilter" class="form-control form-control-sm" placeholder="Search name, category, description, supplier, or upgrade..." oninput="filterItemsList()">
@@ -5326,8 +5374,42 @@ Example:
             _updateUndoBtn();
         }
 
-        function undoLastAction() {
+        function importUndoFingerprint(data) {
+            return JSON.stringify(['rooms', 'roomCounter', 'quoteTitle', 'clientName', 'quoteNumber', 'clientPhone', 'clientEmail', 'projectAddress', 'status'].map(key => data[key] ?? null));
+        }
+
+        window.recordQuoteImportUndo = function(before) {
+            _undoStack.push(JSON.stringify({ kind: 'quote-import', before,
+                after: importUndoFingerprint(collectQuoteData()), quoteId: window._supabaseQuoteId || null }));
+            if (_undoStack.length > _UNDO_LIMIT) _undoStack.shift();
+            _updateUndoBtn();
+        };
+
+        let _importUndoConfirming = false;
+        async function undoLastAction() {
+            if (_importUndoConfirming) return;
             if (_undoStack.length === 0) { qdAlert('Nothing to undo!'); return; }
+            const pending = _undoStack[_undoStack.length - 1];
+            const candidate = JSON.parse(pending);
+            if (candidate.kind === 'quote-import') {
+                if (candidate.quoteId !== (window._supabaseQuoteId || null) || candidate.after !== importUndoFingerprint(collectQuoteData())) {
+                    qdAlert('The quote has changed or been saved as another document since this import. Undo Import is unavailable to avoid overwriting newer work.');
+                    return;
+                }
+                _importUndoConfirming = true;
+                try {
+                    if (!await qdConfirm('Are you sure you want to undo this import? This restores the quote content from before the import. Items saved to your reusable library will stay saved. The restored content stays in this draft; no saved document is deleted.', {
+                        title: 'Undo Import', okText: 'Undo Import', okClass: 'btn-danger', type: 'warning'
+                    })) return;
+                    if (_undoStack[_undoStack.length - 1] !== pending || candidate.quoteId !== (window._supabaseQuoteId || null) || candidate.after !== importUndoFingerprint(collectQuoteData())) return;
+                    applyQuoteData(candidate.before);
+                    _undoStack.pop();
+                    if (typeof calculateTotals === 'function') calculateTotals();
+                    if (typeof markUnsaved === 'function') markUnsaved();
+                    _updateUndoBtn();
+                } finally { _importUndoConfirming = false; }
+                return;
+            }
             const state = JSON.parse(_undoStack.pop());
             _undoPaused = true;
             rooms = JSON.parse(JSON.stringify(state.rooms)); // deep clone
@@ -5340,6 +5422,12 @@ Example:
         }
 
         function _updateUndoBtn() {
+            var importButton = document.getElementById('undoQuoteImportBtn');
+            if (importButton) {
+                var latest = _undoStack.length ? JSON.parse(_undoStack[_undoStack.length - 1]) : null;
+                importButton.disabled = !latest || latest.kind !== 'quote-import';
+                importButton.title = importButton.disabled ? 'Undo later changes first, or import a quote to enable this action.' : 'Undo the most recent import (Ctrl+Z)';
+            }
             var btns = document.querySelectorAll('#undoBtn, [id="undoBtn"]');
             btns.forEach(function(btn) {
                 btn.disabled = _undoStack.length === 0;
@@ -5350,7 +5438,7 @@ Example:
         document.addEventListener('keydown', function(e) {
             if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
                 // Don't fire if user is typing in an input
-                if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+                if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName) || document.activeElement.isContentEditable || document.querySelector('dialog[open], .modal.show')) return;
                 e.preventDefault();
                 undoLastAction();
             }
@@ -11250,9 +11338,7 @@ Example:
             activeQuoteCategoryChange.icon = icon;
             activeQuoteCategoryChange.initialIcon = icon;
             const saved = Object.prototype.hasOwnProperty.call(pricingDatabase || {}, cat);
-            document.getElementById('quoteCategoryIconScope').textContent = saved
-                ? 'Applying an icon updates this saved category for future use. Existing sent quotes are not changed.'
-                : 'This icon stays with this quote. The category will not be added to your database.';
+            document.getElementById('quoteCategoryIconScope').textContent = 'By default, icons change only on this quote. Check the option above to also update matching saved categories. No new database categories or existing sent quotes are changed.';
             const grid = document.getElementById('quoteCategoryIconGrid');
             grid.innerHTML = CAT_ICONS.map(function(choice) {
                 return '<button type="button" class="btn btn-outline-primary" title="' + catPickerEscape(choice.label) + '" aria-label="' + catPickerEscape(choice.label) + '" aria-pressed="' + (choice.fa === icon) + '" data-quote-category-icon="' + catPickerEscape(choice.fa) + '" data-search="' + catPickerEscape((choice.label + ' ' + (choice.tags || '')).toLowerCase()) + '">' + renderCategoryIconMarkup(choice.fa) + '</button>';
@@ -11272,21 +11358,57 @@ Example:
             });
         }
 
-        function applyQuoteCategoryIcon(cat, icon) {
+        function detectQuoteCategoryIcon(cat) {
+            const words = String(cat || '').toLowerCase().match(/[a-z0-9]+/g) || [];
+            let best = null, score = 0;
+            CAT_ICONS.forEach(function(choice) {
+                const tags = String(choice.label + ' ' + (choice.tags || '')).toLowerCase().match(/[a-z0-9]+/g) || [];
+                const matches = words.filter(word => word.length > 2 && tags.includes(word)).length;
+                if (matches > score) { score = matches; best = choice.fa; }
+            });
+            return best;
+        }
+
+        function autoDetectQuoteCategoryIcon() {
+            if (!activeQuoteCategoryChange) return;
+            const icon = detectQuoteCategoryIcon(document.getElementById('quoteCategoryPickerSelect').value);
+            if (!icon) { qdAlert('No confident icon match found. Please choose an icon manually.'); return; }
+            activeQuoteCategoryChange.icon = icon;
+            document.getElementById('quoteCategoryIconSearch').value = '';
+            filterQuoteCategoryIcons('');
+            document.querySelectorAll('[data-quote-category-icon]').forEach(function(button) {
+                button.setAttribute('aria-pressed', String(button.dataset.quoteCategoryIcon === icon));
+                button.classList.toggle('active', button.dataset.quoteCategoryIcon === icon);
+            });
+        }
+
+        async function autoDetectAllQuoteCategoryIcons() {
+            const categories = [...new Set((rooms || []).flatMap(room => (room.items || []).map(item => item.category).filter(Boolean)))];
+            const changes = categories.map(cat => ({cat, icon: detectQuoteCategoryIcon(cat)})).filter(change => change.icon);
+            if (!changes.length) { await qdAlert('No category icon matches found. Please choose icons manually.'); return; }
+            const stored = document.getElementById('quoteCategoryUpdateStored').checked;
+            if (!await qdConfirm('You are about to auto-detect icons for all categories on this quote. ' + changes.length + ' of ' + categories.length + ' categories have a match; unmatched categories will keep their icons. ' + (stored ? 'Matching saved categories will also be updated for future quotes.' : 'Your saved category database will not change.'), {title: 'Auto Detect All Category Icons', okText: 'Change Icons', type: 'warning'})) return;
+            _pushUndo();
+            changes.forEach(change => applyQuoteCategoryIcon(change.cat, change.icon, stored, true));
+            finishRoomBulkItemAction();
+            populateQuoteCategoryIcons();
+        }
+
+        function applyQuoteCategoryIcon(cat, icon, updateStored = false, batch = false) {
             if (!CAT_ICONS.some(function(choice) { return choice.fa === icon; })) return;
             const saved = Object.prototype.hasOwnProperty.call(pricingDatabase || {}, cat);
-            _pushUndo();
-            if (saved) {
+            if (!batch) _pushUndo();
+            if (saved && updateStored) {
                 categoryStyles[cat] = Object.assign({}, categoryStyles[cat] || {}, {icon: icon});
                 (rooms || []).forEach(function(room) { if (room.quoteCategoryStyles) delete room.quoteCategoryStyles[cat]; });
                 saveCategoryStyle(cat);
             } else {
                 // Room data already travels with quote saves, drafts and templates.
                 (rooms || []).forEach(function(room) {
-                    room.quoteCategoryStyles = Object.assign({}, room.quoteCategoryStyles || {}, {[cat]: {icon: icon}});
+                    room.quoteCategoryStyles = Object.assign({}, room.quoteCategoryStyles || {}, {[cat]: Object.assign({}, (room.quoteCategoryStyles || {})[cat] || {}, {icon: icon})});
                 });
             }
-            finishRoomBulkItemAction();
+            if (!batch) finishRoomBulkItemAction();
         }
 
         function replaceQuoteCategoryOrder(room, oldCategory, newCategory) {
@@ -11377,6 +11499,7 @@ Example:
                 context.textContent = oldCategory + ' in ' + (room.name || getQuoteDividerLabels().singular) + ' contains ' + itemCount + ' line item' + (itemCount === 1 ? '' : 's') + '.';
             }
             populateQuoteCategoryPicker(oldCategory);
+            document.getElementById('quoteCategoryUpdateStored').checked = false;
             populateQuoteCategoryIcons();
             var modalEl = document.getElementById('quoteCategoryPickerModal');
             if (modalEl && window.bootstrap && bootstrap.Modal) {
@@ -11397,7 +11520,7 @@ Example:
             if (!activeQuoteCategoryChange || !select || !select.value) return;
             reassignQuoteCategory(activeQuoteCategoryChange.roomId, activeQuoteCategoryChange.oldCategory, select.value);
             if (activeQuoteCategoryChange.icon !== activeQuoteCategoryChange.initialIcon) {
-                applyQuoteCategoryIcon(select.value, activeQuoteCategoryChange.icon);
+                applyQuoteCategoryIcon(select.value, activeQuoteCategoryChange.icon, document.getElementById('quoteCategoryUpdateStored').checked);
             }
             closeQuoteCategoryPicker();
         }

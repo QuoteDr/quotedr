@@ -84,7 +84,7 @@
 
         function getManageItemsPortraitFields() {
             try {
-                var parsed = JSON.parse(localStorage.getItem(MANAGE_PORTRAIT_FIELDS_KEY) || '[]');
+                var parsed = JSON.parse(localStorage.getItem(MANAGE_PORTRAIT_FIELDS_KEY) || '["unit","rate"]');
                 return Array.isArray(parsed) ? parsed.map(function(field) { return String(field || '').trim(); }).filter(Boolean) : [];
             } catch (e) {
                 return [];
@@ -2353,6 +2353,13 @@
                 ? manageItemsCategoryOrderMode === 'custom' && !isManageCategoryOrderAlphabetical(manageItemsCategoryCustomOrder)
                 : customizedValue === 'true';
         }
+
+        window.showManageItemsMobilePrices = function() {
+            var fields = getManageItemsPortraitFields();
+            ['unit', 'rate'].forEach(function(field) { if (!fields.includes(field)) fields.push(field); });
+            localStorage.setItem(MANAGE_PORTRAIT_FIELDS_KEY, JSON.stringify(fields));
+            applyManageItemsPortraitFieldSettings();
+        };
 
         function isManageCategoryOrderAlphabetical(order) {
             var categories = Array.isArray(order) ? order : [];
