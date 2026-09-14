@@ -3522,6 +3522,14 @@ Example:
                                     <hr class="flex-grow-1">
                                 </div>
 
+                                <label for="quoteImportMissingUnit" class="form-label fw-semibold">When the source has no unit type</label>
+                                <select id="quoteImportMissingUnit" class="form-select mb-1" onchange="updateQuoteImportMissingUnit()">
+                                    <option value="ea" selected>Each</option>
+                                    <option value="Flatrate">Flat rate</option>
+                                    <option value="">Leave blank</option>
+                                    <option value="ls">Lump sum (ls)</option>
+                                </select>
+                                <p class="small text-muted">Only fills missing units. Existing units, quantities and prices stay unchanged.</p>
                                 <label class="form-label fw-semibold">Copied quote text</label>
                                 <textarea id="quoteImportPaste" class="form-control font-monospace" rows="12" placeholder="Paste an old quote, invoice, Excel export, CSV rows, or copied PDF text here..."></textarea>
 
@@ -3562,8 +3570,12 @@ Example:
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary me-auto" id="quoteImportExportDebugBtn" onclick="exportQuoteImportDebug()" disabled><i class="fas fa-bug me-1"></i>Export Debug</button>
+                    <div id="quoteImportApplyHelp" class="small text-warning-emphasis w-100" role="status" hidden>
+                        Before applying, check the highlighted items and tick “I checked the highlighted handwriting and source arithmetic.”
+                        <button type="button" class="btn btn-link btn-sm p-0" onclick="showQuoteImportRequiredReview()">Go to review checkbox</button>
+                    </div>
                     <button type="button" class="btn btn-outline-primary" id="quoteImportSaveCandidatesBtn" onclick="saveQuoteImportCandidates()" disabled><i class="fas fa-bookmark me-1"></i>Save Selected Items</button>
-                    <button type="button" class="btn btn-success" id="quoteImportApplyBtn" onclick="applyImportedQuote()" disabled><i class="fas fa-check me-1"></i>Apply to Quote</button>
+                    <button type="button" class="btn btn-success" id="quoteImportApplyBtn" aria-describedby="quoteImportApplyHelp" onclick="applyImportedQuote()" disabled><i class="fas fa-check me-1"></i>Apply to Quote</button>
                 </div>
             </div>
         </div>
@@ -19464,7 +19476,7 @@ Example:
     <script src="quote-review-construction-knowledge.js?v=2026080201"></script>
     <script src="quote-starter-item-library.js?v=2026080201"></script>
     <script src="quote-items.js?v=2026090701"></script>
-    <script src="quote-import.js?v=2026082003"></script>
+    <script src="quote-import.js?v=2026091401"></script>
     <script src="supplier-materials.js?v=2026090101"></script>
     <script>
         // Load templates from localStorage on startup

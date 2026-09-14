@@ -90,7 +90,7 @@
 
     function normalizeUnit(unit) {
         var text = String(unit || '').trim().toLowerCase();
-        if (!text) return 'ls';
+        if (!text) return '';
         text = text.replace(/\./g, '').replace(/\s+/g, ' ');
         if (/^(sq ?ft|sqft|square ?feet|square ?foot|sf)$/.test(text)) return 'sq ft';
         if (/^(lin ?ft|linear ?feet|linear ?foot|lf|ft)$/.test(text)) return 'lf';
@@ -101,12 +101,32 @@
         if (/^(sheet|sheets)$/.test(text)) return 'sheet';
         if (/^(box|boxes)$/.test(text)) return 'box';
         if (/^(bag|bags)$/.test(text)) return 'bag';
-        return text;
+        return /^(flat ?rate)$/.test(text) ? 'Flatrate' : text;
     }
 
     function normalizeImportedUnit(unit) {
         var text = String(unit || '').trim();
-        return text ? normalizeUnit(text) : 'ea';
+        return text ? normalizeUnit(text) : missingUnitLabel();
+    }
+
+    function missingUnitLabel() {
+        var field = typeof document.getElementById === 'function' && document.getElementById('quoteImportMissingUnit');
+        var value = field ? field.value : 'ea';
+        return ['', 'ea', 'Flatrate', 'ls'].indexOf(value) !== -1 ? value : 'ea';
+    }
+
+    function updateQuoteImportMissingUnit() {
+        var parsed = _quoteImportState.parsed;
+        if (!parsed) return;
+        asArray(parsed.quote.rooms).forEach(function(room) {
+            asArray(room.items).forEach(function(item) {
+                if (item.unitWasMissing) item.unit = item.unitType = missingUnitLabel();
+            });
+        });
+        asArray(parsed.savedItemCandidates).forEach(function(item) {
+            if (item.unitWasMissing) item.unit = item.unitType = missingUnitLabel();
+        });
+        renderQuoteImportPreview();
     }
 
     function normalizeImportDescriptionKey(value) {
@@ -129,17 +149,24 @@
         return first + '\n' + second;
     }
 
+    function getImportedScopeDescription(item) {
+        var nameKeys = [item.description, item.name, item.serviceName].map(normalizeImportDescriptionKey).filter(Boolean);
+        return [item.itemDescription, item.displayDescription, item.notes].reduce(function(scope, value) {
+            var text = String(value || '').trim();
+            if (!text || nameKeys.indexOf(normalizeImportDescriptionKey(text)) !== -1) return scope;
+            return mergeImportedDescriptionText(scope, text);
+        }, '');
+    }
+
     function scrubImportedItemForBuilder(item) {
         if (!item || typeof item !== 'object') return item;
-        var importedDescription = mergeImportedDescriptionText(
-            item.itemDescription || item.displayDescription || '',
-            item.notes || ''
-        );
+        var importedDescription = getImportedScopeDescription(item);
         item.itemDescription = importedDescription;
         item.notes = '';
         delete item.confidence;
         delete item.sourceExcerpt;
         delete item.reviewReasons;
+        delete item.unitWasMissing;
         return item;
     }
 
@@ -157,7 +184,7 @@
     function normalizeImportedItem(item) {
         if (!item || typeof item !== 'object' || looksLikeSkipRow(item)) return null;
         var description = String(item.description || item.name || item.serviceName || item.actualDescription || '').trim();
-        var importedDescription = String(item.notes || item.itemDescription || item.displayDescription || '').trim();
+        var importedDescription = getImportedScopeDescription(item);
         var quantity = parseQuantity(item.quantity);
         var rate = parseMoney(item.rate || item.unitPrice || item.unit_price);
         var total = parseMoney(item.total || item.amount || item.lineTotal || item.line_total);
@@ -181,6 +208,7 @@
             quantity: quantity,
             unit: unitType,
             unitType: unitType,
+            unitWasMissing: item.unitWasMissing === true || !String(item.unitType || item.unit || item.units || '').trim(),
             rate: rate,
             materialCost: parseMoney(item.materialCost || item.material_cost) || 0,
             total: total,
@@ -288,9 +316,10 @@
                     category: category,
                     name: name,
                     unitType: unitType,
+                    unitWasMissing: item.unitWasMissing === true,
                     rate: rate,
                     materialCost: parseMoney(item.materialCost) || 0,
-                    description: String(item.itemDescription || item.notes || item.displayDescription || '').trim(),
+                    description: getImportedScopeDescription(item),
                     sourceRoom: room.name || '',
                     confidence: item.confidence,
                     recommended: true
@@ -356,10 +385,10 @@
         var description = parts[0];
         var quantity = null;
         var rate = null;
-        var unitType = 'ea';
+        var unitType = '';
         if (parts.length >= 5) {
             quantity = parseQuantity(parts[1]);
-            unitType = normalizeImportedUnit(parts[2]);
+            unitType = normalizeUnit(parts[2]);
             rate = parseMoney(parts[3]);
         } else if (parts.length >= 4) {
             quantity = parseQuantity(parts[1]);
@@ -393,6 +422,7 @@
                 quantity: quantity,
                 unit: unitType,
                 unitType: unitType,
+                unitWasMissing: !unitType,
                 rate: Math.round(rate * 100) / 100,
                 materialCost: 0,
                 total: Math.round(total * 100) / 100,
@@ -946,6 +976,8 @@
     }
 
     function setApplyButtonsEnabled(enabled) {
+        var help = document.getElementById('quoteImportApplyHelp');
+        if (help && !enabled) help.hidden = true;
         ['quoteImportApplyBtn', 'quoteImportSaveCandidatesBtn', 'quoteImportExportDebugBtn'].forEach(function(id) {
             var btn = document.getElementById(id);
             if (btn) btn.disabled = !enabled;
@@ -1002,7 +1034,22 @@
         var apply = document.getElementById('quoteImportApplyBtn');
         if (!apply) return;
         var acknowledged = document.getElementById('quoteImportReviewAcknowledged');
-        apply.disabled = !_quoteImportState.parsed || (_quoteImportState.requiresReviewAcknowledgement && !(acknowledged && acknowledged.checked));
+        var needsReview = Boolean(_quoteImportState.parsed && _quoteImportState.requiresReviewAcknowledgement && !(acknowledged && acknowledged.checked));
+        // Keep the review-blocked action focusable so click, touch and keyboard
+        // users can discover why it is blocked. applyImportedQuote still guards it.
+        apply.disabled = !_quoteImportState.parsed;
+        apply.setAttribute('aria-disabled', String(apply.disabled || needsReview));
+        apply.classList.toggle('opacity-50', needsReview);
+        apply.title = needsReview ? 'Review the highlighted items and tick the review checkbox before applying. Click to go there.' : '';
+        var help = document.getElementById('quoteImportApplyHelp');
+        if (help) help.hidden = !needsReview;
+    }
+
+    function showQuoteImportRequiredReview() {
+        var acknowledged = document.getElementById('quoteImportReviewAcknowledged');
+        if (!acknowledged) return;
+        acknowledged.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        acknowledged.focus({ preventScroll: true });
     }
 
     function renderImportLoadingStatus(progress) {
@@ -1147,7 +1194,7 @@
         candidates.forEach(function(item, index) {
             html += '<label class="d-flex gap-2 border rounded p-2 mb-2" for="quoteImportCandidate' + index + '">';
             html += '<input class="form-check-input mt-1 quote-import-candidate" type="checkbox" id="quoteImportCandidate' + index + '" data-index="' + index + '">';
-            html += '<span><span class="fw-semibold">' + escapeHtml(item.name) + '</span>' + (item.recommended !== false ? '<span class="badge text-bg-light border ms-1">Recommended</span>' : '<span class="badge text-bg-warning ms-1">Review first</span>') + '<span class="small text-muted"> - ' + escapeHtml(item.category || 'Imported Quote') + ' | ' + escapeHtml(item.unitType || 'ls') + ' | $' + (parseMoney(item.rate) || 0).toFixed(2) + '</span>';
+            html += '<span><span class="fw-semibold">' + escapeHtml(item.name) + '</span>' + (item.recommended !== false ? '<span class="badge text-bg-light border ms-1">Recommended</span>' : '<span class="badge text-bg-warning ms-1">Review first</span>') + '<span class="small text-muted"> - ' + escapeHtml(item.category || 'Imported Quote') + ' | ' + escapeHtml(item.unitType || '(blank)') + ' | $' + (parseMoney(item.rate) || 0).toFixed(2) + '</span>';
             if (item.description) html += '<span class="d-block small text-muted">' + escapeHtml(item.description) + '</span>';
             html += '</span></label>';
         });
@@ -1399,7 +1446,7 @@
             if (!parsed.quote.rooms.length) throw new Error('No quote rooms or line items were found.');
             parsed.savedItemCandidates = mergeSavedItemCandidates(parsed.quote, parsed.savedItemCandidates);
             _quoteImportState.parsed = parsed;
-            renderQuoteImportPreview();
+            updateQuoteImportMissingUnit();
             setImportStatus('');
             setApplyButtonsEnabled(true);
             refreshQuoteImportApplyAvailability();
@@ -1422,6 +1469,9 @@
         }
         if (!response.ok || data.error) {
             var message = data.error || ('Server error: ' + response.status);
+            if (/OpenAI error:.*(?:internal_error|server_error)/is.test(String(message))) {
+                message = 'The AI service could not process this request. Your extracted text is still here; try Parse Quote again. If it repeats, export the debug details or try a smaller section.';
+            }
             if (response.status === 546) {
                 message = 'The server timed out while converting this quote section. Try again; if it repeats, remove blank/hidden spreadsheet rows or split the old quote by floor.';
             }
@@ -1576,6 +1626,7 @@
         var acknowledged = document.getElementById('quoteImportReviewAcknowledged');
         if (_quoteImportState.requiresReviewAcknowledgement && !(acknowledged && acknowledged.checked)) {
             setImportStatus('<div class="alert alert-warning py-2 small">Check the highlighted handwriting and arithmetic, then confirm the review checkbox before applying.</div>');
+            showQuoteImportRequiredReview();
             return;
         }
         var mode = document.querySelector('input[name="quoteImportApplyMode"]:checked')?.value || 'replace';
@@ -1730,6 +1781,8 @@
         collectQuoteImportReviewIssues: collectQuoteImportReviewIssues
     };
     global.openQuoteImportModal = openQuoteImportModal;
+    global.updateQuoteImportMissingUnit = updateQuoteImportMissingUnit;
+    global.showQuoteImportRequiredReview = showQuoteImportRequiredReview;
     global.handleQuoteImportFileChange = handleQuoteImportFileChange;
     global.runQuoteImport = runQuoteImport;
     global.applyImportedQuote = applyImportedQuote;

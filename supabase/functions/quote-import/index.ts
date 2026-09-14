@@ -1,6 +1,17 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
+// Retry only explicit upstream server failures, not auth, quota or invalid input.
+async function fetchQuoteImportWithRetry(url: string, options: RequestInit): Promise<Response> {
+  let response = await fetch(url, options);
+  if ([500, 502, 503, 504].includes(response.status)) {
+    await response.body?.cancel();
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    response = await fetch(url, options);
+  }
+  return response;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -434,6 +445,7 @@ Convert old quote text into QuoteDr JSON. You may receive one chunk/page/section
           {
             "category": "Category",
             "description": "Line item name",
+            "itemDescription": "Full supporting scope description printed beneath or beside this line item; empty if none",
             "quantity": 1,
             "unit": "ls",
             "unitType": "ls",
@@ -485,8 +497,9 @@ Rules:
 - Extract every valid billable item. Do not summarize and do not return only a sample.
 - Preserve room or section headings such as 2ND FLOOR, MAIN FLOOR, KITCHEN, BASEMENT BATHROOM, EXTERIOR, etc.
 - If an item has quantity, unit, rate, and total, preserve them as numbers.
-- If an item has no quantity or unit but does have pricing, set quantity to 1, unit and unitType to "ea", rate to that total, and total to that total.
+- If an item has no quantity or unit but does have pricing, set quantity to 1, rate to that total, and total to that total. When no unit is printed, return unit and unitType as empty strings. Never invent ea or ls. Apply the same rule to savedItemCandidates; the user chooses a missing-unit label in QuoteDr.
 - Preserve long imported item descriptions in itemDescription/displayDescription. Keep description as the short item/service name.
+- Always include itemDescription for every billable item. Copy all supporting scope text, including wrapped lines and continuation paragraphs beneath or beside its name, into that field. Do not replace it with the item name, summarize away specifications or exclusions, or treat continuation text as a separate billable item. If there is no supporting text, use an empty string instead of repeating the name. Preserve the same full scope in the corresponding savedItemCandidates description.
 - Leave job-specific notes blank during import. Do not duplicate imported descriptions into notes; notes are reserved for contractor-added job notes later.
 - Ignore document headers, footers, dates, page numbers, bill-to labels, terms, disclaimers, subtotals, taxes, total rows, balance due rows, deposit/payment rows, and repeated table headers as billable items.
 - Ignore TBD, to-be-determined, included-only, blank, or zero-price rows as billable line items unless they are clearly a priced line item.
@@ -521,7 +534,7 @@ Rules:
             ]),
           ]
         : userPrompt;
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetchQuoteImportWithRetry('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openaiKey}`,
@@ -543,8 +556,9 @@ Rules:
       });
 
       if (!response.ok) {
-        const err = await response.text();
-        throw new Error(`OpenAI error: ${err}`);
+        console.error('quote-import upstream failure', { status: response.status, requestId: response.headers.get('x-request-id') });
+        await response.body?.cancel();
+        throw new Error('The AI service could not process this quote. Your extracted text is still available. Please try Parse Quote again in a moment; if it repeats, try a smaller section.');
       }
 
       const data = await response.json();
