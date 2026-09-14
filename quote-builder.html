@@ -2728,6 +2728,7 @@ if (location.search.includes('debug')) {
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="startVoiceQuote()"><i class="fas fa-microphone me-2" style="color:#7c3aed"></i>AI Quote</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openAiVoiceTranscriptHistory()"><i class="fas fa-clock-rotate-left me-2" style="color:#7c3aed"></i>AI Voice Transcript History</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteImportModal()"><i class="fas fa-file-import me-2 text-success"></i>Import Old Quote</a></li>
+                            <li><button type="button" class="dropdown-item" onclick="QuoteDrQuoteFind.open(function(){ return rooms; })"><i class="fas fa-search me-2"></i>Find in Quote</button></li>
                             <li><button type="button" class="dropdown-item" id="undoQuoteImportBtn" onclick="undoLastAction()" disabled><i class="fas fa-undo me-2"></i>Undo Import</button></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openFullQuoteSpellcheck()"><i class="fas fa-spell-check me-2 text-primary"></i>Check Entire Quote</a></li>
                             <li><hr class="dropdown-divider"></li>
@@ -10323,7 +10324,9 @@ Example:
                 renderLineItemHighlightModalOptions(
                     parseInt(optionsEl.getAttribute('data-room-id'), 10),
                     parseInt(optionsEl.getAttribute('data-item-index'), 10),
-                    String(optionsEl.getAttribute('data-selected-indexes') || '').split(',').map(Number).filter(Number.isFinite)
+                    optionsEl.getAttribute('data-highlight-mode') === 'bulk'
+                        ? String(optionsEl.getAttribute('data-selected-indexes') || '').split(',').filter(value => value.trim() !== '').map(Number).filter(Number.isInteger)
+                        : undefined
                 );
                 return;
             }
@@ -12855,7 +12858,7 @@ Example:
             var roomId = parseInt(optionsEl.getAttribute('data-room-id'), 10);
             var itemIndex = parseInt(optionsEl.getAttribute('data-item-index'), 10);
             var isBulk = optionsEl.getAttribute('data-highlight-mode') === 'bulk';
-            var selectedIndexes = String(optionsEl.getAttribute('data-selected-indexes') || '').split(',').map(Number).filter(Number.isFinite);
+            var selectedIndexes = String(optionsEl.getAttribute('data-selected-indexes') || '').split(',').filter(value => value.trim() !== '').map(Number).filter(Number.isInteger);
             var room = rooms.find(function(candidate) { return candidate.id === roomId; });
             var showDescriptionOnItems = !document.getElementById('highlightDescriptionLegendOnly')?.checked;
             var targetIndexes = isBulk ? selectedIndexes : [itemIndex];
@@ -19598,8 +19601,9 @@ Example:
     </script>
     <script src="quote-review-construction-knowledge.js?v=2026080201"></script>
     <script src="quote-starter-item-library.js?v=2026080201"></script>
-    <script src="quote-items.js?v=2026090701"></script>
+    <script src="quote-items.js?v=2026091402"></script>
     <script src="quote-import.js?v=2026091401"></script>
+    <script src="quote-find.js?v=2026091401"></script>
     <script src="supplier-materials.js?v=2026090101"></script>
     <script>
         // Load templates from localStorage on startup

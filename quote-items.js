@@ -2359,6 +2359,11 @@
             ['unit', 'rate'].forEach(function(field) { if (!fields.includes(field)) fields.push(field); });
             localStorage.setItem(MANAGE_PORTRAIT_FIELDS_KEY, JSON.stringify(fields));
             applyManageItemsPortraitFieldSettings();
+            var button = document.querySelector('#manageItemsModal .manage-mobile-prices');
+            if (button) {
+                button.textContent = 'Units & prices shown';
+                button.setAttribute('aria-pressed', 'true');
+            }
         };
 
         function isManageCategoryOrderAlphabetical(order) {

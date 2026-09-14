@@ -1,0 +1,17 @@
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const fs = require('node:fs');
+const ctx = {window:{}};
+vm.createContext(ctx); vm.runInContext(fs.readFileSync('quote-find.js','utf8'),ctx);
+const search = ctx.window.QuoteDrQuoteFind.search;
+const rooms = [{id:1,name:'Basement',items:[{description:'Pot lights',category:'Electrical',itemDescription:'Install six recessed fixtures',notes:'Dimmer by stairs'},{description:'Drywall',itemDescription:'Paint-ready finish'}]}];
+const before = JSON.stringify(rooms);
+assert.equal(search(rooms,'BASEMENT lights').length,1);
+assert.equal(search(rooms,'six fixtures')[0].title,'Pot lights');
+assert.equal(search(rooms,'stairs')[0].index,0);
+assert.equal(search(rooms,'basement electrical')[0].index,0);
+assert.equal(search(rooms,'lights drywall').length,0);
+assert.equal(search(rooms,'   ').length,0);
+assert.equal(search([], 'lights').length,0);
+assert.equal(JSON.stringify(rooms),before);
+console.log('Quote find names, scope, notes, categories and read-only tests passed');
