@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 127,
-  "totalBytes": 27694062,
-  "treeSha256": "eb1736a4aa8a10b9aadac277443958bdf16b0fb94317cbbb1cb0c222566d2640",
+  "fileCount": 131,
+  "totalBytes": 27715859,
+  "treeSha256": "39d0aceb22262fb178de0d642655074d95b0145f549de09f10f3fffc977de19f",
   "files": [
     {
       "path": "404.html",
@@ -42,8 +42,8 @@
     },
     {
       "path": "ai-assistant.js",
-      "bytes": 18332,
-      "sha256": "d74eaafb938e6c8a6f6c627be76bb40f5cfb0fd96632c82f5028c508010a35cf"
+      "bytes": 13728,
+      "sha256": "dbb2888984e3a3b38d69e78f7fbec8d23323d30b7f1ee7b1db8fb223cc777ec1"
     },
     {
       "path": "ai-operations-core.js",
@@ -172,8 +172,8 @@
     },
     {
       "path": "dashboard.html",
-      "bytes": 413514,
-      "sha256": "8ca316cf82acf47ad1101cb2bcaa8a8ad864a39b03d1c31754e2eff0c4ccba80"
+      "bytes": 413565,
+      "sha256": "38319b20791f8349dc1c7eab001bc47b20871b2b66e6e3265c620b6e1b0f3be4"
     },
     {
       "path": "data/whats-new.json",
@@ -199,6 +199,21 @@
       "path": "floor-plan-scanner.js",
       "bytes": 125552,
       "sha256": "2fccc01042eeef8ff4030631769f5b1aeaab79a0367528a47009b12365009a99"
+    },
+    {
+      "path": "handbook-search.mjs",
+      "bytes": 1524,
+      "sha256": "32810afddec1c077e794128f8168b560aa2bc3d23f6fb36c3c32426e6bc20c00"
+    },
+    {
+      "path": "handbook.html",
+      "bytes": 849,
+      "sha256": "61727649756e36c4af7a9450572845217fc4ff0bad1c4f0f1088e711606466a0"
+    },
+    {
+      "path": "handbook.js",
+      "bytes": 1235,
+      "sha256": "2a0ff7646e1b81d317bee7e046c3a3507b0fae3a29d123e50bc6bd66c30b7608"
     },
     {
       "path": "help-content.js",
@@ -242,8 +257,8 @@
     },
     {
       "path": "interactive-quote-viewer.html",
-      "bytes": 369959,
-      "sha256": "89ae3251e774ce63d4e833e39a4de72b2911405d235b7c3ed6cc839877e5699b"
+      "bytes": 370907,
+      "sha256": "f0139e281ad3a5ac736f54c2adc0a58dce13fb7429e8696f43e8f223488183a5"
     },
     {
       "path": "invoice-viewer.html",
@@ -351,6 +366,11 @@
       "sha256": "85fefa787a3c4a1839afd49d56bbaf9e59ce90505b063424cf58cec67c588471"
     },
     {
+      "path": "qdr-handbook.json",
+      "bytes": 13501,
+      "sha256": "ef3b2ea3aeb6d7f352538f10d33ee48fa999c5328e8f0f1a67b9f2779da2eaf5"
+    },
+    {
       "path": "quickbooks-import-controller.js",
       "bytes": 8350,
       "sha256": "776e8e16fd20936fcd6dd09bd1a81a179a369c133e5c2290ac0fd3c9d77ac1dc"
@@ -367,8 +387,8 @@
     },
     {
       "path": "quote-builder.html",
-      "bytes": 1520295,
-      "sha256": "08a1f9d0843f2da33e720d64f52109b2a88f3b2466a7f02f1e12045230f13c77"
+      "bytes": 1522093,
+      "sha256": "654bea56987c334d33af2e3cadbd4a09fe8cf980238a73dda46c10948ac23108"
     },
     {
       "path": "quote-calculators.js",
@@ -422,8 +442,8 @@
     },
     {
       "path": "quote-items.js",
-      "bytes": 408976,
-      "sha256": "5e9eb370e12860b2583acb4b3ce4ff273946c099e06ec49cc128ab244cf861ea"
+      "bytes": 409795,
+      "sha256": "4f3eeea1558ebe2fe782fcf27103351b4c4a2f7494fcb90ee407705e59762b92"
     },
     {
       "path": "quote-media.js",
@@ -467,8 +487,8 @@
     },
     {
       "path": "quote-style.js",
-      "bytes": 98219,
-      "sha256": "84d75d2e5e3b189b019f7081e6b8da09098a15b4c351f0e79a57c342c29aeb16"
+      "bytes": 99280,
+      "sha256": "74351cbc138dd9cd1ae023072a2a0a5414cfc221d2329a2c25a64474c89f765d"
     },
     {
       "path": "quote-template-files.js",
@@ -477,8 +497,8 @@
     },
     {
       "path": "quote-tips.js",
-      "bytes": 20906,
-      "sha256": "d1e3db4b7b3450ce04d9e18fc6c5d0c31cd25bf16f62f741a26be23bc9ac30d1"
+      "bytes": 25521,
+      "sha256": "8a2b82ca81eeaf78f2c28bf4589eb694ddbea5a6427e3935e181ee0f249276af"
     },
     {
       "path": "quotedr-logo.svg",
@@ -503,7 +523,7 @@
     {
       "path": "settings.html",
       "bytes": 378386,
-      "sha256": "b9194be9f34e7600fe818bf3e6d9297765631a246b3706b1d386d6aaae770c7a"
+      "sha256": "59564986ca44a5b9cefa2dcd886369e5b726bc8344a5095ab7289f7d38f41fa5"
     },
     {
       "path": "signup-gate.css",

@@ -1,0 +1,10 @@
+Handbook and chatbot release rule:
+
+Before deploying, follow docs/HANDBOOK-MAINTENANCE.md.
+For every user-facing change, update the affected articles in qdr-handbook.json against the final integrated code. Include exact UI steps, prerequisites, platform/permission limits, troubleshooting and save/recovery precautions. Keep stable article IDs; update source references, verifiedAt, release and handbook version. Do not document pending features as live.
+
+Add realistic retrieval and conversational regression cases, including synonyms, follow-ups and failure cases. Run npm run test:handbook and npm run check:handbook -- <the exact origin/main SHA fetched before integrating>. If genuinely no handbook change is needed, provide the documented exact-base, file-specific no-impact explanation; do not silently skip it.
+
+Deploy the handbook with its matching feature. Deploy changed Edge Functions separately with all current dependencies, without reverting newer live backend code. After release, verify the public handbook version, source links and authenticated chatbot answers for the changed workflows. Test without sending client messages or modifying real customer records. Clearly list anything not tested; passing retrieval/static tests is not proof that AI answers are correct.
+
+Preserve the bot's read-only scope and privacy boundaries. It must distinguish missing evidence from unavailable features and never claim to have verified a save or performed an action it cannot perform.

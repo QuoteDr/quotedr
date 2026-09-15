@@ -9,7 +9,7 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-const knowledge = read('supabase/functions/_shared/quotedr-knowledge.ts');
+const knowledge = read('supabase/functions/_shared/quotedr-knowledge.ts') + read('qdr-handbook.json');
 const assistantFn = read('supabase/functions/ai-assistant/index.ts');
 const widget = read('ai-assistant.js');
 const helpContent = read('help-content.js');

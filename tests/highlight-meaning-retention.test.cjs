@@ -1,0 +1,13 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('quote-builder.html','utf8');
+const start=source.indexOf('function cleanupUnusedChangeOrderHighlightLegend()'),end=source.indexOf('function getLineItemHighlight(',start);
+const ctx={window:{_quoteHighlightLegend:{yellow:'Changed scope',orange:'New work'}},rooms:[]};
+ctx.quoteHighlightLegend=()=>ctx.window._quoteHighlightLegend;
+vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);
+ctx.cleanupUnusedChangeOrderHighlightLegend();
+assert.deepEqual(ctx.window._quoteHighlightLegend,{yellow:'Changed scope',orange:'New work'});
+ctx.rooms=[{items:[{highlightColor:'yellow'}]}];ctx.cleanupUnusedChangeOrderHighlightLegend();
+assert.equal(ctx.window._quoteHighlightLegend.orange,'New work');
+assert(source.includes("okText:'Clear Explanation',cancelText:'Keep Explanation'"));
+assert(source.indexOf('var clearMeaning = await qdConfirm')<source.indexOf('else if (colorKey) delete quoteHighlightLegend()[colorKey]'));
+console.log('Highlight meaning retention and explicit clear guard passed');

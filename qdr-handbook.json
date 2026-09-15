@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "version": "2026-09-15.3",
+  "articles": [
+    {
+      "id": "quote-builder-basics",
+      "title": "Quote Builder basics",
+      "verifiedAt": "2026-09-15",
+      "release": "6c4ba1f",
+      "sources": [
+        "quote-builder.html",
+        "quote-items.js"
+      ],
+      "body": "- Start or open a quote, fill client information, then build the quote by room or area.\n- Add Room creates a room/area section. Add Item inside a room opens Add Line Item.\n- Add Line Item can use Quick Search to find saved items. Users can also create a new unsaved line item, save it to the database, or add it only to the current quote.\n- Line items include category, item/service name, description, quantity, unit type, rate, optional material cost, supplier URL, and optional upgrade information.\n- Rooms support scope notes, photos, timeline estimate, markup, undo, room templates, saved groups, and grouping controls."
+    },
+    {
+      "id": "bulk-editing-and-highlight-colours",
+      "title": "Bulk editing and highlight colours",
+      "verifiedAt": "2026-09-15",
+      "release": "2026-09-15.3",
+      "sources": [
+        "quote-builder.html",
+        "quote-items.js"
+      ],
+      "body": "- To highlight several line items, tick their checkboxes within a room, then use that room's Edit > Highlight Selected... Choose a colour and Apply Highlight. Edit > Select All Items selects that room's items, not every room in the quote.\n- The same Edit menu supports Move Selected to..., Copy Selected to..., Duplicate Selected Here, Markup Selected and Delete Selected. Do not confuse bulk selection with saved Choice Groups.\n- A single row's highlighter opens Highlight Item. Clicking the selected colour again or Clear deselects the draft colour without closing the window. Apply Highlight commits changes; closing with unsaved changes prompts before discarding.\n- Each colour may have an optional explanation and a choice to show it on each item or only in the legend. Enter an explanation for the legend; AI Refine can polish it. Highlight colour alone is not a description.\n- Client quotes retain the on-page legend and can show a dismissible legend introduction. Contractor preview may suppress the introduction.\n- Colour explanations are retained even when no items use the colour. Clearing a highlight does not delete its explanation. To remove shared wording, empty its explanation and Apply Highlight, then confirm Clear Explanation. Keep Explanation restores the wording and leaves the editor open. Unused colours are omitted from the client legend."
+    },
+    {
+      "id": "saving-backups-and-recovery",
+      "title": "Saving, backups and recovery",
+      "verifiedAt": "2026-09-15",
+      "release": "6c4ba1f",
+      "sources": [
+        "quote-builder.html",
+        "quote-items.js"
+      ],
+      "body": "- Cloud saved and folder backup verified are separate statuses. Saved on this device or syncing is NOT confirmation of a cloud save. Do not promise a draft is in the dashboard until cloud saving succeeds.\n- Connect Backup Folder lets a supported browser save versioned quote files into a user-chosen folder while QuoteDr is open. Back Up Now requests a backup. The browser must grant folder access; this is not an always-running desktop backup service.\n- Folder backups are organized beneath QuoteDr Backups by account, client and quote. Unchanged snapshots are deduplicated, earlier changed versions are retained. Files are not encrypted and do not include all uploaded media.\n- Changing folders replaces the connection after confirmation; Disconnect forgets the connection without deleting existing files. A remembered connection is not a verified write. If an error occurs, retain existing files and report the exact error; do not assume Google Drive is the cause or that a file's existence proves verification.\n- Dashboard Export All Quotes creates a portable backup of cloud quote records. It is not a backup of unsynced browser edits, every invoice or all media. Save a local copy of unsynced work separately.\n- Open a local recovery file with File > Open > Open Local File, review the recovered content, then explicitly Save to the intended cloud destination. Opening a recovery is not itself a cloud save.\n- If cloud saving fails or conflicts, keep the local recovery copy, check the displayed error and contact support if needed. Do not instruct users to repeatedly overwrite or clear storage."
+    },
+    {
+      "id": "old-quote-import-and-writing-assistance",
+      "title": "Old quote import and writing assistance",
+      "verifiedAt": "2026-09-15",
+      "release": "6c4ba1f",
+      "sources": [
+        "quote-builder.html",
+        "quote-items.js"
+      ],
+      "body": "- Tools > Import Old Quote accepts supported PDF, image, spreadsheet and text sources. Parse Quote, review rooms, descriptions, quantities, rates and totals, then Apply to Quote. It can replace the quote or append rooms.\n- Missing-unit labels can be chosen in the importer. Review warnings and the review acknowledgement can block Apply until checked. Save Selected Items saves selected reusable items to the library; Apply to Quote is a separate action.\n- Undo Import requests confirmation before restoring the pre-import quote. Do not promise it remains available after refresh or that later edits will be preserved.\n- AI Refine is available for reusable descriptions, job-specific notes and highlight explanations. It improves wording; the user should verify scope and facts before applying.\n- Job-specific notes belong to the current job; reusable descriptions belong to the item template. Do not advise saving job-specific details into the reusable database."
+    },
+    {
+      "id": "manage-items-and-saved-pricing",
+      "title": "Manage Items and saved pricing",
+      "verifiedAt": "2026-09-15",
+      "release": "6c4ba1f",
+      "sources": [
+        "quote-builder.html",
+        "quote-items.js"
+      ],
+      "body": "- Manage Items is the saved pricing database. It stores categories, item names, unit types, rates, material costs, supplier URLs, descriptions, photos, and upgrade options.\n- Users can add a new category from the category picker, add new items, edit rows, filter/search, expand details, and Save Changed or Save All.\n- Manage Items > Add Category saves a named empty category without creating a dummy line item. It becomes available in the category picker. Add Item still requires an actual item name and unit.\n- Material Cost is the user's cost for margin tracking. Rate is what the client is charged.\n- Upgrade options can have their own unit, rate, material cost, supplier URL, description, and photo."
+    },
+    {
+      "id": "saved-choice-groups",
+      "title": "Saved Choice Groups",
+      "verifiedAt": "2026-09-15",
+      "release": "6c4ba1f",
+      "sources": [
+        "quote-builder.html",
+        "quote-items.js"
+      ],
+      "body": "- Manage Items > Choice Group is where users view, create, edit, rename, and delete reusable saved choice groups.\n- To create a saved group, open Manage Items, click Choice Group, click New, search/select saved items from the user's item database, choose Pick One or Pick Multiple, choose the default/base option for Pick One, keep \"Always use grouping when any of these items are added to a quote\" on if desired, then save.\n- Pick One means the client chooses one option from several choices, such as vinyl flooring, laminate flooring, or hardwood flooring.\n- Pick Multiple means the client can choose more than one option, such as baseboards, shoe moulding, and crown moulding.\n- Saved Choice Groups can be manually added to a room with Saved Group.\n- When auto-grouping is enabled, adding a saved item that belongs to a saved Choice Group can automatically place the whole group on the quote instead of a single normal line item.\n- Auto-grouping applies to manual Add Line Item and AI Voice To Quote when saved groups are found.\n- The quote may ask \"Grouped items found. Use saved groups?\" with Yes, No, and Review for AI Voice results.\n- In Review, users can uncheck grouped suggestions before they hit the quote.\n- Turn Off Grouping affects only that quote row. It asks which grouped option should remain and converts that row back into a normal line item.\n- Disable Grouping on a room turns off automatic saved grouping for that room and makes grouping disabled by default for future new rooms until re-enabled.\n- For Pick One rows, the Pick One badge in the quote builder opens a picker so the user can choose which option is the selected/base visible item. That selected option moves to the top for the client view but does not change the saved group template."
+    },
+    {
+      "id": "ai-voice-to-quote",
+      "title": "AI Voice To Quote",
+      "verifiedAt": "2026-09-15",
+      "release": "6c4ba1f",
+      "sources": [
+        "quote-builder.html",
+        "quote-items.js"
+      ],
+      "body": "- AI Voice To Quote lets the user record a spoken scope, pause/resume recording, generate parsed items, and review before adding to the quote.\n- AI Voice Review lists parsed items, puts uncertain or duplicate items at the top, lets users include/exclude rows, match typed phrases to saved items, add notes, save learned mappings, and keep or hide AI-generated room scope notes.\n- For paint walls, QuoteDr should use perimeter times wall height when room dimensions and ceiling height are known.\n- If ceiling height or another required measurement is missing for a relevant calculation, the review step should ask for it before finalizing.\n- AI Memory stores user-specific phrase-to-item mappings learned from voice corrections.\n- AI Trade Rules let users teach rules like \"when I say case a door, apply 35 linear feet of 2-3/4 MDF trim per door.\"\n- Voice Templates let users save reusable packages such as \"standard bedroom package\" and apply quantities from room dimensions.\n- AI Voice can use saved Choice Groups through the same grouping helper as normal quote additions."
+    },
+    {
+      "id": "sending-quotes-client-choices-and-approvals",
+      "title": "Sending quotes, client choices, and approvals",
+      "verifiedAt": "2026-09-15",
+      "release": "6c4ba1f",
+      "sources": [
+        "quote-builder.html",
+        "quote-items.js"
+      ],
+      "body": "- Send Quote Settings controls quote style, pricing detail, deposit display, approval type, expiry, and client message.\n- Client views can show itemized pricing, category subtotals, or total-only depending on pricing detail.\n- Approval Type can allow accept quote, accept/request changes, or review-only.\n- Client-facing choice groups show Pick One or Pick Multiple options. The client can select options in the interactive quote view.\n- Client notes/requested changes should be reviewed before updating a quote."
+    },
+    {
+      "id": "invoices-and-payments",
+      "title": "Invoices and payments",
+      "verifiedAt": "2026-09-15",
+      "release": "6c4ba1f",
+      "sources": [
+        "quote-builder.html",
+        "quote-items.js"
+      ],
+      "body": "- Quotes can be converted or sent as invoices from the invoice tools.\n- Stripe Payments are configured in Settings > Payments.\n- Settings > Payments can enable Stripe, set the default deposit percent, show a deposit payment button on quote links, and show a pay-in-full button on invoice links.\n- Deposit payment button on quote links is for collecting deposits from accepted or shared quote links when enabled.\n- Pay-in-full button on invoice links is for collecting full invoice balances when enabled.\n- Manual payment instructions can also be shown for e-transfer, cash, cheque, or other offline payment methods."
+    },
+    {
+      "id": "dashboard-settings-and-feedback",
+      "title": "Dashboard, settings, and feedback",
+      "verifiedAt": "2026-09-15",
+      "release": "6c4ba1f",
+      "sources": [
+        "quote-builder.html",
+        "quote-items.js"
+      ],
+      "body": "- Dashboard is where users create, open, manage, and track saved quotes.\n- Settings includes Business Profile, Quote Preferences, Manage Items entry point, AI Voice Learning, email/reminder settings, Feedback, Payments, QuickBooks, and Account/Plan controls.\n- Feedback is the correct place for bugs and feature ideas. Direct users to Settings > Feedback when QuoteDr does not have a requested feature yet.\n- Basic includes core quoting, invoicing, clients, branding, sync, templates, and Stripe payments. Pro unlocks AI voice quote tools, AI assistant, smart import, floor plan scanner, QuickBooks, upsells, profit tracking, and reminders where available."
+    },
+    {
+      "id": "job-note-preview-length",
+      "title": "Job note preview length",
+      "verifiedAt": "2026-09-15",
+      "release": "2026-09-15.3",
+      "sources": [
+        "quote-style.js",
+        "quote-builder.html",
+        "interactive-quote-viewer.html"
+      ],
+      "body": "In Send Quote Settings, use Job note preview length to choose how much of each job-specific note is initially visible in the client quote. Set the slider to 0 for full text, or choose 20–1200 characters before Show more. The client can expand the full note; this does not hide confidential content or delete any text. The setting is independent of description and scope preview lengths. The live preview updates and Save Defaults can retain the preference. Existing quotes without this setting keep full notes."
+    }
+  ]
+}

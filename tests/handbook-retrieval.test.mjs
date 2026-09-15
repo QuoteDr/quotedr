@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
+let calls=0;
+globalThis.fetch=async(url,options)=>{calls++;assert.equal(url,'https://quotedr.io/qdr-handbook.json');assert.equal(options.redirect,'error');return new Response(JSON.stringify(book));};
+const {retrieveHandbook}=await import('../supabase/functions/_shared/handbook-retrieval.ts?published');
+const messages=[{role:'user',content:'Highlight several line items'}];
+const results=await Promise.all([retrieveHandbook(messages),retrieveHandbook(messages)]);
+assert.equal(calls,1);assert.equal(results[0].mode,'published');assert(results[0].articles.length);
+globalThis.fetch=async()=>new Response('not json');
+const fallback=await import('../supabase/functions/_shared/handbook-retrieval.ts?fallback');
+assert.equal((await fallback.retrieveHandbook(messages)).mode,'bundled-fallback');
+globalThis.fetch=async()=>new Response('x'.repeat(200001));
+const huge=await import('../supabase/functions/_shared/handbook-retrieval.ts?huge');
+assert.equal((await huge.retrieveHandbook(messages)).mode,'bundled-fallback');
+console.log('Handbook network: fixed URL, single-flight cache, invalid/oversize fallback passed');

@@ -1,0 +1,11 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('ai-assistant.js','utf8');
+const fn=source.slice(source.indexOf('function getQuoteDrAssistantContext()'),source.indexOf('window._qdAiSend = async'));
+const context={window:{location:{pathname:'/quote-builder'},QuoteDrFolderBackups:{}},document:{querySelector:s=>s==='.modal.show'?{id:'lineItemHighlightModal',textContent:'PRIVATE CLIENT NAME'}:{},getElementById:()=>({value:'PRIVATE QUOTE VALUE'})}};
+vm.createContext(context);vm.runInContext(fn,context);
+const result=context.getQuoteDrAssistantContext();
+assert.equal(result.activeModalId,'lineItemHighlightModal');assert.equal(result.capabilities.selectedItems,true);
+assert(!JSON.stringify(result).includes('PRIVATE'));
+assert(!source.includes('link.href = source.url'));
+assert(source.includes("link.href = 'handbook.html#' + source.id"));
+console.log('Handbook screen context privacy and fixed source links passed');

@@ -2805,6 +2805,22 @@ if (location.search.includes('debug')) {
             return notes;
         }
 
+        function renderExpandableJobNote(text, id) {
+            var raw = String(text || '').trim();
+            if (!raw) return '';
+            var limit = parseInt(resolveViewerDocumentStyle().jobNotePreviewLength, 10);
+            if (!isFinite(limit)) limit = 0;
+            limit = Math.max(0, Math.min(1200, limit));
+            var content = formatDescriptionText(raw);
+            if (limit > 0 && raw.length > limit) {
+                var preview = raw.slice(0, limit).replace(/\s+\S*$/, '') || raw.slice(0, limit);
+                content = '<span id="' + id + '_short">' + formatDescriptionText(preview) + '...</span>' +
+                    '<span id="' + id + '_full" style="display:none;">' + formatDescriptionText(raw) + '</span>' +
+                    '<button type="button" class="item-desc-toggle" onclick="toggleViewerDescription(\'' + id + '\', this)">Show more</button>';
+            }
+            return '<div class="text-muted mb-1 job-note"><small><i class="fas fa-info-circle"></i> ' + content + '</small></div>';
+        }
+
         function roomAnchorId(roomIdx) {
             return 'quoteRoom_' + roomIdx;
         }
@@ -4585,7 +4601,7 @@ if (location.search.includes('debug')) {
             html += renderViewerChoiceGroupEnhancements(roomIdx, itemIndex, item, isSignedDiff, choicesLocked);
             html += renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff, choicesLocked);
             if (groupNote) {
-                html += '<div class="choice-group-note text-muted mt-2"><small><i class="fas fa-info-circle"></i> ' + escapeHtml(groupNote) + '</small></div>';
+                html += renderExpandableJobNote(groupNote, 'job_note_' + roomIdx + '_' + itemIndex);
             }
             html += '</div>';
             return html;
@@ -5121,7 +5137,7 @@ if (location.search.includes('debug')) {
                             </div>
                             ${coCanExplain ? `<div class="viewer-change-order-note" id="co_note_${roomIdx}_${itemIndex}"><i class="fas fa-circle-info me-1"></i>${escapeHtml(coExplanation)}</div>` : ''}
                             ${hasUpgradeGroups ? renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff, clientChoicesLocked) : ''}
-                            ${visibleNotes ? `<div class="text-muted mb-1"><small><i class="fas fa-info-circle"></i> ${visibleNotes}</small></div>` : ''}
+                            ${renderExpandableJobNote(visibleNotes, 'job_note_' + roomIdx + '_' + itemIndex)}
                             ${isSignedDiff ? `
                                 ${wasUpgraded && origItem ? `<div class="mt-1"><span class="badge bg-success me-1"><i class="fas fa-arrow-up me-1"></i>Upgraded by client</span><span class="text-muted small">was: ${origItem.description} @ ${viewerMoney(viewerItemMarkedAmount(room, origItem, origItem.rate))} = ${viewerMoney(viewerItemMarkedAmount(room, origItem, qvLineTotal(origItem)))}</span></div>` : ''}
                             ` : `

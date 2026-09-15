@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { retrieveHandbook } from '../_shared/handbook-retrieval.ts';
 import {
   AiGuardError,
   aiGuardErrorResponse,
@@ -524,6 +525,7 @@ Deno.serve(async (req) => {
       ? 'You help QuoteDr users turn contractor task details and rough notes into complete, polished, client-facing line item descriptions. State the work and useful scope details supported by the notes. Organize shorthand into clear prose, but never invent brands, materials, measurements, quantities, pricing, warranties, code claims, or work the user did not provide. Return only the finished description with no heading, preface, or quotes.'
       : 'You help QuoteDr users rewrite client-facing descriptions. Keep the user\'s meaning, make it clear and professional, and return only the refined wording.';
 
+    const handbook = aiFeature === 'ai_assistant' ? await retrieveHandbook(completionMessages) : null;
     const assistantSystemPrompt = aiFeature === 'ai_refine'
       ? aiRefineSystemPrompt
       : aiFeature === 'writing_suggestions'
@@ -534,7 +536,7 @@ Deno.serve(async (req) => {
             ? quoteItemDraftSystemPrompt
             : aiFeature === 'voice_item_wizard'
               ? voiceItemWizardSystemPrompt
-            : buildQuoteDrAssistantSystemPrompt(context as QuoteDrAssistantContext | undefined);
+            : buildQuoteDrAssistantSystemPrompt(context as QuoteDrAssistantContext | undefined, handbook);
 
     const model = aiFeature === 'voice_item_wizard' ? 'gpt-5.4-mini' : 'gpt-4o-mini';
     const completionBody: Record<string, unknown> = {
@@ -601,7 +603,12 @@ Deno.serve(async (req) => {
     });
 
     return jsonResponse(
-      review ? { reply, review } : itemDraft ? { reply, itemDraft } : voiceItemWizard ? { reply, voiceItemWizard } : { reply },
+      review ? { reply, review } : itemDraft ? { reply, itemDraft } : voiceItemWizard ? { reply, voiceItemWizard } : {
+        reply,
+        sources: handbook?.articles.map((a: {id:string;title:string;verifiedAt:string}) => ({id:a.id,title:a.title,verifiedAt:a.verifiedAt})),
+        handbookVersion: handbook?.version,
+        handbookMode: handbook?.mode,
+      },
       200,
       corsHeaders,
     );

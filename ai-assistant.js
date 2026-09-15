@@ -354,23 +354,18 @@ window._qdAiAsk = function(text) {
 };
 
 function getQuoteDrAssistantContext() {
-  var activeModal = document.querySelector('.modal.show');
-  var activeModalTitle = '';
-  if (activeModal) {
-    var titleEl = activeModal.querySelector('.modal-title, h1, h2, h3, h4, h5');
-    activeModalTitle = titleEl ? titleEl.textContent.trim() : '';
-  }
-  var activeTool = '';
-  try {
-    var selectedToolbar = document.querySelector('.btn.active, .nav-link.active, [aria-selected="true"]');
-    activeTool = selectedToolbar ? selectedToolbar.textContent.trim().replace(/\s+/g, ' ').slice(0, 80) : '';
-  } catch(e) {}
+  // Only allowlisted UI identifiers/booleans; never scrape headings, input values or client data.
+  var modal = document.querySelector('.modal.show');
+  var known = ['manageItemsModal', 'lineItemHighlightModal', 'quoteCategoryPickerModal'];
+  var path = window.location.pathname;
   return {
-    pagePath: window.location.pathname || '',
-    pageTitle: document.title || '',
-    activeModalId: activeModal ? activeModal.id || '' : '',
-    activeModalTitle: activeModalTitle,
-    activeTool: activeTool
+    pagePath: /^\/(quote-builder|dashboard|settings)(\.html)?\/?$/.test(path) ? path : 'other',
+    activeModalId: modal && known.includes(modal.id) ? modal.id : '',
+    capabilities: {
+      manageItems: !!document.getElementById('manageItemsModal'),
+      selectedItems: !!document.querySelector('[data-room-bulk-requires-selection]:not([disabled])'),
+      backupControls: !!window.QuoteDrFolderBackups
+    }
   };
 }
 
@@ -424,7 +419,21 @@ window._qdAiSend = async function() {
     if (loadingEl) {
       loadingEl.remove();
     }
-    _addMsg(reply, 'ai');
+    var answerElement = _addMsg(reply, 'ai');
+    if (Array.isArray(data.sources) && data.sources.length) {
+      var links = document.createElement('div');
+      links.textContent = data.handbookMode === 'bundled-fallback' ? 'Guide references (offline fallback): ' : 'Guide references: ';
+      data.sources.slice(0,4).forEach(function(source) {
+        if (!/^[a-z0-9-]{1,100}$/.test(source.id) || typeof source.title !== 'string') return;
+        var link = document.createElement('a');
+        link.href = 'handbook.html#' + source.id;
+        link.target = '_blank'; link.rel = 'noopener';
+        link.textContent = source.title.slice(0,160);
+        link.style.display = 'block';
+        links.appendChild(link);
+      });
+      answerElement.appendChild(links);
+    }
     recordPrivacySafeChatbotTopic(text, reply);
   } catch(e) {
     var loadingEl = document.getElementById(loadingId);
@@ -447,6 +456,7 @@ function _addMsg(text, role) {
 
   msgEl.appendChild(div);
   msgEl.scrollTop = msgEl.scrollHeight;
+  return div;
 }
 
 // Init when DOM ready

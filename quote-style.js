@@ -29,6 +29,7 @@
             showScopeNotes: true,
             descriptionPreviewLength: 260,
             scopePreviewLength: 400,
+            jobNotePreviewLength: 0,
             upgradeDescriptionPreviewLength: 260,
             upgradeDescriptionsExpanded: false,
             alwaysShowFullDescriptions: false,
@@ -645,6 +646,17 @@
             if (valueLabel) valueLabel.textContent = normalizeScopePreviewLength(slider?.value) + ' characters';
         }
 
+        function normalizeJobNotePreviewLength(value) {
+            var limit = parseInt(value, 10);
+            return isFinite(limit) ? Math.max(0, Math.min(1200, limit)) : 0;
+        }
+
+        function updateJobNotePreviewControls() {
+            var limit = normalizeJobNotePreviewLength(document.getElementById('quoteJobNotePreviewLength')?.value);
+            var label = document.getElementById('quoteJobNotePreviewLengthValue');
+            if (label) label.textContent = limit === 0 ? 'Full text' : limit + ' characters';
+        }
+
         function updateUpgradeDescriptionPreviewControls() {
             var slider = document.getElementById('quoteUpgradeDescriptionPreviewLength');
             var valueLabel = document.getElementById('quoteUpgradeDescriptionPreviewLengthValue');
@@ -763,6 +775,7 @@
             style.showScopeNotes = document.getElementById('quoteShowScopeNotes')?.checked !== false;
             style.descriptionPreviewLength = normalizeDescriptionPreviewLength(document.getElementById('quoteDescriptionPreviewLength')?.value || style.descriptionPreviewLength);
             style.scopePreviewLength = normalizeScopePreviewLength(document.getElementById('quoteScopePreviewLength')?.value || style.scopePreviewLength);
+            style.jobNotePreviewLength = normalizeJobNotePreviewLength(document.getElementById('quoteJobNotePreviewLength')?.value ?? style.jobNotePreviewLength);
             style.upgradeDescriptionPreviewLength = normalizeUpgradeDescriptionPreviewLength(document.getElementById('quoteUpgradeDescriptionPreviewLength')?.value || style.upgradeDescriptionPreviewLength || style.descriptionPreviewLength);
             style.upgradeDescriptionsExpanded = document.getElementById('quoteUpgradeDetailsDefault')?.value === 'expanded';
             style.alwaysShowFullDescriptions = document.getElementById('quoteAlwaysShowFullDescriptions')?.checked === true;
@@ -796,6 +809,7 @@
             if (!isFinite(parseInt(_quoteStyle.bgOpacity, 10))) _quoteStyle.bgOpacity = 100;
             _quoteStyle.descriptionPreviewLength = normalizeDescriptionPreviewLength(_quoteStyle.descriptionPreviewLength);
             _quoteStyle.scopePreviewLength = normalizeScopePreviewLength(_quoteStyle.scopePreviewLength);
+            _quoteStyle.jobNotePreviewLength = normalizeJobNotePreviewLength(_quoteStyle.jobNotePreviewLength);
             _quoteStyle.upgradeDescriptionPreviewLength = normalizeUpgradeDescriptionPreviewLength(
                 Object.prototype.hasOwnProperty.call(incomingStyle, 'upgradeDescriptionPreviewLength')
                     ? incomingStyle.upgradeDescriptionPreviewLength
@@ -830,11 +844,13 @@
             setFieldValue('quoteShowScopeNotes', _quoteStyle.showScopeNotes);
             setFieldValue('quoteDescriptionPreviewLength', _quoteStyle.descriptionPreviewLength);
             setFieldValue('quoteScopePreviewLength', _quoteStyle.scopePreviewLength);
+            setFieldValue('quoteJobNotePreviewLength', _quoteStyle.jobNotePreviewLength);
             setFieldValue('quoteUpgradeDescriptionPreviewLength', _quoteStyle.upgradeDescriptionPreviewLength);
             setFieldValue('quoteUpgradeDetailsDefault', _quoteStyle.upgradeDescriptionsExpanded ? 'expanded' : 'collapsed');
             setFieldValue('quoteAlwaysShowFullDescriptions', _quoteStyle.alwaysShowFullDescriptions);
             updateDescriptionPreviewControls();
             updateScopePreviewControls();
+            updateJobNotePreviewControls();
             updateUpgradeDescriptionPreviewControls();
             setFieldValue('quoteShowCommitment', _quoteStyle.showCommitment !== false);
             setFieldValue('quoteSkipSettingsOnGenerate', _quoteStyle.skipSettingsOnGenerate === true);
@@ -889,6 +905,7 @@
             updateBgOpacityLabel(bgOpacity);
             updateDescriptionPreviewControls();
             updateScopePreviewControls();
+            updateJobNotePreviewControls();
             updateUpgradeDescriptionPreviewControls();
             queueQuoteStudioStyleUpdate();
         }
@@ -1171,7 +1188,7 @@
             });
             bindStyleSwatchGroup('upgradeAccentSwatches', 'data-upgrade-accent', 'quoteUpgradeAccent', 'upgradeAccent');
             bindStyleSwatchGroup('upgradeBgSwatches', 'data-upgrade-bg', 'quoteUpgradeBg', 'upgradeBg');
-            ['quoteAccentStrength','quoteOptionAccentStrength','quoteHeaderStyle','quoteHeaderEffect','quoteHeaderOpacity','quoteBgOpacity','quoteFontFeel','quoteOptionAccent','quoteUpgradeAccent','quoteUpgradeBg','quotePricingMode','quoteDepositMode','quoteDepositKind','quoteDepositPercent','quoteDepositFixedAmount','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteDescriptionPreviewLength','quoteAlwaysShowFullDescriptions','quoteScopePreviewLength','quoteUpgradeDetailsDefault','quoteUpgradeDescriptionPreviewLength','quoteShowCommitment','quoteSkipSettingsOnGenerate','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
+            ['quoteAccentStrength','quoteOptionAccentStrength','quoteHeaderStyle','quoteHeaderEffect','quoteHeaderOpacity','quoteBgOpacity','quoteFontFeel','quoteOptionAccent','quoteUpgradeAccent','quoteUpgradeBg','quotePricingMode','quoteDepositMode','quoteDepositKind','quoteDepositPercent','quoteDepositFixedAmount','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteDescriptionPreviewLength','quoteAlwaysShowFullDescriptions','quoteScopePreviewLength','quoteJobNotePreviewLength','quoteUpgradeDetailsDefault','quoteUpgradeDescriptionPreviewLength','quoteShowCommitment','quoteSkipSettingsOnGenerate','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el && !el.dataset.styleBound) {
                     el.addEventListener('input', updateStylePreview);

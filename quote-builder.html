@@ -10260,15 +10260,9 @@ Example:
         }
 
         function cleanupUnusedChangeOrderHighlightLegend() {
-            var used = {};
-            (rooms || []).forEach(function(room) {
-                (room.items || []).forEach(function(item) {
-                    if (item && item.highlightColor) used[item.highlightColor] = true;
-                });
-            });
-            Object.keys(quoteHighlightLegend()).forEach(function(key) {
-                if (!used[key]) delete window._quoteHighlightLegend[key];
-            });
+            // These are reusable, quote-level meanings. Removing the last item of a
+            // colour must not erase its meaning; the viewer filters unused colours.
+            quoteHighlightLegend();
             window._changeOrderHighlightLegend = window._quoteHighlightLegend;
         }
 
@@ -12897,6 +12891,13 @@ Example:
                 await qdAlert('Explain what this highlight means to the client before applying it.');
                 if (meaningEl) meaningEl.focus();
                 return;
+            }
+            if (colorKey && !meaning && quoteHighlightLabel(colorKey)) {
+                var clearMeaning = await qdConfirm('Remove this colour\'s explanation from every item and the legend on this quote? The highlight colour will remain.', {title:'Clear Shared Highlight Explanation?',okText:'Clear Explanation',cancelText:'Keep Explanation'});
+                if (!clearMeaning) {
+                    if (meaningEl) meaningEl.value = quoteHighlightLabel(colorKey);
+                    return;
+                }
             }
             if (colorKey && meaning) quoteHighlightLegend()[colorKey] = meaning.slice(0, 240);
             else if (colorKey) delete quoteHighlightLegend()[colorKey];
@@ -23694,7 +23695,7 @@ Example:
     <script src="quote-contact-property-lookup.js?v=2026080301"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
     <script src="ikea-quote.js?v=1778059000"></script>
-<script src="quote-style.js?v=2026090701"></script>
+<script src="quote-style.js?v=2026091505"></script>
 
     <!-- Quote Style Modal -->
     <div class="modal fade" id="quoteStyleModal" tabindex="-1">
@@ -23989,6 +23990,10 @@ Example:
                                 </div>
                                 <div class="col-12">
                                     <div class="send-settings-card">
+                                        <label class="form-label fw-bold" for="quoteJobNotePreviewLength">Job note preview length</label>
+                                        <span id="quoteJobNotePreviewLengthValue" class="badge bg-light text-dark border">Full text</span>
+                                        <input type="range" class="form-range" id="quoteJobNotePreviewLength" min="0" max="1200" step="20" value="0">
+                                        <div class="text-muted small mb-3">Set to 0 for full text, or choose how many characters appear before Show more. The full job note remains available to the client.</div>
                                         <label class="form-label fw-bold" for="quoteUpgradeDetailsDefault">Upgrade option details</label>
                                         <select class="form-select form-select-sm mb-3" id="quoteUpgradeDetailsDefault">
                                             <option value="collapsed">Collapsed by default</option>
@@ -24896,7 +24901,7 @@ Example:
         </div>
     </div>
 <script src="chatbot-feedback-topics.js?v=2026080801"></script>
-<script src="ai-assistant.js?v=2026091503"></script>
+<script src="ai-assistant.js?v=2026091504"></script>
 
 
 <!-- Hardwood/LVP Calculator Modal -->

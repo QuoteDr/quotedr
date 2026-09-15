@@ -2,6 +2,9 @@
   "name": "quotedr-static-site",
   "private": true,
   "scripts": {
+    "test:handbook": "node tests/handbook-search.test.mjs && node tests/handbook-retrieval.test.mjs && node tests/handbook-context.test.cjs",
+    "prebuild": "npm run check:handbook && npm run test:handbook",
+    "check:handbook": "node scripts/check-handbook-release.mjs",
     "build": "node scripts/build-public-artifact.mjs",
     "build:public": "node scripts/build-public-artifact.mjs",
     "test:artifact": "node tests/public-artifact.test.mjs",
