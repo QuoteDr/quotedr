@@ -6233,6 +6233,8 @@
 
         async function refineDescription(textareaEl, btnEl) {
             if (!textareaEl || !btnEl) return;
+            const highlightOptions = textareaEl.id === 'changeOrderHighlightMeaning' ? document.getElementById('lineItemHighlightOptions') : null;
+            const highlightContext = highlightOptions ? highlightOptions.outerHTML : null;
             const noteRequestId = textareaEl.id === 'lineNotes' ? (textareaEl._refineRequestId = (textareaEl._refineRequestId || 0) + 1) : null;
             const currentText = textareaEl.value || '';
             const request = await openAiDescriptionModeDialog(currentText);
@@ -6247,7 +6249,7 @@
             btnEl.disabled = true;
             btnEl.setAttribute('aria-busy', 'true');
             try {
-                const prompt = buildAiDescriptionPrompt(request.mode, request.sourceText) + (textareaEl.id === 'lineNotes' ? '\nThis is a job-specific note, not a reusable service description. Preserve the supplied site conditions, quantities, exclusions and reasons. Do not invent or expand the scope of work.' : '');
+                const prompt = buildAiDescriptionPrompt(request.mode, request.sourceText) + (textareaEl.id === 'lineNotes' ? '\nThis is a job-specific note, not a reusable service description. Preserve the supplied site conditions, quantities, exclusions and reasons. Do not invent or expand the scope of work.' : '') + (highlightOptions ? '\nThis is a short colour legend explanation for a quote, not a service description. Preserve its meaning and any qualifications. Do not invent scope, prices or commitments. Return plain text no longer than 240 characters.' : '');
                 if (typeof getSupabaseFunctionAuthHeaders !== 'function') throw new Error('Please sign in again before using AI Refine.');
                 const response = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/ai-assistant', {
                     method: 'POST',
@@ -6258,6 +6260,11 @@
                 if (!response.ok || data.error) throw new Error(data.error || 'AI description request failed');
                 const refinedText = normalizeAiDescriptionReply(data.reply);
                 if (!refinedText) throw new Error('AI did not return a description. Please try again.');
+                if (highlightOptions && (textareaEl.value !== currentText || highlightOptions.outerHTML !== highlightContext || !textareaEl.closest('.modal.show'))) {
+                    qdAlert('The highlight selection or text changed while AI was working. Your current text was kept.');
+                    return;
+                }
+                if (highlightOptions && refinedText.length > 240) throw new Error('The AI explanation was too long. Your text was kept; please try again with shorter wording.');
                 if (noteRequestId !== null && (textareaEl._refineRequestId !== noteRequestId || textareaEl.value !== currentText)) {
                     qdAlert('The job note changed while AI was working. Your current note was kept; refine it again if needed.');
                     return;

@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "outputDirectory": "dist",
   "fileCount": 127,
-  "totalBytes": 27686825,
-  "treeSha256": "130d0d37635d06bd1ac5f4801f8682e893d6f54c7848f33bf6d061fee88129a1",
+  "totalBytes": 27694062,
+  "treeSha256": "eb1736a4aa8a10b9aadac277443958bdf16b0fb94317cbbb1cb0c222566d2640",
   "files": [
     {
       "path": "404.html",
@@ -173,7 +173,7 @@
     {
       "path": "dashboard.html",
       "bytes": 413514,
-      "sha256": "50675438e28618afbf39345b4d21d2a1fef20a391566b47013084ef90e8977ca"
+      "sha256": "8ca316cf82acf47ad1101cb2bcaa8a8ad864a39b03d1c31754e2eff0c4ccba80"
     },
     {
       "path": "data/whats-new.json",
@@ -242,8 +242,8 @@
     },
     {
       "path": "interactive-quote-viewer.html",
-      "bytes": 368297,
-      "sha256": "98e0002d02222ef6db444a40f5169873b7de45c0e0bd55ac7f01f3bf808ab248"
+      "bytes": 369959,
+      "sha256": "89ae3251e774ce63d4e833e39a4de72b2911405d235b7c3ed6cc839877e5699b"
     },
     {
       "path": "invoice-viewer.html",
@@ -367,8 +367,8 @@
     },
     {
       "path": "quote-builder.html",
-      "bytes": 1518796,
-      "sha256": "09a96e07a1ead26d536a471392668dd240cff353b53d08f62f5944c399c0e992"
+      "bytes": 1520295,
+      "sha256": "08a1f9d0843f2da33e720d64f52109b2a88f3b2466a7f02f1e12045230f13c77"
     },
     {
       "path": "quote-calculators.js",
@@ -412,8 +412,8 @@
     },
     {
       "path": "quote-folder-backups.js",
-      "bytes": 11432,
-      "sha256": "6d7a4f400a3fc9d20bfc851c01aeb059ec2b7c597112bb47cf4de98eaffa33f3"
+      "bytes": 13230,
+      "sha256": "723821b8c7ae9fc50cdb5fabb6ce70f90a860b0f250fcf89c596eb0960403146"
     },
     {
       "path": "quote-import.js",
@@ -422,8 +422,8 @@
     },
     {
       "path": "quote-items.js",
-      "bytes": 407973,
-      "sha256": "6d6c37ac7e74fd251903eeeef2ab3ee4c6f720290cd65a84699e664024ccc6ce"
+      "bytes": 408976,
+      "sha256": "5e9eb370e12860b2583acb4b3ce4ff273946c099e06ec49cc128ab244cf861ea"
     },
     {
       "path": "quote-media.js",
@@ -437,8 +437,8 @@
     },
     {
       "path": "quote-portal-readiness.js",
-      "bytes": 4918,
-      "sha256": "e395ecf475db7040e4a491dfc6f5f7114ed8627cad883fb2d8f2996eb0688a06"
+      "bytes": 6193,
+      "sha256": "e897e5272dbec2d63ef937bda3b2b673d32d3a1b3d592dd49ec481a821fa7b6c"
     },
     {
       "path": "quote-profit-report.js",

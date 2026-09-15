@@ -75,6 +75,10 @@
     }
 
     async function confirmZeroPricedItems(documentData, confirmFn) {
+        var expiryMessage = expiryWarningMessage(documentData);
+        if (expiryMessage && (typeof confirmFn !== 'function' || !await confirmFn(expiryMessage, {
+            title:'Check Quote Expiry',okText:'Send Anyway',cancelText:'Go Back & Review',type:'warning'
+        }))) return false;
         var findings = findZeroPricedItems(documentData);
         if (!findings.length) return true;
         if (typeof confirmFn !== 'function') return false;
@@ -87,7 +91,21 @@
         }, findings));
     }
 
+    function expiryWarningMessage(data, now) {
+        data=data || {};
+        if (documentIsChangeOrder(data) || data.type === 'invoice') return '';
+        var raw=(data.style || {}).expiryDate || data.valid_until || data.validUntil || data.validUntilDate;
+        if (!raw) return '';
+        var match=String(raw).match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (!match) return 'The quote expiry date could not be checked. Review it before sending.';
+        var today=now || new Date();
+        var days=Math.round((Date.UTC(+match[1],+match[2]-1,+match[3])-Date.UTC(today.getFullYear(),today.getMonth(),today.getDate()))/86400000);
+        if (days >= 7) return '';
+        return (days < 0 ? 'This quote has already expired.' : days === 0 ? 'This quote expires today.' : 'This quote expires in '+days+' day'+(days===1?'':'s')+'.')+' Review the expiry date before sending, or continue only if this is intentional.';
+    }
+
     return {
+        expiryWarningMessage: expiryWarningMessage,
         itemIsIncluded: itemIsIncluded,
         itemIsPriceTbd: itemIsPriceTbd,
         documentIsChangeOrder: documentIsChangeOrder,

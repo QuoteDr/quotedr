@@ -1,7 +1,8 @@
 (function(global) {
     'use strict';
-    var chain = Promise.resolve(), syncing = false, folderBusy = false, pending = 0;
+    var chain = Promise.resolve(), syncing = false, folderBusy = false, pending = 0, statusRevision = 0;
     function status(message, failed) {
+        statusRevision++;
         document.querySelectorAll('[data-folder-backup-status]').forEach(function(el) {
             el.textContent = message;
             el.className = failed ? 'small text-danger' : 'small text-muted';
@@ -45,14 +46,21 @@
         return JSON.stringify(value);
     }
     async function writeSnapshot(root, userId, quote) {
+        var stage='preparing quote';
+        try {
         if (!quote || !Array.isArray(quote.rooms)) throw new Error('No complete quote snapshot available.');
         var id=quote.supabaseId || quote._localBackupId;
         if (!id) throw new Error('Quote has no stable backup identity.');
         var content=contentOf(quote), hash=await digest(canonical(content));
+        stage='opening backup directory';
         var dir=await root.getDirectoryHandle('QuoteDr Backups',{create:true});
+        stage='opening account directory';
         dir=await dir.getDirectoryHandle('account-'+safeName(userId),{create:true});
+        stage='opening client directory';
         dir=await dir.getDirectoryHandle('client-'+safeName(quote.clientName || 'Unnamed client')+'-'+safeName(quote.clientId || quote.clientNumber || 'unassigned'),{create:true});
+        stage='opening quote directory';
         dir=await dir.getDirectoryHandle('quote-'+safeName(id),{create:true});
+        stage='checking existing snapshot';
         var name='snapshot-'+hash+'.qdr';
         try {
             var existing=await dir.getFileHandle(name);
@@ -66,13 +74,19 @@
                 else throw error;
             }
         }
+        stage='creating snapshot file';
         var file=await dir.getFileHandle(name,{create:true});
+        stage='opening snapshot for writing';
         var writable=await file.createWritable();
-        try { await writable.write(JSON.stringify(quote,null,2)); await writable.close(); }
+        try { stage='writing snapshot'; await writable.write(JSON.stringify(quote,null,2)); stage='closing snapshot'; await writable.close(); }
         catch(error){try{await writable.abort();}catch(_){}throw error;}
+        stage='reading snapshot back for verification';
         var verified=JSON.parse(await (await file.getFile()).text());
         if (await digest(canonical(contentOf(verified))) !== hash) throw new Error('Backup read-back verification failed.');
         return 'saved';
+        } catch(error) {
+            throw new Error('Failed while '+stage+' ('+(error.name || 'Error')+'): '+error.message+' Backup is not verified. Existing files have not been deleted.');
+        }
     }
     function enqueue(work) {
         pending++;
@@ -93,10 +107,10 @@
                 if (!handle) return {state:'not_configured'};
                 if (await handle.queryPermission({mode:'readwrite'}) !== 'granted') throw new Error('Folder permission needed — click Connect Folder again.');
                 var result=await writeSnapshot(handle,id,snapshot);
-                status('Folder backup verified at '+new Date().toLocaleTimeString()+'. Earlier versions retained.');
+                status('Folder backup verified in '+handle.name+' at '+new Date().toLocaleTimeString()+'. Earlier versions retained.');
                 return {state:result};
             } catch(error) {
-                status('Folder backup NOT confirmed: '+error.message,true);
+                status('Folder backup NOT confirmed'+(handle ? ' in '+handle.name : '')+': '+error.message,true);
                 return {state:'failed',error:error.message};
             }
         });
@@ -129,9 +143,15 @@
             // Call the picker immediately inside the click gesture.
             var handle=await global.showDirectoryPicker({id:'quotedr-backups',mode:'readwrite'});
             var id=await owner();
-            if(!await global.qdConfirm('Enable private, unencrypted quote backups in '+handle.name+'? QuoteDr will keep changed versions under client folders and never delete old files. Backups run only while QuoteDr is open. They exclude linked media files. Keep this folder private and monitor free disk space. Clearing browser data requires reconnecting the folder, but does not delete its files.',{title:'Enable Folder Backups',okText:'Enable Backups'})) return;
-            await config(id,handle);
-            status('Folder connected. Preparing backup…');
+            var previous=await config(id);
+            var replacement=previous ? 'Replace the current backup folder ('+previous.name+') with '+handle.name+'? The old connection will be removed after any in-progress write finishes. Existing files stay in the old folder; they will not be moved or deleted. ' : '';
+            if(!await global.qdConfirm(replacement+'Enable private, unencrypted quote backups in '+handle.name+'? QuoteDr will keep changed versions under client folders and never delete old files. Backups run only while QuoteDr is open. They exclude linked media files. Keep this folder private and monitor free disk space. Clearing browser data requires reconnecting the folder, but does not delete its files.',{title:previous ? 'Replace Backup Folder' : 'Enable Folder Backups',okText:previous ? 'Replace Folder' : 'Enable Backups'})) return;
+            await enqueue(async function(){
+                if(await owner() !== id) throw new Error('Account changed; backup folder was not replaced.');
+                // Replace atomically, after old writes finish. A failed save keeps the old handle.
+                await config(id,handle);
+                status((previous ? 'Previous folder connection replaced. ' : '')+'Selected folder: '+handle.name+'. Preparing backup; not yet verified.');
+            });
             if(typeof global.collectQuoteData==='function' && global.quoteStorageNeedsCloudSave && typeof global.quoteStorageHasOpenDocument==='function' && global.quoteStorageHasOpenDocument()) await saveDraft(global.collectQuoteData());
             else await syncAll();
         } catch(error){if(error.name!=='AbortError')status('Could not connect backup folder: '+error.message,true);}
@@ -151,14 +171,17 @@
             } catch(error){status(error.message,true);}};
             el.querySelector('[data-folder-disconnect]').onclick=function(){disconnect().catch(function(e){status(e.message,true);});};
         });
+        var initialStatusRevision=statusRevision;
         setTimeout(async function(){
             try {
                 var handle=await config(await owner());
                 if(handle) {
-                    if(await handle.queryPermission({mode:'readwrite'}) !== 'granted') status('Backup folder needs permission. Click Connect Backup Folder to reconnect; existing files are safe.',true);
-                    else status('Backup folder connected: '+handle.name+'. New edits will be backed up while QuoteDr is open.');
+                    var permission=await handle.queryPermission({mode:'readwrite'});
+                    if(statusRevision !== initialStatusRevision || folderBusy) return;
+                    if(permission !== 'granted') status('Backup folder needs permission. Click Connect Backup Folder to reconnect; existing files are safe.',true);
+                    else status('Remembered backup folder: '+handle.name+'. Permission available; no backup verified this session. Click Back Up Now to check.');
                 }
-            } catch(error){status('Folder backup unavailable: '+error.message,true);}
+            } catch(error){if(statusRevision === initialStatusRevision && !folderBusy)status('Folder backup unavailable: '+error.message,true);}
         },1000);
         if(typeof global.collectQuoteData!=='function') {
             setTimeout(syncAll,5000);
