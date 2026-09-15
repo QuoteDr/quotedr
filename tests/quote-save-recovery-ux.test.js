@@ -35,7 +35,7 @@ function extractFunction(source, name) {
   throw new Error(`Could not extract ${name}`);
 }
 
-const context = { console, Date, JSON, Promise, String, Array, parseInt };
+const context = { console, Date, JSON, Promise, String, Array, parseInt, window: {} };
 vm.createContext(context);
 [
   'quoteStorageNormalizeCloudId',
@@ -120,9 +120,9 @@ assert(
 
 assert(
   quoteStorage.includes('window.qdExportQuoteRecovery = quoteStorageExportRecoveryQuote') &&
-    quoteStorage.includes("updateSaveStatus('pending', 'Backup opened on this device - syncing to cloud')") &&
-    quoteStorage.includes('setTimeout(function() { doAutoSave(); }, 0)'),
-  'opening a recovery quote should preserve the file and immediately retry cloud sync'
+    quoteStorage.includes('window._quoteBackupReviewOnly = true') &&
+    quoteStorage.includes('Backup opened for review'),
+  'opening a recovery quote should preserve the file and require an explicit save destination'
 );
 
 assert(

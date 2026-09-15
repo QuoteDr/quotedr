@@ -1031,6 +1031,8 @@
             }
             return {
                 version: 1,
+                _backupReviewOnly: !!window._quoteBackupReviewOnly,
+                _localBackupId: window._localBackupId || (window._localBackupId = crypto.randomUUID()),
                 savedAt: new Date().toISOString(),
                 _clientEditedAt: window._quoteLocalEditAt || loadedData._clientEditedAt || loadedData._saveMeta && loadedData._saveMeta.clientEditedAt || null,
                 _editorInstanceId: quoteStorageInstanceId,
@@ -1171,6 +1173,7 @@
             }
             if (!cloudVersion) return;
             window._quoteServerUpdatedAt = cloudVersion;
+            quoteCloudSaveUnconfirmed = false;
             if (window._loadedQuoteData) {
                 window._loadedQuoteData._serverUpdatedAt = cloudVersion;
                 window._loadedQuoteData.updated_at = cloudVersion;
@@ -1203,6 +1206,9 @@
         }
 
         function applyQuoteData(data) {
+            window._localBackupId = data._localBackupId || crypto.randomUUID();
+            window._quoteBackupReviewOnly = !!data._backupReviewOnly;
+            quoteCloudSaveUnconfirmed = !!data._backupReviewOnly;
             var wasInitDone = initDone;
             initDone = false; // suppress markUnsaved during load
             if (document.getElementById('quoteTitle'))     document.getElementById('quoteTitle').value     = data.quoteTitle || data.clientName || data.client_name || '';
@@ -1305,7 +1311,29 @@
             setTimeout(function() { quoteStorageEnsureRealtimeSubscription(); }, 0);
         }
 
+        var quoteCloudSaveUnconfirmed = false;
+        window.quoteStorageNeedsCloudSave = function() {
+            return quoteStorageHasOpenDocument() && (quoteCloudSaveUnconfirmed || !window._supabaseQuoteId);
+        };
+
+        function quoteStorageShowUnconfirmedSave(result) {
+            quoteCloudSaveUnconfirmed = true;
+            var error = result && result.error;
+            var reason = typeof error === 'string' ? error : error && error.message;
+            var state = result && result.state;
+            var pending = state === 'local_pending' && !reason;
+            updateSaveStatus(pending ? 'pending' : 'error', pending
+                ? 'Saved on this device — cloud save not confirmed. Open Sync & Recovery.'
+                : 'Cloud save not confirmed: ' + quoteStorageEscapeHtml(reason || (state === 'conflict' ? 'A save conflict needs your review.' : state === 'action_required' ? 'Action required in Sync & Recovery.' : 'No cloud acknowledgement received.')));
+            if (window.QuoteDrSave && typeof window.QuoteDrSave.openRecoveryCenter === 'function') window.QuoteDrSave.openRecoveryCenter();
+        }
+
         function updateSaveStatus(state, detail) {
+            if (state === 'saved' && detail === 'Confirmed in cloud') {
+                quoteCloudSaveUnconfirmed = false;
+                window._quoteBackupReviewOnly = false;
+            }
+            if (state === 'error') quoteCloudSaveUnconfirmed = true;
             const el = document.getElementById('saveStatus');
             if (!el) return;
             const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -1317,6 +1345,7 @@
             } else if (state === 'saving') {
                 el.innerHTML = '<span style="color:#6c757d;"><i class="fas fa-spinner fa-spin"></i> Saving\u2026</span>';
             } else if (state === 'pending') {
+                quoteCloudSaveUnconfirmed = true;
                 el.innerHTML = '<span style="color:#9a6700;"><i class="fas fa-cloud-arrow-up"></i> ' + (detail || 'Saved on this device - syncing to cloud') + '</span>';
                 unsavedChanges = false;
             } else if (state === 'loaded') {
@@ -1330,6 +1359,7 @@
         function markUnsaved() {
             if (quoteStoragePortalExitActive()) return;
             if (!quoteStorageHasOpenDocument()) return;
+            quoteCloudSaveUnconfirmed = true;
             unsavedChanges = true;
             window._quoteLocalEditAt = new Date().toISOString();
             if (quoteStorageRemoteUpdate) {
@@ -1415,10 +1445,12 @@ async function saveQuote() {
         // -- Save Dialog ----------------------------------------------------------
         var _saveDialogData = null;
         var _selectedOverwriteId = null;
+        var _saveDialogRows = [];
 
         async function showSaveDialog(qData) {
             _saveDialogData = qData;
             _selectedOverwriteId = null;
+            _saveDialogRows = [];
             // Pre-fill name
             var nameInput = document.getElementById('saveQuoteNameInput');
             if (nameInput) nameInput.value = qData.quoteTitle || qData.clientName || '';
@@ -1437,6 +1469,7 @@ async function saveQuote() {
                 var listSavedQuotes = typeof listQuoteSummariesFromSupabase === 'function' ? listQuoteSummariesFromSupabase : listQuotesFromSupabase;
                 var result = await listSavedQuotes();
                 var quotes = (result && result.data) ? result.data : [];
+                _saveDialogRows = quotes;
                 if (!listEl) return;
                 if (!quotes.length) {
                     listEl.innerHTML = '<div class="text-muted small text-center py-2">No saved quotes yet</div>';
@@ -1446,8 +1479,8 @@ async function saveQuote() {
                     var date = q.updated_at ? new Date(q.updated_at).toLocaleDateString() : '';
                     var total = q.total ? ('$' + parseFloat(q.total).toFixed(2)) : '$0.00';
                     return '<div class="save-quote-item p-2 mb-1 rounded" style="border:1px solid #dee2e6; cursor:pointer;" onclick="selectSaveOverwrite(\'' + q.id + '\', this)">' +
-                        '<div class="fw-bold">' + (q.client_name || 'Unnamed') + '</div>' +
-                        '<div class="text-muted small">' + date + ' &middot; ' + total + '</div>' +
+                        '<div class="fw-bold">' + quoteStorageEscapeHtml(q.quote_title || q.data && q.data.quoteTitle || q.client_name || 'Unnamed') + '</div>' +
+                        '<div class="text-muted small">' + quoteStorageEscapeHtml(q.quote_number || '') + ' &middot; ' + date + ' &middot; ' + total + '</div>' +
                         '</div>';
                 }).join('');
             }
@@ -1487,9 +1520,11 @@ async function saveQuote() {
                 _saveDialogData.clientNumber = reservation.clientNumber || _saveDialogData.clientNumber || null;
                 _saveDialogData.supabaseId = null;
                 _saveDialogData.forceNew = true;
+                delete _saveDialogData._backupReviewOnly;
                 window._supabaseQuoteId = null;
                 localStorage.removeItem("ald_active_quote_id");
                 if (document.getElementById('quoteNumber')) document.getElementById('quoteNumber').value = reservation.documentNumber;
+                if (window.QuoteDrFolderBackups) window.QuoteDrFolderBackups.saveDraft(_saveDialogData).catch(function() {});
                 var result = await saveQuoteToSupabase(_saveDialogData);
                 if (result && !result.error && result.state === 'cloud_saved' && result.data) {
                     var saved = Array.isArray(result.data) ? result.data[0] : result.data;
@@ -1500,11 +1535,9 @@ async function saveQuote() {
                     }
                     unsavedChanges = false;
                     updateSaveStatus('saved', 'Confirmed in cloud');
-                } else if (result && result.state !== 'local_failed') {
-                    unsavedChanges = false;
-                    updateSaveStatus('pending', 'Saved on this device - syncing to cloud');
                 } else {
-                    throw new Error((result && result.error && result.error.message) || 'The quote could not be stored safely.');
+                    quoteStorageShowUnconfirmedSave(result);
+                    return;
                 }
                 updateDraftWarning();
                 bootstrap.Modal.getInstance(document.getElementById('saveQuoteModal')).hide();
@@ -1521,6 +1554,11 @@ async function saveQuote() {
 
         async function confirmOverwrite() {
             if (!_saveDialogData || !_selectedOverwriteId) return;
+            var destination = _saveDialogRows.find(function(row) { return row.id === _selectedOverwriteId; });
+            if (!destination || !destination.quote_number || !destination.updated_at) {
+                await qdAlert('The selected quote identity could not be verified. Reopen Save and choose the destination again.');
+                return;
+            }
             var nameInput = document.getElementById('saveQuoteNameInput');
             if (nameInput) _saveDialogData.quoteTitle = nameInput.value.trim();
             var selectedEl = document.querySelector('.save-quote-item[style*="background"]');
@@ -1532,11 +1570,20 @@ async function saveQuote() {
                 type: 'warning'
             })) return;
             _saveDialogData.supabaseId = _selectedOverwriteId;
+            // Overwrite content, never the selected document's permanent number.
+            _saveDialogData.quoteNumber = destination.quote_number;
+            _saveDialogData._serverUpdatedAt = destination.updated_at;
+            delete _saveDialogData.forceNew;
+            delete _saveDialogData._forceNewQuote;
+            delete _saveDialogData._backupReviewOnly;
+            window._quoteServerUpdatedAt = destination.updated_at;
+            if (document.getElementById('quoteNumber')) document.getElementById('quoteNumber').value = destination.quote_number;
             window._supabaseQuoteId = _selectedOverwriteId;
             localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
             var owBtn = document.getElementById('overwriteBtn');
             if (owBtn) { owBtn.disabled = true; owBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...'; }
             try {
+                if (window.QuoteDrFolderBackups) window.QuoteDrFolderBackups.saveDraft(_saveDialogData).catch(function() {});
                 var result = await saveQuoteToSupabase(_saveDialogData);
                 if (result && !result.error && result.state === 'cloud_saved') {
                     var saved = Array.isArray(result.data) ? result.data[0] : result.data;
@@ -1546,10 +1593,9 @@ async function saveQuote() {
                         localStorage.setItem("ald_active_quote_id", saved.id);
                     }
                     updateSaveStatus('saved', 'Confirmed in cloud');
-                } else if (result && result.state !== 'local_failed') {
-                    updateSaveStatus('pending', 'Saved on this device - syncing to cloud');
                 } else {
-                    throw new Error((result && result.error && result.error.message) || 'The quote could not be stored safely.');
+                    quoteStorageShowUnconfirmedSave(result);
+                    return;
                 }
                 updateDraftWarning();
                 bootstrap.Modal.getInstance(document.getElementById('saveQuoteModal')).hide();
@@ -1702,7 +1748,13 @@ async function saveQuote() {
         }
 
         async function quoteStorageResolveOpenedData(parsed) {
-            if (parsed && parsed.format === 'quotedr-recovery-v1') {
+            if (window.QuoteDrBackups && (parsed && (parsed.format === 'quotedr-dashboard-backup-v1' || parsed.format === 'quotedr-server-recovery-v1'))) {
+                var restored = window.QuoteDrBackups.candidates(parsed);
+                if (!restored.length) throw new Error('This backup contains no supported quote documents.');
+                var picked = await quoteStorageChooseRecoveryQuote(restored);
+                return picked ? { data: picked.quote, fromRecovery: true } : null;
+            }
+            if (parsed && ['quotedr-recovery-v1', 'quotedr-server-recovery-v1', 'quotedr-dashboard-backup-v1'].includes(parsed.format)) {
                 var candidates = quoteStorageRecoveryCandidates(parsed);
                 if (!candidates.length) throw new Error('This recovery file does not contain a quote backup.');
                 var selected = await quoteStorageChooseRecoveryQuote(candidates);
@@ -1767,12 +1819,13 @@ async function saveQuote() {
             quoteStorageSetDocumentState('open');
             startAutoSave();
             updateSaveStatus('loaded', selectedFile.file.name);
+            quoteCloudSaveUnconfirmed = true;
+            updateSaveStatus('pending', 'Local backup opened — use Save to confirm a dashboard/cloud copy.');
             if (resolved.fromRecovery) {
-                window._quoteLocalEditAt = new Date().toISOString();
-                unsavedChanges = true;
-                updateSaveStatus('pending', 'Backup opened on this device - syncing to cloud');
-                setTimeout(function() { doAutoSave(); }, 0);
+                updateSaveStatus('pending', 'Backup opened for review — use Save to choose its dashboard destination.');
             }
+            window._quoteBackupReviewOnly = true;
+            saveSessionQuote();
             return { data: data, fileName: selectedFile.file.name, fromRecovery: resolved.fromRecovery };
         }
 
@@ -1939,10 +1992,22 @@ async function saveQuote() {
             var el = document.getElementById('saveStatus');
             var qData = collectQuoteData();
             // Always save to localStorage as backup
+            // Disk backup is independent: a slow drive must never hold up cloud saving.
+            if (window.QuoteDrFolderBackups) window.QuoteDrFolderBackups.saveDraft(qData).catch(function() {});
+            var localBackupSaved = false;
             try {
                 localStorage.setItem('ald_autosave_draft', JSON.stringify(qData));
                 localStorage.setItem('ald_session_quote', JSON.stringify(qData));
+                localBackupSaved = true;
             } catch(e) {}
+            if (window._quoteBackupReviewOnly) {
+                if (!localBackupSaved) {
+                    updateSaveStatus('error', 'Device backup failed — keep this page open and use Save to download a backup or save to the dashboard.');
+                    return { state: 'local_failed' };
+                }
+                updateSaveStatus('pending', 'Backup edits saved on this device — use Save to choose a dashboard destination.');
+                return { state: 'local_saved' };
+            }
             // Also write to file if we have a handle
             if (saveFileHandle) {
                 try {
@@ -2001,8 +2066,9 @@ async function saveQuote() {
                             window._quoteServerUpdatedAt = saved.updated_at || null;
                             localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
                         }
-                    } else if (!cloudResult || cloudResult.state === 'local_failed') {
-                        throw new Error((cloudResult && cloudResult.error && cloudResult.error.message) || 'Auto-save could not store a durable copy.');
+                    } else {
+                        quoteStorageShowUnconfirmedSave(cloudResult);
+                        return cloudResult || { state: 'local_failed' };
                     }
                 } catch (error) {
                     unsavedChanges = true;
@@ -2011,6 +2077,7 @@ async function saveQuote() {
                 }
             }
             unsavedChanges = false;
+            if (cloudState === 'cloud_saved') quoteCloudSaveUnconfirmed = false;
             if (el) {
                 if (cloudState === 'cloud_saved') {
                     el.innerHTML = '<span style="color:#28a745;"><i class="fas fa-cloud-check"></i> Cloud saved at ' + t + '</span>';
@@ -2038,16 +2105,15 @@ async function saveQuote() {
                 await quoteStorageShowRemoteUpdatePrompt();
                 return false;
             }
-            if (!unsavedChanges) return true;
+            if (!unsavedChanges && !window.quoteStorageNeedsCloudSave()) return true;
             updateSaveStatus('saving', 'Finishing save before leaving');
             var result = await doAutoSave({ force: true });
-            if (result && result.state !== 'local_failed' && result.state !== 'conflict') return true;
+            if (result && result.state === 'cloud_saved') return true;
             if (window.QuoteDrSave && typeof window.QuoteDrSave.openRecoveryCenter === 'function') window.QuoteDrSave.openRecoveryCenter();
-            await qdAlert('QuoteDr could not safely retain your latest changes, so this page will stay open. Export a backup from Save Status before leaving.', {
-                title: 'Save Needs Attention',
-                type: 'error'
+            var leave = await qdConfirm('Your latest quote has not been confirmed in the dashboard/cloud. Stay here to resolve the save, or leave only if you have a separate backup file.', {
+                title: 'Cloud Save Not Confirmed', okText: 'Stay Here', cancelText: 'Cancel', secondaryText: 'Leave with My Backup', secondaryValue: 'leave_with_backup', type: 'warning'
             });
-            return false;
+            return leave === 'leave_with_backup';
         };
 
         function downloadQuoteFallback() {

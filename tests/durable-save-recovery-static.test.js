@@ -159,7 +159,7 @@ assert(
 assert(
   quoteStorage.includes("cloudResult.state === 'cloud_saved'") &&
     quoteStorage.includes("cloudState === 'local_pending'") &&
-    quoteStorage.includes("cloudResult.state === 'local_failed'") &&
+    quoteStorage.includes('quoteStorageShowUnconfirmedSave(cloudResult)') &&
     quoteStorage.includes('await saveQuoteToSupabase('),
   'Quote saves should await the coordinator and distinguish cloud, local-pending, and local-failed outcomes'
 );
@@ -202,7 +202,8 @@ assert(
     settings.includes('Mark User Confirmed') &&
     settings.includes('Close Without Recovery') &&
     settings.includes('A temporary recovery copy was retained.') &&
-    settings.includes('QuoteDr prepares the message but never sends it automatically.') &&
+    settings.includes('Review the message, then click Send Email') &&
+    settings.includes("callSaveRecoveryAdmin('send_contact'") &&
     settings.includes('Open Email Draft') &&
     settings.includes("callSaveRecoveryAdmin('contacted'") &&
     settings.includes("callSaveRecoveryAdmin('confirm'") &&

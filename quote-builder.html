@@ -2258,7 +2258,7 @@
             justify-content: flex-end;
         }
         .quote-items-table tr.quote-item-highlighted > td {
-            background: var(--line-highlight-bg, rgba(255, 216, 77, 0.18)) !important;
+            background: var(--line-highlight-bg, #ffff99) !important;
         }
         .quote-items-table tr.quote-item-highlighted > td:first-child {
             border-left: 4px solid var(--line-highlight-border, #f2c94c);
@@ -2657,12 +2657,12 @@
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="card-payment-rules.js?v=2026080301"></script>
-    <script src="supabase-v2.js?v=2026081902"></script>
+    <script src="supabase-v2.js?v=2026091404"></script>
     <script src="account-access.js?v=2026080701"></script>
     <script src="document-numbering.js?v=2026081901"></script>
     <script src="ai-voice-rule-matcher.js?v=2026081902"></script>
     <script src="ai-voice-audio-recorder.js?v=2026081901"></script>
-    <script src="save-coordinator.js?v=2026081801"></script>
+    <script src="save-coordinator.js?v=2026091404"></script>
     <script src="quote-media.js?v=2026071202"></script>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
 <script>
@@ -2787,6 +2787,7 @@ if (location.search.includes('debug')) {
                 </div>
                 <div class="d-flex align-items-center gap-2 mt-1">
                     <div id="saveStatus" class="text-muted small" style="min-height: 1.2em;"></div>
+                    <div data-folder-backups class="mt-2"></div>
                     <div class="form-check form-switch mb-0 ms-2 autosave-toolbar-toggle" style="font-size:0.78rem;" title="Auto-save writes your file instantly when you make changes. Turning this off is not recommended.">
                         <input class="form-check-input" type="checkbox" id="autoSaveToggle" style="cursor:pointer;">
                         <label class="form-check-label text-muted" for="autoSaveToggle">Auto-save</label>
@@ -4005,8 +4006,14 @@ Example:
                         </div>
                     </div>
 
-                    <label><strong>Job-specific Note (Optional):</strong></label>
-                    <textarea id="lineNotes" class="form-control mb-3" rows="2" placeholder="Explain what is unique about this job, location, site condition, or why this line item is included..." spellcheck="true"></textarea>
+                    <div class="description-refine-scope">
+                        <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                            <label for="lineNotes"><strong>Job-specific Note (Optional):</strong></label>
+                            <div><button type="button" class="btn btn-sm btn-outline-secondary undo-refine-desc-btn" onclick="toggleRefinedDescription(this)" title="Undo refined job note" style="display:none"><i class="fas fa-undo"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="refineDescription(document.getElementById('lineNotes'), this)"><i class="fas fa-wand-magic-sparkles me-1"></i>AI Refine</button></div>
+                        </div>
+                        <textarea id="lineNotes" class="form-control mb-3 item-description-textarea" rows="2" placeholder="Explain what is unique about this job, location, site condition, or why this line item is included..." spellcheck="true"></textarea>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -9280,7 +9287,18 @@ Example:
         let quoteReviewLineItemContext = null;
         let quoteReviewLineItemReturnContext = null;
 
+        function resetJobNoteRefineState() {
+            const note = document.getElementById('lineNotes');
+            if (note) note._refineRequestId = (note._refineRequestId || 0) + 1;
+            const scope = document.getElementById('lineNotes')?.closest('.description-refine-scope');
+            const button = scope?.querySelector('.undo-refine-desc-btn');
+            if (!button) return;
+            button.style.display = 'none';
+            ['_previousDescription','_refinedDescription','_aiDescriptionMode','_showingRefined'].forEach(key => delete button[key]);
+        }
+
         function resetAddLineDescriptionRefineState() {
+            resetJobNoteRefineState();
             const undoBtn = document.querySelector('#addLineModal .undo-refine-desc-btn');
             if (!undoBtn) return;
             undoBtn.style.display = 'none';
@@ -9293,6 +9311,7 @@ Example:
         }
 
         function resetLineItemEditState() {
+            resetJobNoteRefineState();
             editingItemIndex = null;
             if (typeof quoteReviewLineItemContext !== 'undefined') quoteReviewLineItemContext = null;
             document.getElementById('quoteReviewDraftNotice')?.remove();
@@ -10200,11 +10219,11 @@ Example:
         }
 
         const LINE_ITEM_HIGHLIGHTS = {
-            yellow: { label: 'Yellow', background: 'rgba(255, 216, 77, 0.18)', swatch: '#fff7bf', border: '#f2c94c' },
+            yellow: { label: 'Yellow', background: '#ffff99', swatch: '#ffff66', border: '#c9bd00' },
             green: { label: 'Green', background: 'rgba(59, 178, 115, 0.14)', swatch: '#dff7df', border: '#3bb273' },
             blue: { label: 'Blue', background: 'rgba(79, 141, 247, 0.14)', swatch: '#ddecff', border: '#4f8df7' },
             pink: { label: 'Pink', background: 'rgba(231, 90, 156, 0.14)', swatch: '#ffe1ef', border: '#e75a9c' },
-            orange: { label: 'Orange', background: 'rgba(245, 158, 11, 0.16)', swatch: '#ffe7c2', border: '#f59e0b' },
+            orange: { label: 'Orange', background: '#ffdbad', swatch: '#ffc078', border: '#ed941c' },
             purple: { label: 'Purple', background: 'rgba(139, 92, 246, 0.14)', swatch: '#eee3ff', border: '#8b5cf6' }
         };
         const CHANGE_ORDER_CUSTOM_HIGHLIGHT_KEYS = ['yellow', 'blue', 'purple'];
@@ -10315,6 +10334,9 @@ Example:
 
         function setActiveLineItemHighlight(colorKey) {
             const optionsEl = document.getElementById('lineItemHighlightOptions');
+            if (!optionsEl) return;
+            // Selecting the active swatch again uses the same clear path as Clear.
+            if (colorKey && optionsEl.getAttribute('data-candidate-color') === colorKey) colorKey = '';
             if (colorKey) {
                 var allowedKeys = window._quoteDocumentType === 'change_order' ? CHANGE_ORDER_CUSTOM_HIGHLIGHT_KEYS : Object.keys(LINE_ITEM_HIGHLIGHTS);
                 if (allowedKeys.indexOf(colorKey) === -1) return;
@@ -14491,6 +14513,7 @@ Example:
         }
 
         function resetLineItemDescriptionRefineState() {
+            resetJobNoteRefineState();
             const undoBtn = document.querySelector('#addLineModal .undo-refine-desc-btn');
             if (!undoBtn) return null;
             undoBtn.style.display = 'none';
@@ -19495,7 +19518,9 @@ Example:
         // Save/load/session core moved to quote-storage.js
     </script>
     <script src="change-orders.js?v=1778152100"></script>
-    <script src="quote-storage.js?v=2026090702"></script>
+    <script src="quote-backups.js?v=2026091404"></script>
+    <script src="quote-folder-backups.js?v=2026091405"></script>
+    <script src="quote-storage.js?v=2026091405"></script>
     <script src="property-memory.js?v=2026081001"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
@@ -19601,8 +19626,8 @@ Example:
     </script>
     <script src="quote-review-construction-knowledge.js?v=2026080201"></script>
     <script src="quote-starter-item-library.js?v=2026080201"></script>
-    <script src="quote-items.js?v=2026091402"></script>
-    <script src="quote-import.js?v=2026091401"></script>
+    <script src="quote-items.js?v=2026091405"></script>
+    <script src="quote-import.js?v=2026091403"></script>
     <script src="quote-find.js?v=2026091401"></script>
     <script src="supplier-materials.js?v=2026090101"></script>
     <script>
@@ -23412,7 +23437,8 @@ Example:
         // Warn on refresh/close if unsaved
         window.addEventListener('beforeunload', function(e) {
             if (typeof quoteStoragePortalExitActive === 'function' && quoteStoragePortalExitActive()) return;
-            if (typeof unsavedChanges !== 'undefined' && unsavedChanges) {
+            if ((typeof unsavedChanges !== 'undefined' && unsavedChanges) ||
+                (typeof window.quoteStorageNeedsCloudSave === 'function' && window.quoteStorageNeedsCloudSave())) {
                 e.preventDefault();
                 e.returnValue = '';
             }

@@ -65,10 +65,11 @@ assert(
 assert(
   storage.includes('window.qdSaveBeforeNavigation = async function()') &&
     storage.includes('var result = await doAutoSave({ force: true })') &&
-    storage.includes("result.state !== 'local_failed'") &&
+    storage.includes("result.state === 'cloud_saved'") &&
+    storage.includes("return leave === 'leave_with_backup'") &&
     dialogs.includes("typeof window.qdSaveBeforeNavigation === 'function'") &&
     !dialogs.includes('You have unsaved changes. Leave anyway?'),
-  'leaving the builder should finish a durable save and remain on the page only when local retention fails'
+  'leaving requires cloud acknowledgement or an explicit backup-only exit'
 );
 
 assert(

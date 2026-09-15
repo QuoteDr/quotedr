@@ -6233,6 +6233,7 @@
 
         async function refineDescription(textareaEl, btnEl) {
             if (!textareaEl || !btnEl) return;
+            const noteRequestId = textareaEl.id === 'lineNotes' ? (textareaEl._refineRequestId = (textareaEl._refineRequestId || 0) + 1) : null;
             const currentText = textareaEl.value || '';
             const request = await openAiDescriptionModeDialog(currentText);
             if (!request) return;
@@ -6246,7 +6247,7 @@
             btnEl.disabled = true;
             btnEl.setAttribute('aria-busy', 'true');
             try {
-                const prompt = buildAiDescriptionPrompt(request.mode, request.sourceText);
+                const prompt = buildAiDescriptionPrompt(request.mode, request.sourceText) + (textareaEl.id === 'lineNotes' ? '\nThis is a job-specific note, not a reusable service description. Preserve the supplied site conditions, quantities, exclusions and reasons. Do not invent or expand the scope of work.' : '');
                 if (typeof getSupabaseFunctionAuthHeaders !== 'function') throw new Error('Please sign in again before using AI Refine.');
                 const response = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/ai-assistant', {
                     method: 'POST',
@@ -6257,6 +6258,10 @@
                 if (!response.ok || data.error) throw new Error(data.error || 'AI description request failed');
                 const refinedText = normalizeAiDescriptionReply(data.reply);
                 if (!refinedText) throw new Error('AI did not return a description. Please try again.');
+                if (noteRequestId !== null && (textareaEl._refineRequestId !== noteRequestId || textareaEl.value !== currentText)) {
+                    qdAlert('The job note changed while AI was working. Your current note was kept; refine it again if needed.');
+                    return;
+                }
                 if (refinedText !== currentText) {
                     const undoBtn = btnEl.parentElement ? btnEl.parentElement.querySelector('.undo-refine-desc-btn') : null;
                     if (undoBtn) {

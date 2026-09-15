@@ -339,6 +339,9 @@
                         <h3 class="mb-0">Recent Quotes</h3>
                         <button class="btn btn-outline-secondary btn-sm" onclick="refreshQuotes()" title="Refresh quotes"><i class="fas fa-sync-alt"></i></button>
                         <div class="d-flex gap-2 flex-wrap">
+                            <button id="exportAllQuotesBtn" class="btn btn-sm btn-outline-primary" onclick="QuoteDrBackups.exportAll()">Export All Quotes</button>
+                            <div data-folder-backups class="w-100 mt-2"></div>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="qdAlert('To restore a QuoteDr JSON backup: open the builder, choose File → Open → Open Local File, and select the backup. Choose a quote, review it, then use Save to choose the dashboard destination. No dashboard records are changed just by opening a backup.')">Restore Backup Help</button>
                             <button class="btn btn-sm btn-primary" onclick="openNewQuoteModal()">
                                 <i class="fas fa-plus me-1"></i> New Quote
                             </button>
@@ -515,12 +518,14 @@
     <script src="modal-help.js?v=1777741200"></script>
     <script src="change-orders.js?v=1778060200"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026082401"></script>
+    <script src="supabase-v2.js?v=2026091404"></script>
+    <script src="quote-backups.js?v=2026091404"></script>
+    <script src="quote-folder-backups.js?v=2026091405"></script>
     <script src="birthday-rewards.js?v=2026082401"></script>
     <script src="account-access.js?v=2026080701"></script>
     <script src="document-numbering.js?v=2026081901"></script>
     <script src="admin-access.js?v=2026080201"></script>
-    <script src="save-coordinator.js?v=2026081801"></script>
+    <script src="save-coordinator.js?v=2026091404"></script>
     <script src="app-broadcasts.js?v=1779131000"></script>
     <script>
         function dashboardQuoteRowById(quoteId) {

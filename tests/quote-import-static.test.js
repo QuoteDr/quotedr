@@ -21,7 +21,7 @@ assert(builderHtml.includes('quoteImportImagePreview'), 'photo import should pre
 assert(builderHtml.includes('id="quoteImportParseBtn"'), 'quote import should identify the parse action so duplicate AI requests can be blocked');
 assert(builderHtml.includes('function openAiVoiceDestinationModal(preparedRooms, options)'), 'quote import should reuse the configurable AI Voice room destination flow');
 assert(builderHtml.includes('modalEl._aiVoiceDestinationRooms = destinationRooms'), 'the shared destination chooser should validate against the rooms offered to that workflow');
-assert(builderHtml.includes('quote-import.js?v=2026091401'), 'quote builder should cache-bust the importer missing-unit update');
+assert(builderHtml.includes('quote-import.js?v=2026091403'), 'quote builder should cache-bust the importer save-identity update');
 
 const edgeFunctionPath = path.join(__dirname, '..', 'supabase', 'functions', 'quote-import', 'index.ts');
 assert(fs.existsSync(edgeFunctionPath), 'quote-import edge function should exist');

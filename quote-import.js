@@ -1702,12 +1702,13 @@
             return;
         }
         var appliedData = mode === 'replace' ? {
-            quoteTitle: quote.quoteTitle || 'Imported Quote',
-            clientName: quote.clientName || '',
-            quoteNumber: quote.quoteNumber || document.getElementById('quoteNumber')?.value || '',
-            clientPhone: quote.clientPhone || '',
-            clientEmail: quote.clientEmail || '',
-            projectAddress: quote.projectAddress || '',
+            ...currentData,
+            quoteTitle: (currentData.supabaseId && currentData.quoteTitle) || quote.quoteTitle || 'Imported Quote',
+            clientName: (currentData.supabaseId && currentData.clientName) || quote.clientName || '',
+            quoteNumber: currentData.quoteNumber || quote.quoteNumber || '',
+            clientPhone: (currentData.supabaseId && currentData.clientPhone) || quote.clientPhone || '',
+            clientEmail: (currentData.supabaseId && currentData.clientEmail) || quote.clientEmail || '',
+            projectAddress: (currentData.supabaseId && currentData.projectAddress) || quote.projectAddress || '',
             status: 'draft',
             rooms: destinationResult.rooms,
             roomCounter: destinationResult.roomCounter
@@ -1741,10 +1742,7 @@
         if (typeof global.markUnsaved === 'function') global.markUnsaved();
         if (typeof global.updateDraftWarning === 'function') global.updateDraftWarning();
 
-        if (mode === 'replace') {
-            window._supabaseQuoteId = null;
-            localStorage.removeItem('ald_active_quote_id');
-        }
+        // Replace content, not the open document's cloud identity or save version.
 
         if (typeof global.recordQuoteImportUndo === 'function') global.recordQuoteImportUndo(deepClone(currentData));
 

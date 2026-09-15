@@ -642,6 +642,11 @@
             return markAcknowledged(latest, result);
         } catch (error) {
             var normalizedError = errorObject(error);
+            if (latest.entityType === 'quote' && /quotes_user_quote_unique/i.test(normalizedError.message || '')) {
+                var numberError = new Error('This quote number is already used by another dashboard document. Export this backup, then use File → Save to select the correct existing quote or Save as New for a newly assigned number. Your retained copy has not been discarded.');
+                numberError.code = 'QD_DUPLICATE_QUOTE_NUMBER';
+                return markActionRequired(latest, numberError, { recordAttempt: true });
+            }
             if (isClientSchemaContractError(latest, error)) {
                 return markActionRequired(latest, error, { recordAttempt: true });
             }

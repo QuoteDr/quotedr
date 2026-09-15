@@ -1387,6 +1387,33 @@ async function deleteItem(itemName) {
 }
 
 // Get all quotes for current user
+// Full payloads for a user-requested backup, never the dashboard's filtered cache.
+async function listQuotesForBackup() {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    if (await qdUsesTeamAccountApi()) {
+        const result = await qdTeamAccountCall('quotes.list', { limit: 500 });
+        if (result.error) return result;
+        if ((result.data || []).length >= 500) return { error: 'This account reaches the current 500-document team export limit. No partial backup was downloaded.' };
+        return result;
+    }
+    const rows = [];
+    let total = null;
+    for (let offset = 0; ; ) {
+        const page = await _supabase.from('quotes').select('*', { count: 'exact' })
+            .eq('user_id', user.id).order('id', { ascending: true }).range(offset, offset + 199);
+        if (page.error) return { error: page.error };
+        if (!Number.isInteger(page.count)) return { error: 'Could not verify backup completeness. Please retry.' };
+        if (total !== null && total !== page.count) return { error: 'The document list changed during export. Please retry.' };
+        total = page.count;
+        const data = page.data || [];
+        rows.push(...data);
+        offset += data.length;
+        if (offset >= total) return { data: rows };
+        if (!data.length) return { error: 'The server returned an incomplete backup. Please retry.' };
+    }
+}
+
 async function listQuotes() {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };

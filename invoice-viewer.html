@@ -222,7 +222,7 @@
             width: 100%;
         }
         .invoice-line-items tr.invoice-line-item-highlighted > td {
-            background: var(--invoice-line-highlight-bg, rgba(255, 216, 77, 0.16)) !important;
+            background: var(--invoice-line-highlight-bg, #ffff99) !important;
         }
         .invoice-line-items tr.invoice-line-item-highlighted > td:first-child {
             border-left: 4px solid var(--invoice-line-highlight-border, #f2c94c);
@@ -957,11 +957,11 @@ if (location.search.includes('debug')) {
         }
 
         const INVOICE_LINE_ITEM_HIGHLIGHTS = {
-            yellow: { label: 'Yellow', background: 'rgba(255, 216, 77, 0.16)', border: '#f2c94c' },
+            yellow: { label: 'Yellow', background: '#ffff99', border: '#c9bd00' },
             green: { label: 'Green', background: 'rgba(59, 178, 115, 0.13)', border: '#3bb273' },
             blue: { label: 'Blue', background: 'rgba(79, 141, 247, 0.13)', border: '#4f8df7' },
             pink: { label: 'Pink', background: 'rgba(231, 90, 156, 0.13)', border: '#e75a9c' },
-            orange: { label: 'Orange', background: 'rgba(245, 158, 11, 0.14)', border: '#f59e0b' },
+            orange: { label: 'Orange', background: '#ffdbad', border: '#ed941c' },
             purple: { label: 'Purple', background: 'rgba(139, 92, 246, 0.13)', border: '#8b5cf6' }
         };
 

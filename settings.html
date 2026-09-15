@@ -528,7 +528,7 @@ if (location.search.includes('debug')) {
     <script src="quickbooks-import-controller.js?v=2026080801"></script>
     <script src="account-access.js?v=2026080701"></script>
     <script src="document-numbering.js?v=2026081901"></script>
-    <script src="save-coordinator.js?v=2026081801"></script>
+    <script src="save-coordinator.js?v=2026091404"></script>
     <script src="analytics.js?v=1778059000"></script>
 </head>
 <body>
@@ -2273,6 +2273,7 @@ Sarah Jones, 905-555-5678"></textarea>
 
 	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="quote-dialogs.js?v=2026071501"></script>
+    <script src="quote-backups.js?v=2026091404"></script>
 	<script src="app-broadcasts.js?v=1779131000"></script>
 	<script src="help-content.js?v=2026080801"></script>
 	<script src="modal-help.js?v=1777741200"></script>
@@ -4047,7 +4048,8 @@ Sarah Jones, 905-555-5678"></textarea>
 						(active && !documentBackup ? '<button type="button" class="btn btn-primary btn-sm" onclick="retrySaveRecoveryIncident(\'' + row.operation_id + '\')"><i class="fas fa-rotate me-1"></i>Retry</button>' : '') +
 						'<button type="button" class="btn btn-outline-primary btn-sm" onclick="openSaveIncidentContact(\'' + row.operation_id + '\')"><i class="fas fa-envelope me-1"></i>Contact User</button>' +
 						(row.resolution_strategy !== 'user_confirmed' ? '<button type="button" class="btn btn-outline-success btn-sm" onclick="confirmSaveRecoveryIncident(\'' + row.operation_id + '\')"><i class="fas fa-user-check me-1"></i>Mark User Confirmed</button>' : '') +
-						'<button type="button" class="btn btn-outline-secondary btn-sm" onclick="exportSaveRecoveryIncident(\'' + row.operation_id + '\')"><i class="fas fa-download me-1"></i>Export</button>' +
+						'<button type="button" class="btn btn-outline-secondary btn-sm" onclick="exportSaveRecoveryIncident(\'' + row.operation_id + '\')"><i class="fas fa-download me-1"></i>Export Incident</button>' +
+                        (row.payload && Array.isArray(row.payload.rooms) ? '<button type="button" class="btn btn-outline-success btn-sm" onclick="downloadRecoverableIncidentQuote(\'' + row.operation_id + '\')">Download Recoverable Quote</button>' : '') +
 						(active ? '<button type="button" class="btn btn-outline-danger btn-sm" onclick="discardSaveRecoveryIncident(\'' + row.operation_id + '\')"><i class="fas fa-box-archive me-1"></i>Close Without Recovery</button>' : '') +
 						'</div>' +
 					'</div>' +
@@ -4114,6 +4116,15 @@ Sarah Jones, 905-555-5678"></textarea>
 			}
 		}
 
+        function downloadRecoverableIncidentQuote(operationId) {
+            var row = saveRecoveryIncidentRows.find(function(item) { return item.operation_id === operationId; });
+            if (!row) return;
+            try {
+                var quote = QuoteDrBackups.recoveryQuote(row.payload);
+                QuoteDrBackups.download(quote, 'QuoteDr Recovered Quote - ' + String(row.operation_id).replace(/[^a-zA-Z0-9-]/g, '') + '.json');
+                showToast('Quote backup download started. This does not resolve the incident or change the live quote.', 'success');
+            } catch (error) { qdAlert(error.message); }
+        }
 		function exportSaveRecoveryIncident(operationId) {
 			var row = saveRecoveryIncidentRows.find(function(item) { return item.operation_id === operationId; });
 			if (!row) return;
@@ -4136,7 +4147,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			modal.innerHTML = '<div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content">' +
 				'<div class="modal-header bg-primary text-white"><h5 class="modal-title"><i class="fas fa-envelope me-2"></i>Contact User About Save Incident</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button></div>' +
 				'<div class="modal-body">' +
-				'<div class="alert alert-info small"><i class="fas fa-circle-info me-1"></i>QuoteDr prepares the message but never sends it automatically. Open the draft, review it, and send it from your email app.</div>' +
+				'<div class="alert alert-info small"><i class="fas fa-circle-info me-1"></i>Review the message, then click Send Email to send directly from QuoteDr Support. Sending does not resolve the incident. You can still use your email app instead.</div>' +
 				'<label class="form-label fw-semibold" for="saveIncidentContactTo">To</label><input id="saveIncidentContactTo" class="form-control mb-3" readonly>' +
 				'<label class="form-label fw-semibold" for="saveIncidentContactSubject">Subject</label><input id="saveIncidentContactSubject" class="form-control mb-3">' +
 				'<label class="form-label fw-semibold" for="saveIncidentContactBody">Message</label><textarea id="saveIncidentContactBody" class="form-control" rows="12"></textarea>' +
@@ -4144,6 +4155,25 @@ Sarah Jones, 905-555-5678"></textarea>
 				'<div class="modal-footer"><button type="button" class="btn btn-outline-secondary" id="saveIncidentCopyMessage"><i class="fas fa-copy me-1"></i>Copy Message</button><button type="button" class="btn btn-outline-success" id="saveIncidentMarkContacted"><i class="fas fa-envelope-circle-check me-1"></i>Mark Contacted</button><button type="button" class="btn btn-primary" id="saveIncidentOpenEmail"><i class="fas fa-paper-plane me-1"></i>Open Email Draft</button></div>' +
 				'</div></div>';
 			document.body.appendChild(modal);
+			var sendButton = document.createElement('button');
+			sendButton.type = 'button'; sendButton.className = 'btn btn-success'; sendButton.textContent = 'Send Email';
+			modal.querySelector('.modal-footer').appendChild(sendButton);
+			sendButton.addEventListener('click', async function() {
+				if (sendButton.disabled) return;
+				sendButton.disabled = true;
+				try {
+					if (!await qdConfirm('Send this reviewed message to ' + row.user_email + ' from QuoteDr Support?', {title:'Send Support Email', okText:'Send Email'})) return;
+					var result = await callSaveRecoveryAdmin('send_contact', operationId, {
+						subject: modal.querySelector('#saveIncidentContactSubject').value,
+						message: modal.querySelector('#saveIncidentContactBody').value
+					});
+					if (!result.providerAccepted) throw new Error('Email sending was not confirmed.');
+					showToast(result.contactRecorded ? 'Email accepted for delivery. Incident remains unresolved.' : 'Email accepted for delivery, but contact recording failed. Do not resend; use Mark Contacted.', 'success');
+					instance.hide();
+					await loadSaveRecoveryIncidents();
+				} catch(error) { await qdAlert(error.message || 'Email sending was not confirmed. Retry the unchanged message to avoid duplicates.'); }
+				finally { sendButton.disabled = false; }
+			});
 			modal.querySelector('#saveIncidentContactTo').value = row.user_email || '';
 			modal.querySelector('#saveIncidentContactSubject').value = draft.subject;
 			modal.querySelector('#saveIncidentContactBody').value = draft.message;

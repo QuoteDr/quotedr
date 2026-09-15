@@ -1,0 +1,44 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const importer = fs.readFileSync('quote-import.js', 'utf8');
+const storage = fs.readFileSync('quote-storage.js', 'utf8');
+const start = importer.indexOf("var appliedData = mode === 'replace'");
+const end = importer.indexOf("if (typeof applyQuoteData", start);
+const currentData = {supabaseId:'existing-id', quoteNumber:'Q-123', quoteTitle:'Existing title', _serverUpdatedAt:'version', terms:['keep'], rooms:[]};
+const ctx = { mode:'replace', currentData, quote:{quoteNumber:'supplier-tax-id',quoteTitle:'Imported'}, destinationResult:{rooms:[{name:'Imported'}],roomCounter:1} };
+vm.createContext(ctx);
+vm.runInContext(importer.slice(start,end),ctx);
+assert.equal(ctx.appliedData.supabaseId,'existing-id');
+assert.equal(ctx.appliedData.quoteNumber,'Q-123');
+assert.equal(ctx.appliedData._serverUpdatedAt,'version');
+assert.equal(ctx.appliedData.quoteTitle,'Existing title');
+assert.equal(ctx.appliedData.rooms[0].name,'Imported');
+assert(!importer.slice(start,importer.indexOf('async function saveQuoteImportCandidates',start)).includes('window._supabaseQuoteId = null'));
+let status, recovery = 0;
+const sandbox = {window:{QuoteDrSave:{openRecoveryCenter(){recovery++;}}}, quoteStorageEscapeHtml:s=>String(s).replaceAll('<','&lt;'), updateSaveStatus:(...args)=>status=args};
+vm.createContext(sandbox);
+vm.runInContext(storage.slice(storage.indexOf('function quoteStorageShowUnconfirmedSave('),storage.indexOf('function updateSaveStatus(')),sandbox);
+for (const result of [{error:'Not authenticated'}, {error:{message:'Request rejected'}}, {state:'action_required'}, {state:'conflict'}, null]) {
+ sandbox.quoteStorageShowUnconfirmedSave(result);
+ assert.equal(status[0],'error');
+ assert.equal(sandbox.quoteCloudSaveUnconfirmed,true);
+}
+sandbox.quoteStorageShowUnconfirmedSave({state:'local_pending'});
+assert.equal(status[0],'pending');
+assert.match(status[1],/not confirmed/);
+sandbox.quoteStorageShowUnconfirmedSave({error:'<unsafe>'});
+assert(!status[1].includes('<unsafe>'));
+const nav = storage.slice(storage.indexOf('window.qdSaveBeforeNavigation ='),storage.indexOf('function downloadQuoteFallback'));
+let choice = false;
+Object.assign(sandbox,{clearTimeout(){},_autoSaveTimer:null,quoteStoragePortalExitActive:()=>false,quoteStorageHasOpenDocument:()=>true,saveSessionQuote(){},quoteStorageRemoteUpdate:null,unsavedChanges:false,doAutoSave:async()=>({state:'local_pending'}),qdConfirm:async()=>choice});
+sandbox.window.quoteStorageNeedsCloudSave=()=>true;
+vm.runInContext(nav,sandbox);
+(async()=>{
+ assert.equal(await sandbox.window.qdSaveBeforeNavigation(),false,'dismissal stays on page');
+ choice='leave_with_backup';
+ assert.equal(await sandbox.window.qdSaveBeforeNavigation(),true,'explicit local backup escape');
+ sandbox.doAutoSave=async()=>({state:'cloud_saved'});
+ assert.equal(await sandbox.window.qdSaveBeforeNavigation(),true);
+ console.log('Import identity and unconfirmed cloud-save regressions passed');
+})().catch(e=>{console.error(e);process.exitCode=1;});

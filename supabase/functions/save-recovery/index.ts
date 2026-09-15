@@ -395,6 +395,37 @@ serve(async (req) => {
       return json({ success: true, state: "resolved" });
     }
 
+    if (action === "send_contact") {
+      if (!isAdminEmail(user.email)) return json({ error: "Admin access required" }, 403);
+      if (!RESEND_API_KEY) return json({ error: "Support email sending is not configured" }, 503);
+      const operationId = text(body.operationId, 160);
+      const subject = String(body.subject || "").trim();
+      const message = String(body.message || "").trim();
+      if (!subject || subject.length > 300 || /[\r\n]/.test(subject) || !message || message.length > 16000) {
+        return json({ error: "Enter a subject (up to 300 characters) and message (up to 16,000 characters)" }, 400);
+      }
+      const { data: record, error: readError } = await service.from("save_recovery_records")
+        .select("operation_id,user_email").eq("operation_id", operationId).maybeSingle();
+      if (readError) throw readError;
+      if (!record) return json({ error: "Save incident not found" }, 404);
+      // Recipient is bound to the authenticated incident, never supplied by the browser.
+      const recipient = String(record.user_email || "").trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) return json({ error: "Incident has no valid recipient email" }, 400);
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify([operationId, recipient, subject, message])));
+      const key = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST", signal: AbortSignal.timeout(15000),
+        headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `save-contact-${key}` },
+        body: JSON.stringify({ from: "QuoteDr Support <quotes@quotedr.io>", to: [recipient], reply_to: ADMIN_REPLY_EMAIL, subject, text: message }),
+      });
+      if (!response.ok) return json({ error: "Email was not confirmed by the provider. Retry the unchanged message or use your email app." }, 502);
+      const receipt = await response.json();
+      if (!receipt.id) return json({ error: "Email acknowledgement missing. Retry the unchanged message." }, 502);
+      const { error: contactError } = await service.from("save_recovery_records")
+        .update({ admin_contacted_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("operation_id", operationId);
+      return json({ success: true, providerAccepted: true, contactRecorded: !contactError });
+    }
+
     if (action === "contacted") {
       if (!isAdminEmail(user.email)) return json({ error: "Admin access required" }, 403);
       const operationId = text(body.operationId, 160);
