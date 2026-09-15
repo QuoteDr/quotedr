@@ -4074,7 +4074,7 @@ Example:
                             <label class="form-label"><strong>Category</strong></label>
                             <div class="d-flex gap-2">
                                 <select id="newItemCategory" class="form-select" onchange="handleCategoryChange()"></select>
-                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addNewCategory()" title="Add a new category"><i class="fas fa-plus"></i></button>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addNewCategory()" title="Save a category with or without items"><i class="fas fa-plus"></i> Add Category</button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary" onclick="renameSelectedCategory()" title="Rename selected category"><i class="fas fa-pen"></i></button>
                             </div>
                         </div>
@@ -7374,6 +7374,8 @@ Example:
         function _catPickerHTML(cat) {
             var cur = categoryStyles[cat] || {};
             var html = '<div class="icon-section-label" style="font-size:0.7rem;font-weight:700;text-transform:uppercase;color:#6c757d;letter-spacing:0.5px;margin:4px 0 6px;">Icon</div>';
+            html += '<button type="button" class="btn btn-sm btn-outline-primary mb-2" data-cat-auto-detect><i class="fas fa-wand-magic-sparkles me-1"></i>Auto Detect</button>';
+            html += '<div class="small text-muted mb-2">Detects from the category name and updates this saved category icon.</div>';
             html += '<input type="text" id="catIconSearch" data-cat-icon-search class="form-control form-control-sm" placeholder="Search icons..." onclick="event.stopPropagation()" onkeydown="event.stopPropagation()" oninput="filterCategoryIconPicker(this.value)" style="margin-bottom:8px;">';
             html += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">';
             CAT_ICONS.forEach(function(ico) {
@@ -7432,11 +7434,21 @@ Example:
             if (picker.dataset.categoryPickerBound === '1') return;
             picker.dataset.categoryPickerBound = '1';
             picker.addEventListener('click', function(e) {
+                var autoBtn = e.target.closest('[data-cat-auto-detect]');
                 var iconBtn = e.target.closest('[data-cat-style-icon]');
                 var colorBtn = e.target.closest('[data-cat-style-color]');
-                if (!iconBtn && !colorBtn) return;
+                if (!autoBtn && !iconBtn && !colorBtn) return;
                 e.preventDefault();
                 e.stopPropagation();
+                if (autoBtn) {
+                    var detected = detectQuoteCategoryIcon(cat);
+                    if (!detected) {
+                        qdAlert('No confident icon match found. Please choose an icon manually.');
+                        return;
+                    }
+                    selectCatIcon(cat, detected);
+                    return;
+                }
                 if (iconBtn) selectCatIcon(cat, iconBtn.getAttribute('data-cat-style-icon'));
                 if (colorBtn) selectCatColor(cat, colorBtn.getAttribute('data-cat-style-color'));
             });
@@ -7447,7 +7459,7 @@ Example:
             if (!picker || _catPickerOpen !== cat) return;
             var header = picker.querySelector('[data-cat-picker-header]');
             picker.innerHTML = (header ? header.outerHTML : '') + _catPickerHTML(cat);
-            picker.dataset.categoryPickerBound = '';
+            // The delegated listener survives innerHTML replacement; do not bind it twice.
             bindCategoryPickerChoices(picker, cat);
         }
 
@@ -19639,7 +19651,7 @@ Example:
     </script>
     <script src="quote-review-construction-knowledge.js?v=2026080201"></script>
     <script src="quote-starter-item-library.js?v=2026080201"></script>
-    <script src="quote-items.js?v=2026091501"></script>
+    <script src="quote-items.js?v=2026091503"></script>
     <script src="quote-import.js?v=2026091403"></script>
     <script src="quote-find.js?v=2026091401"></script>
     <script src="supplier-materials.js?v=2026090101"></script>
@@ -24884,7 +24896,7 @@ Example:
         </div>
     </div>
 <script src="chatbot-feedback-topics.js?v=2026080801"></script>
-<script src="ai-assistant.js?v=1778194800"></script>
+<script src="ai-assistant.js?v=2026091503"></script>
 
 
 <!-- Hardwood/LVP Calculator Modal -->
@@ -25274,7 +25286,7 @@ Example:
 <script src="quote-calculators.js?v=1778198600"></script>
 <script src="help-content.js?v=2026080801"></script>
 <script src="modal-help.js?v=1778055200"></script>
-<script src="quote-tips.js?v=2026080801"></script>
+<script src="quote-tips.js?v=2026091502"></script>
 <script src="quote-spellcheck.js?v=2026071602"></script>
 <script src="ai-voice-new-item-wizard.js?v=2026081901"></script>
 <script src="quote-completeness-review.js?v=2026080201"></script>

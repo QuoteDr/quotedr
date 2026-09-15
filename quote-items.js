@@ -2988,6 +2988,10 @@
                 title: 'New Category'
             }) || '').trim();
             if (!newCat || newCat.length === 0) return null;
+            if (newCat.startsWith('__') || ['__proto__', 'constructor', 'prototype'].includes(newCat.toLowerCase())) {
+                await qdAlert('Please choose a different category name.');
+                return null;
+            }
             const existing = Object.keys(pricingDatabase || {}).find(function(cat) {
                 return cat.toLowerCase() === newCat.toLowerCase();
             });
@@ -3000,7 +3004,17 @@
                 return existing;
             }
             pricingDatabase[newCat] = [];
+            customItems[newCat] = [];
             populateNewItemCategorySelect(newCat);
+            renderAllItemsList();
+            try {
+                const result = await saveCustomItems(false);
+                showManageItemsToast(result && result.error
+                    ? 'Category saved on this device. Cloud save is not confirmed.'
+                    : 'Category saved. You can add items now or leave it empty.', !(result && result.error));
+            } catch (error) {
+                await qdAlert('Category save could not be confirmed. Please retry saving before leaving. ' + (error.message || ''));
+            }
             if (typeof window.notifyBuilderGuideSavedItemCategorySelected === 'function') {
                 window.notifyBuilderGuideSavedItemCategorySelected();
             }

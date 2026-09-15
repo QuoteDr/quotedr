@@ -14,6 +14,15 @@
   };
 
   var TIP_CATALOG = [
+    {id:'folder-backups',icon:'fa-folder-open',title:'Keep a verified backup on your computer',body:'Connect Backup Folder in the dashboard or builder to keep changed quote versions in a private folder. Wait for Folder backup verified. QuoteDr must remain open and folder permission must be available; attached media files are not included.',helpUrl:'dashboard.html',videoUrl:''},
+    {id:'export-restore',icon:'fa-download',title:'Export and restore your quotes',body:'Export All Quotes on the dashboard downloads a JSON backup of cloud-saved quotes. Restore through File → Open → Open Local File in the builder, review the quote, then choose its save destination. Opening a backup alone does not overwrite a dashboard quote.',helpUrl:'dashboard.html',videoUrl:''},
+    {id:'cloud-save-status',icon:'fa-cloud',title:'Local saved and cloud saved are different',body:'Check the save status before leaving. Saved on this device is not confirmation of a dashboard save. Open Sync and Recovery if cloud saving needs attention, and keep a local backup until you verify your latest work.',helpUrl:'help.html',videoUrl:''},
+    {id:'import-review',icon:'fa-file-import',title:'Bring an old quote into the builder',body:'Import Old Quote can read supported documents and pasted text. Review descriptions, units, quantities and totals before applying. Selected reusable items are only added to your library when you save them.',helpUrl:'help.html',videoUrl:''},
+    {id:'design-before-pricing',icon:'fa-images',title:'Introduce the design before the price',body:'Attach renderings or interactive designs to a quote from the portal. You can arrange their review order, enable design before pricing, and choose a viewing-problem fallback.',helpUrl:'help.html',videoUrl:''},
+    {id:'highlight-legend',icon:'fa-highlighter',title:'Explain changes with highlight colours',body:'Highlight changed or added line items and give each colour a client-friendly explanation. Choose item labels or legend-only wording. Colour changes stay in the highlight window until you apply them.',helpUrl:'help.html',videoUrl:''},
+    {id:'private-profit',icon:'fa-chart-line',title:'Review profit without duplicating a quote',body:'Use View Quote & Profit (private) on the dashboard to inspect your pricing and costs, including quotes already in a portal. This is an administrator view, not a client-facing profit report.',helpUrl:'dashboard.html',videoUrl:''},
+    {id:'bulk-quotes',icon:'fa-list-check',title:'Manage several dashboard quotes together',body:'Use the selection checkboxes in dashboard List view for bulk actions. Check your search and filters before selecting visible documents. Moving documents to Junk is different from permanently deleting them.',helpUrl:'dashboard.html',videoUrl:''},
+    {id:'refine-notes',icon:'fa-wand-magic-sparkles',title:'Polish notes without changing the scope',body:'AI Refine is available for item descriptions, job-specific notes and highlight explanations. Review the result before applying—especially quantities, exclusions and commitments.',helpUrl:'help.html#ai-features',videoUrl:''},
     {
       id: 'rooms',
       icon: 'fa-door-open',
@@ -280,7 +289,14 @@
         .eq('key', QUOTE_TIPS_CLOUD_KEY)
         .maybeSingle();
       if (result && result.data && result.data.value) {
-        return saveLocalSettings(Object.assign({}, local, result.data.value));
+        var latest=getSettings();
+        var remote=normalizeSettings(result.data.value);
+        // A delayed cloud read must not undo a newer local opt-out.
+        if ((Date.parse(remote.updatedAt) || 0) > (Date.parse(latest.updatedAt) || 0)) {
+          localStorage.setItem(QUOTE_TIPS_SETTINGS_KEY, JSON.stringify(remote));
+          return remote;
+        }
+        return latest;
       }
     } catch (err) {
       console.warn('QuoteDr tips cloud load failed', err);
@@ -316,7 +332,7 @@
   }
 
   function hasOpenModal() {
-    return !!document.querySelector('.modal.show');
+    return !!document.querySelector('.modal.show') || !!document.querySelector('dialog[open], .offcanvas.show');
   }
 
   function isFirstQuoteTutorialCompleteEnough() {
@@ -340,6 +356,9 @@
   function shouldShowAutomaticTip(settings) {
     settings = normalizeSettings(settings);
     if (!settings.enabled) return false;
+    if (document.hidden) return false;
+    var active=document.activeElement;
+    if (active && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName))) return false;
     if (hasOpenModal()) return false;
     if (isBuilderTutorialCompeting()) return false;
     return Date.now() - Number(settings.lastShownAt || 0) >= QUOTE_TIPS_INTERVAL_MS;
@@ -382,7 +401,7 @@
   }
 
   async function recordShown(settings, options) {
-    settings = normalizeSettings(settings);
+    settings = normalizeSettings(Object.assign({},settings,{enabled:getSettings().enabled}));
     settings.lastShownAt = Date.now();
     if (!options || !options.keepRotation) {
       settings.rotationIndex = (Number(settings.rotationIndex || 0) + 1) % TIP_CATALOG.length;
@@ -413,7 +432,7 @@
       learn.removeAttribute('href');
     }
 
-    var tutorialUrl = tip.videoUrl || QUOTE_TIPS_YOUTUBE_PLACEHOLDER_URL;
+    var tutorialUrl = tip.videoUrl === '' ? '' : (tip.videoUrl || QUOTE_TIPS_YOUTUBE_PLACEHOLDER_URL);
     if (tutorialUrl) {
       tutorial.style.display = '';
       tutorial.href = tutorialUrl;
@@ -459,8 +478,11 @@
   }
 
   async function showAutomaticTip() {
-    var settings = await loadCloudSettings();
+    var settings = getSettings();
     if (!shouldShowAutomaticTip(settings)) return false;
+    if (!window.bootstrap || !bootstrap.Modal) return false;
+    // Reserve the cooldown immediately, not when the user eventually dismisses it.
+    settings=saveLocalSettings(Object.assign({},settings,{lastShownAt:Date.now()}));
     renderTip(getNextTip(settings), settings, {});
     return true;
   }
@@ -487,10 +509,24 @@
   }
 
   function initAutoTips() {
-    if (!/quote-builder\.html(?:$|[?#])/i.test(window.location.pathname + window.location.search)) return;
-    setTimeout(function() {
-      showAutomaticTip();
-    }, 1400);
+    if (!/\/(quote-builder|dashboard|settings)(?:\.html)?\/?$/i.test(window.location.pathname)) return;
+    var until=0, timer=null;
+    function opportunity() {
+      until=Date.now()+120000;
+      clearTimeout(timer);
+      timer=setTimeout(check,6000);
+    }
+    async function check() {
+      if(Date.now()>until) return;
+      try { if(await showAutomaticTip()) {until=0;return;} }
+      catch(error) {console.warn('QuoteDr tip deferred',error);}
+      timer=setTimeout(check,15000);
+    }
+    // Load preferences once per page, not on every retry.
+    loadCloudSettings().catch(function(){}).finally(opportunity);
+    window.addEventListener('hashchange',opportunity);
+    window.addEventListener('popstate',opportunity);
+    window.addEventListener('pageshow',function(event){if(event.persisted)opportunity();});
   }
 
   window.QuoteDrTips = {

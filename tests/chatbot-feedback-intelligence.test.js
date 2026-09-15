@@ -29,7 +29,7 @@ const assistant = read('ai-assistant.js');
 assert(/body:\s*JSON\.stringify\(\{\s*action:\s*'record',\s*topicKey:\s*classified\.topicKey,\s*intentKey:\s*classified\.intentKey,\s*surfaceKey:\s*classified\.surfaceKey\s*\}\)/.test(assistant), 'collector payload must contain controlled enums only');
 assert(!/body:\s*JSON\.stringify\(\{[^}]*question:/s.test(assistant), 'collector must not send a raw question');
 assert(assistant.includes('.catch(function() {})'), 'telemetry failure must be swallowed');
-assert(assistant.includes('recordPrivacySafeChatbotTopic(text, localReply)') && assistant.includes('recordPrivacySafeChatbotTopic(text, reply)'), 'local and remote answers should both classify after normal use succeeds');
+assert(assistant.includes('recordPrivacySafeChatbotTopic(text, reply)'), 'assistant answers should classify after normal use succeeds');
 
 const edge = read('supabase/functions/chatbot-feedback/index.ts');
 assert(edge.includes('FORBIDDEN_RAW_FIELDS'), 'endpoint must reject raw content fields');

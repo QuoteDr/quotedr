@@ -27,7 +27,10 @@ assert(knowledge.includes('AI Trade Rules'), 'knowledge should explain AI Trade 
 assert(knowledge.includes('Voice Templates'), 'knowledge should explain Voice Templates');
 assert(knowledge.includes('deposit payment button on quote links'), 'knowledge should explain quote deposits');
 assert(knowledge.includes('pay-in-full button on invoice links'), 'knowledge should explain invoice full payments');
-assert(knowledge.includes('From what I can see, QuoteDr does not have that yet. Go to Settings > Feedback'), 'knowledge should include missing-feature guidance');
+assert(knowledge.includes('Missing documentation is NOT evidence'), 'unknown workflows must not be declared unavailable');
+for (const topic of ['Highlight Selected', 'Connect Backup Folder', 'Export All Quotes', 'Open Local File', 'Add Category', 'AI Refine']) {
+  assert(knowledge.includes(topic), 'knowledge missing workflow: ' + topic);
+}
 
 assert(assistantFn.includes('buildQuoteDrAssistantSystemPrompt'), 'ai-assistant function should import/use shared knowledge');
 assert(assistantFn.includes('../_shared/quotedr-knowledge.ts'), 'ai-assistant function should import the shared knowledge module');
@@ -36,11 +39,9 @@ assert(assistantFn.includes('Grounded-only product guide'), 'ai-assistant system
 
 assert(widget.includes('getQuoteDrAssistantContext'), 'assistant widget should collect lightweight page/tool context');
 assert(widget.includes('context: getQuoteDrAssistantContext()'), 'assistant widget should send context with chat requests');
-assert(widget.includes('getQuoteDrLocalAssistantReply'), 'assistant widget should provide deterministic local answers for built-in app help prompts');
-assert(widget.includes('Manage Items > Choice Group'), 'assistant widget local answer should explain the real saved group workflow');
-assert(widget.includes('click Choice Group, then click New'), 'saved group local answer should not route users to Settings > Saved Groups');
+assert(!widget.includes('getQuoteDrLocalAssistantReply'), 'keyword shortcuts must not bypass conversation reasoning');
 assert(!widget.includes('Select "Saved Groups"'), 'assistant widget should not contain the incorrect old saved group instruction');
-assert(widget.includes('From what I can see, QuoteDr does not have that yet. Go to Settings > Feedback'), 'assistant widget should locally handle obvious missing-feature questions');
+assert(!widget.includes('QuoteDr does not have that yet'), 'widget must not invent missing-feature claims');
 
 assert(helpContent.includes('Manage Items > Choice Group'), 'contextual help should explain saved choice groups');
 assert(helpContent.includes('AI Memory'), 'contextual help should mention AI Memory');
