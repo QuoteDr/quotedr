@@ -3203,6 +3203,7 @@ if (location.search.includes('debug')) {
                         <div id="grandTotalDisplay">$0.00</div>
                     </div>
                     <div class="quote-total-actions">
+                        <button class="btn btn-outline-primary btn-sm w-100 mb-2" type="button" onclick="QuoteDrDepositReview.review(getCurrentQuoteDataForPortal(), true)">Choose / review deposit for this quote</button>
                         <button class="btn btn-outline-secondary btn-sm w-100" type="button" data-bs-toggle="collapse" data-bs-target="#profitReport" aria-expanded="false">
                             <i class="fas fa-chart-line me-1"></i> View Profit Report
                         </button>
@@ -4410,6 +4411,7 @@ Example:
     <script src="quote-pdf-export.js?v=2026091601"></script>
     <script src="quote-payable-total.js?v=2026081801"></script>
     <script src="quote-portal-readiness.js?v=2026091502"></script>
+    <script src="quote-deposit-review.js?v=2026091602"></script>
     <script src="change-order-scope.js?v=2026082701"></script>
     <script src="app-broadcasts.js?v=1779131000"></script>
     <script src="quote-template-files.js?v=1778012600"></script>
@@ -18099,6 +18101,7 @@ Example:
         }
 
         async function confirmQuotePortalZeroPricedItems(quoteData) {
+            if (!window.QuoteDrDepositReview || !await window.QuoteDrDepositReview.review(quoteData)) return false;
             if (!window.QuoteDrPortalReadiness || typeof window.QuoteDrPortalReadiness.confirmZeroPricedItems !== 'function') {
                 var unavailableMessage = 'The zero-price safety check is unavailable. Refresh QuoteDr and try again before adding this quote to the portal.';
                 if (typeof qdAlert === 'function') await qdAlert(unavailableMessage, { title: 'Safety Check Unavailable', type: 'warning' });
@@ -23706,7 +23709,7 @@ Example:
     <script src="quote-contact-property-lookup.js?v=2026080301"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
     <script src="ikea-quote.js?v=1778059000"></script>
-<script src="quote-style.js?v=2026091601"></script>
+<script src="quote-style.js?v=2026091603"></script>
 
     <!-- Quote Style Modal -->
     <div class="modal fade" id="quoteStyleModal" tabindex="-1">

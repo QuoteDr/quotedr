@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 132,
-  "totalBytes": 27733825,
-  "treeSha256": "4b07dab8cf98e37691db45c970e74f74bdec26f9917efe3c1ccd8fd22021f3c2",
+  "fileCount": 133,
+  "totalBytes": 27746431,
+  "treeSha256": "c6a2a73b7947ce4278b87c11786faa9fdac1646810e715e0502fb2da41ce6c6e",
   "files": [
     {
       "path": "404.html",
@@ -172,8 +172,8 @@
     },
     {
       "path": "dashboard.html",
-      "bytes": 414072,
-      "sha256": "cf7049bc9c792471171bd51d1c7fd6ab285af54361a25133f6e4ab47bbb49bae"
+      "bytes": 414372,
+      "sha256": "016346623edbbda073560d967813fec9d15acd504a2c9aa656702aecb4196db5"
     },
     {
       "path": "data/whats-new.json",
@@ -367,8 +367,8 @@
     },
     {
       "path": "qdr-handbook.json",
-      "bytes": 17111,
-      "sha256": "a13f47b2e79b3415575cdcaa69168ba95577c55ebfe06d0bff1d53f6491a4280"
+      "bytes": 19207,
+      "sha256": "280639b6d1a1c040ec4b78f4e9ac4973a39601ee75c1a736f8cfcac99dd472f7"
     },
     {
       "path": "quickbooks-import-controller.js",
@@ -387,8 +387,8 @@
     },
     {
       "path": "quote-builder.html",
-      "bytes": 1524272,
-      "sha256": "bff79fd162f06e00c74038143e8eb25b02193bbad75442b3f21bf79c0d928522"
+      "bytes": 1524673,
+      "sha256": "17b8f56584aef1ac476861e25ee869ea2418361b12c389dbccd947b9beba20cf"
     },
     {
       "path": "quote-calculators.js",
@@ -409,6 +409,11 @@
       "path": "quote-contact-property-lookup.js",
       "bytes": 13764,
       "sha256": "2977ee7e2344b23a0a22759a0724fea6e7509f07dd28ca4cccc1a76e367d25ff"
+    },
+    {
+      "path": "quote-deposit-review.js",
+      "bytes": 7908,
+      "sha256": "d37c5fc09019af4ca70e46ec85142afb797e6b8ef52f06bd9e905199f33f7136"
     },
     {
       "path": "quote-design-review.js",
@@ -492,8 +497,8 @@
     },
     {
       "path": "quote-style.js",
-      "bytes": 102518,
-      "sha256": "7b4631ee85344f4e907ad942d64b030b6691e01d08a685cd8c5827bb6fdd150c"
+      "bytes": 103503,
+      "sha256": "d6694e0f23b1e0e36fa6ea13c5ee7e70ca0ac772099134e9b2660cf780ad253a"
     },
     {
       "path": "quote-template-files.js",
@@ -527,8 +532,8 @@
     },
     {
       "path": "settings.html",
-      "bytes": 378386,
-      "sha256": "59564986ca44a5b9cefa2dcd886369e5b726bc8344a5095ab7289f7d38f41fa5"
+      "bytes": 379302,
+      "sha256": "7d9cdf13fdc2600cc8ec324774088dea55857d5d069b4826c8e53118e4df14bb"
     },
     {
       "path": "signup-gate.css",

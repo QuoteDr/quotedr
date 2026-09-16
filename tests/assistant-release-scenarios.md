@@ -24,3 +24,14 @@ Ask whether an expired quote can be sent, whether six versus seven days warns, w
 # PDF export regression
 
 Ask "Can I export a copy for my records with margins?", then "Will my client see those costs?" Require File > Export as PDF > My records (internal) > Include profit report, entitlement requirement, and client-safe defaults. Ask "Is that my net profit?" and require before labour and overhead, not net profit. Ask "It expired before printing" and require restarting from the builder, not sharing a private URL. Ask "Can I restore my quote from that PDF?" and distinguish a readable record from a JSON/folder recovery backup. Verify authenticated responses after release; retrieval tests alone are not answer-quality verification.
+# Deposit review release cases (2026-09-16.2)
+
+- "Can it ask whether I want a down payment for each job?" Explain Settings > Payments > Ask me for each quote; distinguish deposits from card payments.
+- Follow-up: "What about resending?" Explain the saved quote choice, unchanged already-shared terms, and a fresh review for Dashboard revisions.
+- "I pressed Cancel and nothing sent." Correct: review cancellation blocks sharing and applies no choice. Do not claim a payment was taken or a message sent.
+- "Do I need Stripe for this?" No for manual payment methods; do not imply card processing works without Stripe.
+- "Does saving my default 50% answer it for every quote?" No; defaults are suggestions, and cloud-save success is separate from choosing in the dialog.
+# PDF card review regression (2026-09-16.3)
+
+- "Why am I asked about Stripe when exporting a PDF for myself?" Explain the corrected PDF path skips Card Payment Review for both audiences. Do not tell the user to turn off their account payment prompts.
+- Follow-up: "Will it still ask when I share the interactive quote?" Yes, the configured sharing review remains. Export does not mark an unanswered choice reviewed or change it to No card payment.

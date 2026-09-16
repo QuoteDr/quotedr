@@ -1,0 +1,31 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const api = require('../quote-deposit-review.js');
+const ask = {deposit_ask_each_quote:true};
+assert.equal(api.needsReview({}, ask), true);
+assert.equal(api.needsReview({}, {}), false);
+assert.equal(api.needsReview({type:'invoice'}, ask), false);
+assert.equal(api.needsReview({type:'change_order'}, ask), false);
+assert.equal(api.needsReview({portal_visible:true}, ask), false);
+assert.equal(api.needsReview({style:{depositMode:'show'}}, ask), true, 'saved defaults cannot answer for a quote');
+let quote = {grandTotal:123.45};
+api.applyChoice(quote,{mode:'show',kind:'percent',amount:25});
+assert.equal(quote.deposit_due_cents,3086);
+assert.equal(api.needsReview(JSON.parse(JSON.stringify(quote)), ask),false);
+assert.equal(api.needsReview({...quote,quoteNumber:'NEW-QUOTE'}, ask),true,'a copied choice cannot answer for a different quote');
+api.applyChoice(quote,{mode:'show',kind:'fixed',amount:999});
+assert.equal(quote.deposit_due_cents,12345,'fixed capped at total');
+api.applyChoice(quote,{mode:'hide'});
+assert.equal(quote.deposit_due_cents,0);
+assert.equal(quote.payment_terms.deposit_required,false);
+for (const amount of [0,-1,101,Infinity,'bad']) assert.throws(()=>api.applyChoice({}, {mode:'show',kind:'percent',amount}));
+assert.throws(()=>api.applyChoice({}, {mode:''}));
+for (const file of ['quote-builder.html','dashboard.html']) {
+ const source=fs.readFileSync(file,'utf8');
+ assert(source.includes('quote-deposit-review.js'));
+ assert(source.includes('await window.QuoteDrDepositReview.review('));
+}
+const style=fs.readFileSync('quote-style.js','utf8');
+assert(style.includes('delete defaults.depositReviewed'));
+assert(style.includes('_quoteStyle.depositReviewed = incomingStyle.depositReviewed === true'));
+console.log('Deposit review policy, validation, serialization, defaults and send wiring passed');

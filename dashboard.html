@@ -511,6 +511,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="quote-dialogs.js?v=2026082001"></script>
     <script src="quote-portal-readiness.js?v=2026091502"></script>
+    <script src="quote-deposit-review.js?v=2026091602"></script>
     <script src="quote-discounts.js"></script>
     <script src="quote-profit-report.js"></script>
     <script src="portal-activity-visits.js"></script>
@@ -1933,6 +1934,7 @@
                 data.savedAt = now;
                 data.supabaseId = null;
                 data.revisionOf = quote.id;
+                data.style = Object.assign({}, data.style, { depositReviewed: false });
                 data.revisionCreatedAt = now;
                 if (!window.QuoteDrDocumentNumbers) throw new Error('Document numbering is unavailable. Reload QuoteDr and try again.');
                 var revisionReservation = await QuoteDrDocumentNumbers.reserve('revision', {
@@ -2914,6 +2916,7 @@
         }
 
         async function confirmDashboardPortalZeroPricedItems(quote) {
+            if (!window.QuoteDrDepositReview || !await window.QuoteDrDepositReview.review(quote && quote.data ? quote.data : quote)) return false;
             if (!window.QuoteDrPortalReadiness || typeof window.QuoteDrPortalReadiness.confirmZeroPricedItems !== 'function') {
                 var unavailableMessage = 'The zero-price safety check is unavailable. Refresh QuoteDr and try again before adding this document to the portal.';
                 if (typeof qdAlert === 'function') await qdAlert(unavailableMessage, { title: 'Safety Check Unavailable', type: 'warning' });

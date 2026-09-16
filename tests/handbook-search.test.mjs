@@ -4,6 +4,11 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Does exporting a PDF ask me about card payment?','pdf-client-and-internal-records'],
+ ['Will a PDF export answer my Stripe payment review?','pdf-client-and-internal-records'],
+ ['Ask me for each quote whether to request a deposit','deposit-choice-per-quote'],
+ ['Choose no deposit before sending from the dashboard','deposit-choice-per-quote'],
+ ['I cancelled the deposit dialog why did the quote not send?','deposit-choice-per-quote'],
  ['Export PDF for my records with profit report','pdf-client-and-internal-records'],
  ['Does the client PDF include my margin and material costs?','pdf-client-and-internal-records'],
  ['Internal export expired how do I retry?','pdf-client-and-internal-records'],
@@ -25,6 +30,7 @@ const cases=[
 ];
 for(const [q,id] of cases) assert(searchHandbook(book,q).some(a=>a.id===id),q);
 assert(searchHandbook(book,'Can I do all of them?','highlight several items').some(a=>a.id==='bulk-editing-and-highlight-colours'));
+assert(searchHandbook(book,'Will it ask again when I resend?','deposit choice for each quote').some(a=>a.id==='deposit-choice-per-quote'));
 assert.equal(searchHandbook(book,'quantum banana telescope').length,0);
 assert(!validHandbook({...book,articles:[{id:'<script>'}]}));
 assert(!validHandbook({...book,articles:[book.articles[0],book.articles[0]]}));

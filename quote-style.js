@@ -741,6 +741,8 @@
             syncQuoteStyleGlobal();
             try {
                 var defaults = Object.assign({}, _quoteStyle, {expiryStartedAt:''});
+                delete defaults.depositReviewed;
+                delete defaults.depositReviewedFor;
                 if (defaults.expiryMode === 'automatic') defaults.expiryDate = '';
                 localStorage.setItem('ald_quote_send_style', JSON.stringify(defaults));
                 await saveQuoteStyleDefaultsToCloud(defaults);
@@ -818,6 +820,7 @@
         function applyQuoteStyleToControls(style) {
             var incomingStyle = style || {};
             _quoteStyle = Object.assign({}, _quoteStyle, incomingStyle);
+            _quoteStyle.depositReviewed = incomingStyle.depositReviewed === true;
             if (!Object.prototype.hasOwnProperty.call(incomingStyle, 'accentStrength')) _quoteStyle.accentStrength = 100;
             if (!Object.prototype.hasOwnProperty.call(incomingStyle, 'optionAccentStrength')) _quoteStyle.optionAccentStrength = 100;
             if (!isFinite(parseInt(_quoteStyle.accentStrength, 10))) _quoteStyle.accentStrength = 100;
@@ -1166,6 +1169,7 @@
             var savedDefault = await loadQuoteStyleDefaults();
             if (Object.prototype.hasOwnProperty.call(savedDefault, 'expiryDate') && !savedDefault.expiryMode) savedDefault.expiryMode = savedDefault.expiryDate ? 'fixed' : 'none';
             var activeStyle = getActiveQuoteStyleForSend();
+            savedDefault.depositReviewed = false;
             initQuoteStyleColourPickers();
             applyQuoteStyleToControls(Object.assign({}, savedDefault, activeStyle));
             ['quoteExpiryMode','quoteExpiryDurationDays'].forEach(function(id) {
@@ -1229,6 +1233,13 @@
                     el.addEventListener('change', updateStylePreview);
                     if (id === 'quoteDepositMode' || id === 'quoteDepositKind') {
                         el.addEventListener('change', updateQuoteDepositTermControls);
+                    }
+                    if (id === 'quoteDepositMode') {
+                        el.addEventListener('change', function() {
+                            _quoteStyle.depositReviewed = ['show', 'hide'].includes(el.value);
+                            _quoteStyle.depositReviewedFor = window.QuoteDrDepositReview ? window.QuoteDrDepositReview.quoteKey(collectQuoteData()) : '';
+                            syncQuoteStyleGlobal();
+                        });
                     }
                     if (id === 'quoteExpiryDate') {
                         el.addEventListener('input', updateQuoteExpiryPresetButtons);
@@ -1544,7 +1555,8 @@
         window.updateQuoteDepositTermControls = updateQuoteDepositTermControls;
         window.buildQuotePaymentTerms = buildQuotePaymentTerms;
 
-        async function saveQuoteForPortalSharing() {
+        async function saveQuoteForPortalSharing(options) {
+            options = options || {};
             _quoteStyle = readQuoteStyleFromControls();
             syncQuoteStyleGlobal();
             if (_quoteStyle.depositMode === 'show' && _quoteStyle.depositKind === 'fixed' && Number(_quoteStyle.depositFixedCents || 0) <= 0) {
@@ -1567,7 +1579,9 @@
                     throw reasonError;
                 }
             }
-            if (typeof reviewDocumentCardPaymentRules === 'function') {
+            // PDF output does not offer interactive checkout. Do not review or
+            // resolve the document's card-payment choice just to print it.
+            if (options.pdfExport !== true && typeof reviewDocumentCardPaymentRules === 'function') {
                 var cardPaymentReview = await reviewDocumentCardPaymentRules('quote', quoteData);
                 if (!cardPaymentReview) {
                     var cardPaymentCancelled = new Error('Card payment review cancelled.');
@@ -1617,8 +1631,8 @@
 
         // Kept as an internal compatibility wrapper for contractor preview code.
         // It no longer creates or returns a public standalone document token.
-        async function createInteractiveQuoteLink() {
-            return getQuoteAdminPreviewUrl(await saveQuoteForPortalSharing());
+        async function createInteractiveQuoteLink(options) {
+            return getQuoteAdminPreviewUrl(await saveQuoteForPortalSharing(options));
         }
 
         async function previewInteractiveQuote(options) {
@@ -1633,7 +1647,7 @@
             if (saveStatus) saveStatus.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-spinner fa-spin"></i> Preparing preview...</span>';
             try {
                 await initStyleModal();
-                var viewerUrl = await createInteractiveQuoteLink();
+                var viewerUrl = await createInteractiveQuoteLink({ pdfExport: options.print === true });
                 var previewUrl = new URL(viewerUrl, window.location.href);
                 previewUrl.searchParams.set('preview', '1');
                 previewUrl.searchParams.set('admin_preview', '1');

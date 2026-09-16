@@ -107,6 +107,7 @@ export const publicArtifactConfig = Object.freeze({
     'quote-media.js',
     'quote-payable-total.js',
     'quote-portal-readiness.js',
+    'quote-deposit-review.js',
     'quote-review-construction-knowledge.js',
     'quote-spellcheck.js',
     'quote-starter-item-library.js',
