@@ -14,7 +14,7 @@ assert(quoteStyle.includes('function clearQuoteExpiry'), 'quote style module sho
 assert(quoteStyle.includes("expiryEl.value = ''"), 'clear quote expiry should blank the date input');
 assert(quoteStyle.includes('function updateQuoteExpiryPresetButtons'), 'quote style module should centralize expiry preset active states');
 assert(quoteStyle.includes("btn.getAttribute('data-no-expiry') === 'true'"), 'expiry preset state should recognize the no-expiry button');
-assert(quoteStyle.includes("btn.classList.toggle('active', !expiryValue)"), 'no-expiry button should become active when expiry date is blank');
+assert(quoteStyle.includes("btn.classList.toggle('active', mode === 'none')"), 'no-expiry button should follow the explicit no-expiry mode');
 assert(quoteStyle.includes('window.clearQuoteExpiry = clearQuoteExpiry'), 'clear quote expiry helper should be callable from the modal button');
 
 console.log('quote expiry disable static test passed');

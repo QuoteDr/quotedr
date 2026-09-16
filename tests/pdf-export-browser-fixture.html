@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"><title>QDR PDF synthetic release check</title><style>body{font:16px Arial;max-width:1050px;margin:35px auto}button{padding:12px;margin:8px}article{padding:14px;border:1px solid #ddd;margin:12px 0}dialog label{display:inline-block;padding:10px}#result{padding:20px;background:#eef5ff}</style></head><body>
+<h1>Synthetic quote — no customer records</h1><button id="export">Export as PDF</button><button onclick="window.print()">Print synthetic record</button><div id="result">Ready</div>
+<section><h2>Sample client quote</h2><p>Quote QA-001 · Status: draft</p><p>Installation services: $1,200.00</p></section>
+<script src="/quote-discounts.js"></script><script src="/quote-profit-report.js"></script><script src="/quote-pdf-export.js"></script>
+<script>
+document.getElementById('export').onclick=async()=>{
+ const choice=await QuoteDrPdfExport.choose();
+ if(!choice){document.getElementById('result').textContent='Cancelled — no export';return;}
+ document.querySelectorAll('.qdr-internal-label,.qdr-internal-appendix').forEach(e=>e.remove());
+ document.title='QDR PDF synthetic release check';
+ if(choice.internal){
+  const url=new URL('/interactive-quote-viewer?id=synthetic&admin_preview=1&print=1',location.href);
+  const data={quoteNumber:'QA-001',quoteTitle:'Synthetic installation',status:'draft',grandTotal:1200,rooms:[{name:'Test room',items:Array.from({length:12},(_,i)=>({description:'Installation line '+(i+1),quantity:1,rate:100,total:100,materialCost:i===0?0:20,itemDescription:'Synthetic work description for print layout verification. No customer data is used.'}))}]};
+  QuoteDrPdfExport.stage(data,url,choice.profit); QuoteDrPdfExport.mount(QuoteDrPdfExport.consume(url));
+ }
+ document.getElementById('result').textContent=choice.internal?'Internal record ready; profit '+choice.profit:'Client record ready; no private appendix';
+};
+</script></body></html>

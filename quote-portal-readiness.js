@@ -75,36 +75,74 @@
     }
 
     async function confirmZeroPricedItems(documentData, confirmFn) {
-        var expiryMessage = expiryWarningMessage(documentData);
+        var candidate = prepareExpiry(documentData);
+        var expiryMessage = expiryWarningMessage(candidate);
+        var remaining = expiryDays(candidate);
+        if (remaining !== null && (!Number.isFinite(remaining) || remaining < 0)) {
+            if (typeof confirmFn === 'function') await confirmFn('This quote cannot be sent with an expired or invalid expiry date. Open Send Quote Settings and update or renew its expiry first.', {title:'Update Quote Expiry',okText:'Go Back & Update',cancelText:'Cancel',type:'warning'});
+            return false;
+        }
         if (expiryMessage && (typeof confirmFn !== 'function' || !await confirmFn(expiryMessage, {
             title:'Check Quote Expiry',okText:'Send Anyway',cancelText:'Go Back & Review',type:'warning'
         }))) return false;
         var findings = findZeroPricedItems(documentData);
-        if (!findings.length) return true;
+        if (!findings.length) { documentData.style = candidate.style; return true; }
         if (typeof confirmFn !== 'function') return false;
-        return !!(await confirmFn(zeroPriceWarningMessage(findings), {
+        var accepted = !!(await confirmFn(zeroPriceWarningMessage(findings), {
             title: 'Zero-Priced Items Found',
             okText: 'Send Anyway',
             cancelText: 'Go Back & Review',
             okClass: 'btn-danger',
             type: 'warning'
         }, findings));
+        if (accepted) documentData.style = candidate.style;
+        return accepted;
+    }
+
+    function prepareExpiry(data, now) {
+        var result = Object.assign({}, data);
+        result.style = Object.assign({}, data && data.style);
+        var style = result.style;
+        if (!documentIsChangeOrder(result) && result.type !== 'invoice' && style.expiryMode === 'automatic' && !style.expiryStartedAt) {
+            var days = Number(style.expiryDurationDays);
+            if (Number.isInteger(days) && days >= 1 && days <= 365) {
+                var date = new Date(now || new Date());
+                style.expiryStartedAt = date.toISOString();
+                date.setDate(date.getDate() + days);
+                style.expiryDate = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
+            } else style.expiryDate = 'invalid';
+        }
+        return result;
+    }
+
+    function expiryDays(data, now) {
+        data = data || {};
+        if (documentIsChangeOrder(data) || data.type === 'invoice') return null;
+        var style = data.style || {};
+        if (style.expiryMode === 'none') return null;
+        var raw = style.expiryDate || data.valid_until || data.validUntil || data.validUntilDate;
+        if (!raw) return null;
+        var match = String(raw).match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/);
+        if (!match) return NaN;
+        var date = new Date(Date.UTC(+match[1],+match[2]-1,+match[3]));
+        if (date.getUTCFullYear() !== +match[1] || date.getUTCMonth() !== +match[2]-1 || date.getUTCDate() !== +match[3]) return NaN;
+        var today = now || new Date();
+        return Math.round((date.getTime()-Date.UTC(today.getFullYear(),today.getMonth(),today.getDate()))/86400000);
     }
 
     function expiryWarningMessage(data, now) {
         data=data || {};
         if (documentIsChangeOrder(data) || data.type === 'invoice') return '';
-        var raw=(data.style || {}).expiryDate || data.valid_until || data.validUntil || data.validUntilDate;
-        if (!raw) return '';
-        var match=String(raw).match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (!match) return 'The quote expiry date could not be checked. Review it before sending.';
-        var today=now || new Date();
-        var days=Math.round((Date.UTC(+match[1],+match[2]-1,+match[3])-Date.UTC(today.getFullYear(),today.getMonth(),today.getDate()))/86400000);
+        var days=expiryDays(data, now);
+        if (days === null) return '';
+        if (!Number.isFinite(days)) return 'The quote expiry date could not be checked. Review it before sending.';
         if (days >= 7) return '';
         return (days < 0 ? 'This quote has already expired.' : days === 0 ? 'This quote expires today.' : 'This quote expires in '+days+' day'+(days===1?'':'s')+'.')+' Review the expiry date before sending, or continue only if this is intentional.';
     }
 
     return {
+        prepareExpiry: prepareExpiry,
+        expiryDays: expiryDays,
         expiryWarningMessage: expiryWarningMessage,
         itemIsIncluded: itemIsIncluded,
         itemIsPriceTbd: itemIsPriceTbd,

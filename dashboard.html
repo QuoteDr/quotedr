@@ -510,7 +510,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="quote-dialogs.js?v=2026082001"></script>
-    <script src="quote-portal-readiness.js?v=2026091501"></script>
+    <script src="quote-portal-readiness.js?v=2026091502"></script>
     <script src="quote-discounts.js"></script>
     <script src="quote-profit-report.js"></script>
     <script src="portal-activity-visits.js"></script>
@@ -3765,6 +3765,10 @@
 
         async function shareClientPortal(quoteId, clientName, savedEmail, options) {
             options = options || {};
+            var expiryTarget = (allQuotes || []).find(function(row) { return row.id === quoteId; });
+            if (!expiryTarget) return;
+            expiryTarget = await loadDashboardFullQuote(expiryTarget);
+            if (!await confirmDashboardPortalZeroPricedItems(expiryTarget)) return;
             // Dismiss any stale Bootstrap backdrop before opening
             document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
             document.body.classList.remove('modal-open');
@@ -4169,6 +4173,8 @@
             options = options || {};
             var quote = allQuotes.find(function(q) { return q.id === quoteId; });
             if (!quote) return;
+            quote = await loadDashboardFullQuote(quote);
+            if (!await confirmDashboardPortalZeroPricedItems(quote)) return;
             var clientEmail = options.skipPrompt
                 ? String(options.email || savedEmail || '').trim()
                 : await qdPrompt('Email the client portal follow-up to:', savedEmail || '', { title: 'Email Portal Follow-Up' });
@@ -6098,6 +6104,7 @@ function renderBusinessInsights(quotes) {
 
             try {
                 var result = await saveQuoteToSupabase({
+                    expiryDefaultsPending: true,
                     clientName: clientName,
                     clientEmail: clientEmail,
                     clientPhone: clientPhone,
@@ -6112,7 +6119,7 @@ function renderBusinessInsights(quotes) {
                     rooms: [],
                     grandTotal: 0,
                     status: 'draft',
-                    data: { clientName: clientName, clientEmail: clientEmail, clientPhone: clientPhone, clientId: clientDraft.id || '', clientNumber: clientDraft.clientNumber || null, projectAddress: address, quoteNumber: quoteNum, quoteTitle: quoteTitle, title: quoteTitle, dividerSingular: dividerLabels.singular, dividerPlural: dividerLabels.plural, quoteDividerLabels: { singular: dividerLabels.singular, plural: dividerLabels.plural }, rooms: [] }
+                    data: { expiryDefaultsPending: true, clientName: clientName, clientEmail: clientEmail, clientPhone: clientPhone, clientId: clientDraft.id || '', clientNumber: clientDraft.clientNumber || null, projectAddress: address, quoteNumber: quoteNum, quoteTitle: quoteTitle, title: quoteTitle, dividerSingular: dividerLabels.singular, dividerPlural: dividerLabels.plural, quoteDividerLabels: { singular: dividerLabels.singular, plural: dividerLabels.plural }, rooms: [] }
                 });
 
                 if (result.error) throw new Error(result.error.message || 'Save failed');

@@ -25,6 +25,9 @@
             depositFixedCents: 0,
             approvalMode: 'approve_or_changes',
             expiryDate: '',
+            expiryMode: 'automatic',
+            expiryDurationDays: 30,
+            expiryStartedAt: '',
             showUpgrades: true,
             showScopeNotes: true,
             descriptionPreviewLength: 260,
@@ -695,16 +698,21 @@
             return y + '-' + m + '-' + d;
         }
 
-        function setQuoteExpiryPreset(days) {
-            var date = new Date();
-            date.setDate(date.getDate() + days);
+        async function setQuoteExpiryPreset(days) {
+            if (!Number.isInteger(days) || days < 1 || days > 365) { alert('Choose a duration from 1 to 365 days.'); return; }
+            document.getElementById('quoteExpiryMode').value = 'automatic';
+            document.getElementById('quoteExpiryDurationDays').value = days;
+            _quoteStyle.expiryStartedAt = '';
             var expiryEl = document.getElementById('quoteExpiryDate');
-            if (expiryEl) expiryEl.value = formatDateInput(date);
+            if (expiryEl) expiryEl.value = '';
             updateQuoteExpiryPresetButtons();
             updateStylePreview();
+            if (typeof qdConfirm === 'function' && await qdConfirm('Use ' + days + ' days from first client sharing for future quotes too?', {title:'Default Quote Validity',okText:'Save as Default',cancelText:'This Quote Only'})) await saveQuoteStyleDefaults(true);
         }
 
         function clearQuoteExpiry() {
+            document.getElementById('quoteExpiryMode').value = 'none';
+            _quoteStyle.expiryStartedAt = '';
             var expiryEl = document.getElementById('quoteExpiryDate');
             if (expiryEl) expiryEl.value = '';
             updateQuoteExpiryPresetButtons();
@@ -713,14 +721,18 @@
 
         function updateQuoteExpiryPresetButtons() {
             var expiryValue = document.getElementById('quoteExpiryDate')?.value || '';
+            var mode = document.getElementById('quoteExpiryMode')?.value || 'fixed';
+            var duration = Number(document.getElementById('quoteExpiryDurationDays')?.value);
+            var dateEl = document.getElementById('quoteExpiryDate');
+            if (dateEl) dateEl.disabled = mode !== 'fixed';
             document.querySelectorAll('.expiry-preset-btn').forEach(function(btn) {
                 if (btn.getAttribute('data-no-expiry') === 'true') {
-                    btn.classList.toggle('active', !expiryValue);
+                    btn.classList.toggle('active', mode === 'none');
                     return;
                 }
                 var date = new Date();
                 date.setDate(date.getDate() + parseInt(btn.dataset.days, 10));
-                btn.classList.toggle('active', expiryValue === formatDateInput(date));
+                btn.classList.toggle('active', mode === 'automatic' && duration === Number(btn.dataset.days));
             });
         }
 
@@ -728,8 +740,10 @@
             _quoteStyle = readQuoteStyleFromControls();
             syncQuoteStyleGlobal();
             try {
-                localStorage.setItem('ald_quote_send_style', JSON.stringify(_quoteStyle));
-                await saveQuoteStyleDefaultsToCloud(_quoteStyle);
+                var defaults = Object.assign({}, _quoteStyle, {expiryStartedAt:''});
+                if (defaults.expiryMode === 'automatic') defaults.expiryDate = '';
+                localStorage.setItem('ald_quote_send_style', JSON.stringify(defaults));
+                await saveQuoteStyleDefaultsToCloud(defaults);
                 if (showToast !== false) {
                     var saveStatus = document.getElementById('saveStatus');
                     if (saveStatus) saveStatus.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> Quote send defaults saved</span>';
@@ -771,6 +785,9 @@
             style.depositFixedCents = Math.max(0, Math.round((isFinite(depositFixedAmount) ? depositFixedAmount : 0) * 100));
             style.approvalMode = document.getElementById('quoteApprovalMode')?.value || style.approvalMode;
             style.expiryDate = document.getElementById('quoteExpiryDate')?.value || '';
+            style.expiryMode = document.getElementById('quoteExpiryMode')?.value || 'fixed';
+            style.expiryDurationDays = Number(document.getElementById('quoteExpiryDurationDays')?.value || 30);
+            if (style.expiryMode === 'none') style.expiryDate = '';
             style.showUpgrades = document.getElementById('quoteShowUpgrades')?.checked !== false;
             style.showScopeNotes = document.getElementById('quoteShowScopeNotes')?.checked !== false;
             style.descriptionPreviewLength = normalizeDescriptionPreviewLength(document.getElementById('quoteDescriptionPreviewLength')?.value || style.descriptionPreviewLength);
@@ -840,6 +857,8 @@
             updateQuoteDepositTermControls();
             setFieldValue('quoteApprovalMode', _quoteStyle.approvalMode);
             setFieldValue('quoteExpiryDate', _quoteStyle.expiryDate);
+            setFieldValue('quoteExpiryMode', _quoteStyle.expiryMode || (_quoteStyle.expiryDate ? 'fixed' : 'none'));
+            setFieldValue('quoteExpiryDurationDays', _quoteStyle.expiryDurationDays || 30);
             setFieldValue('quoteShowUpgrades', _quoteStyle.showUpgrades);
             setFieldValue('quoteShowScopeNotes', _quoteStyle.showScopeNotes);
             setFieldValue('quoteDescriptionPreviewLength', _quoteStyle.descriptionPreviewLength);
@@ -1126,7 +1145,6 @@
 
         function getActiveQuoteStyleForSend() {
             var docType = window._quoteDocumentType || window._currentQuoteData?.documentType || window._currentQuoteData?.type || window._loadedQuoteData?.documentType || window._loadedQuoteData?.type || '';
-            if (docType !== 'change_order') return {};
             var candidates = [
                 window._currentQuoteData && window._currentQuoteData.style,
                 window._loadedQuoteData && window._loadedQuoteData.style
@@ -1134,17 +1152,33 @@
             for (var i = 0; i < candidates.length; i++) {
                 var style = candidates[i];
                 if (style && typeof style === 'object' && Object.keys(style).length) {
-                    try { return JSON.parse(JSON.stringify(style)); } catch(e) { return Object.assign({}, style); }
+                    var copy = JSON.parse(JSON.stringify(style));
+                    if (!copy.expiryMode) copy.expiryMode = copy.expiryDate ? 'fixed' : 'none';
+                    return copy;
                 }
             }
+            var existing = window._currentQuoteData || window._loadedQuoteData;
+            if (existing && !existing.expiryDefaultsPending && (existing.supabaseId || existing.id || existing.valid_until || existing.validUntil || existing.validUntilDate)) return {expiryMode:(existing.valid_until || existing.validUntil || existing.validUntilDate) ? 'fixed' : 'none',expiryDate:existing.valid_until || existing.validUntil || existing.validUntilDate || '',expiryStartedAt:''};
             return {};
         }
 
         async function initStyleModal() {
             var savedDefault = await loadQuoteStyleDefaults();
+            if (Object.prototype.hasOwnProperty.call(savedDefault, 'expiryDate') && !savedDefault.expiryMode) savedDefault.expiryMode = savedDefault.expiryDate ? 'fixed' : 'none';
             var activeStyle = getActiveQuoteStyleForSend();
             initQuoteStyleColourPickers();
             applyQuoteStyleToControls(Object.assign({}, savedDefault, activeStyle));
+            ['quoteExpiryMode','quoteExpiryDurationDays'].forEach(function(id) {
+                var control = document.getElementById(id);
+                if (!control || control.dataset.expiryBound) return;
+                control.addEventListener('change', function() {
+                    _quoteStyle.expiryStartedAt = '';
+                    if (document.getElementById('quoteExpiryMode').value === 'automatic') document.getElementById('quoteExpiryDate').value = '';
+                    updateQuoteExpiryPresetButtons();
+                    updateStylePreview();
+                });
+                control.dataset.expiryBound = '1';
+            });
             if (typeof loadDocumentCardPaymentControl === 'function') loadDocumentCardPaymentControl('quote');
             initCommitmentIconPickers();
 
@@ -1604,6 +1638,9 @@
                 previewUrl.searchParams.set('preview', '1');
                 previewUrl.searchParams.set('admin_preview', '1');
                 if (options.print === true) previewUrl.searchParams.set('print', '1');
+                if (options.print === true && options.internal === true) {
+                    window.QuoteDrPdfExport.stage(window._currentQuoteData, previewUrl, options.profit === true);
+                }
                 if (typeof saveSessionQuote === 'function') saveSessionQuote();
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:green;"><i class="fas fa-check"></i> Opening preview...</span>';
                 if (typeof qdToast === 'function') {

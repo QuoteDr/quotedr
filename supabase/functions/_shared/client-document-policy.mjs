@@ -59,6 +59,7 @@ const STYLE_SAFE_KEYS = new Set([
   'upgradeAccent', 'upgradeBg', 'bg', 'bgOpacity', 'headerStyle', 'headerEffect',
   'headerOpacity', 'fontFeel', 'pricingMode', 'depositMode', 'depositKind',
   'depositPercent', 'depositFixedCents', 'approvalMode', 'expiryDate', 'showUpgrades',
+  'expiryMode', 'expiryDurationDays', 'expiryStartedAt',
   'showScopeNotes', 'descriptionPreviewLength', 'scopePreviewLength',
   'alwaysShowFullDescriptions', 'showCommitment', 'clientMessage'
 ]);
@@ -569,7 +570,7 @@ export function sanitizeClientDocumentStyle(style) {
   const output = {};
   const numericKeys = new Set([
     'accentStrength', 'optionAccentStrength', 'bgOpacity', 'headerOpacity',
-    'depositPercent', 'depositFixedCents', 'descriptionPreviewLength', 'scopePreviewLength'
+    'depositPercent', 'depositFixedCents', 'descriptionPreviewLength', 'scopePreviewLength', 'expiryDurationDays'
   ]);
   const booleanKeys = new Set(['showUpgrades', 'showScopeNotes', 'alwaysShowFullDescriptions', 'showCommitment']);
   for (const key of STYLE_SAFE_KEYS) {

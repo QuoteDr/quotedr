@@ -6,6 +6,20 @@ async function policy() {
   return import('../supabase/functions/_shared/client-document-policy.mjs');
 }
 
+test('client expiry settings survive projection without exposing internal report data', async () => {
+  const api = await policy();
+  const source = quoteFixture();
+  source.data.style.expiryMode = 'none';
+  source.data.style.expiryDurationDays = 30;
+  source.data.style.expiryStartedAt = '';
+  source.data.style.profitReport = 'PRIVATE';
+  const projected = api.sanitizeClientDocumentRow(source);
+  assert.equal(projected.data.style.expiryMode, 'none');
+  assert.equal(projected.data.style.expiryDurationDays, 30);
+  assert.equal(projected.data.style.expiryStartedAt, '');
+  assert.equal(projected.data.style.profitReport, undefined);
+});
+
 function quoteFixture() {
   const data = {
     quoteNumber: 'Q-SEC-100',

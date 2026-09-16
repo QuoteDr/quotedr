@@ -17,3 +17,10 @@ Run these conversational checks against the candidate backend before calling its
 | Can QDR do an undocumented workflow? | Admit uncertainty and ask context, never infer nonexistence. |
 
 For each feature release, update the shared guide and add a scenario here. Keep UI labels verified against source. Include backup limitations and safety warnings in relevant answers. No customer data is needed for these checks.
+# Expiry regression
+
+Ask whether an expired quote can be sent, whether six versus seven days warns, whether drafting consumes automatic validity, and whether resending silently renews it. Follow up with "make that my default" and ask about an old fixed-date quote. Require exact settings, explicit renewal, cloud-save precautions, and no claim that old links are recalled.
+
+# PDF export regression
+
+Ask "Can I export a copy for my records with margins?", then "Will my client see those costs?" Require File > Export as PDF > My records (internal) > Include profit report, entitlement requirement, and client-safe defaults. Ask "Is that my net profit?" and require before labour and overhead, not net profit. Ask "It expired before printing" and require restarting from the builder, not sharing a private URL. Ask "Can I restore my quote from that PDF?" and distinguish a readable record from a JSON/folder recovery backup. Verify authenticated responses after release; retrieval tests alone are not answer-quality verification.

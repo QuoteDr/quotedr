@@ -1,0 +1,25 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const api = require('../quote-portal-readiness.js');
+const now = new Date(2026, 8, 15, 12);
+const draft = {style:{expiryMode:'automatic',expiryDurationDays:30,expiryDate:''},rooms:[]};
+const sent = api.prepareExpiry(draft,now);
+assert.equal(sent.style.expiryDate,'2026-10-15');
+assert.equal(draft.style.expiryDate,'');
+assert.equal(api.prepareExpiry(sent,new Date(2026,9,1)).style.expiryDate,'2026-10-15');
+assert.equal(api.prepareExpiry({style:{expiryDate:'2026-09-14'}},now).style.expiryDate,'2026-09-14');
+assert.equal(api.expiryDays({style:{expiryDate:'2026-09-22'}},now),7);
+assert.equal(api.expiryDays({style:{expiryDate:'2026-09-21'}},now),6);
+assert.equal(api.expiryDays({style:{expiryDate:'2026-09-15'}},now),0);
+assert(Number.isNaN(api.expiryDays({style:{expiryDate:'2026-02-30'}},now)));
+assert.equal(api.expiryDays({style:{expiryMode:'none'},valid_until:'2000-01-01'},now),null);
+assert.equal(api.prepareExpiry({type:'invoice',...draft},now).style.expiryDate,'');
+const viewer=fs.readFileSync('interactive-quote-viewer.html','utf8');
+assert(viewer.includes('new Date(+dateParts[1], +dateParts[2]-1, +dateParts[3])'));
+(async()=>{
+ assert.equal(await api.confirmZeroPricedItems({style:{expiryDate:'2000-01-01'},rooms:[]},async()=>true),false);
+ assert.equal(await api.confirmZeroPricedItems({style:{expiryDate:'invalid'},rooms:[]},async()=>true),false);
+ assert.equal(await api.confirmZeroPricedItems(draft,async()=>true),true);
+ assert(draft.style.expiryStartedAt);
+ console.log('Send-time expiry, fixed legacy dates, resend, invalid dates, no-expiry and hard blocker passed');
+})();

@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 131,
-  "totalBytes": 27715859,
-  "treeSha256": "39d0aceb22262fb178de0d642655074d95b0145f549de09f10f3fffc977de19f",
+  "fileCount": 132,
+  "totalBytes": 27733825,
+  "treeSha256": "4b07dab8cf98e37691db45c970e74f74bdec26f9917efe3c1ccd8fd22021f3c2",
   "files": [
     {
       "path": "404.html",
@@ -172,8 +172,8 @@
     },
     {
       "path": "dashboard.html",
-      "bytes": 413565,
-      "sha256": "38319b20791f8349dc1c7eab001bc47b20871b2b66e6e3265c620b6e1b0f3be4"
+      "bytes": 414072,
+      "sha256": "cf7049bc9c792471171bd51d1c7fd6ab285af54361a25133f6e4ab47bbb49bae"
     },
     {
       "path": "data/whats-new.json",
@@ -257,8 +257,8 @@
     },
     {
       "path": "interactive-quote-viewer.html",
-      "bytes": 370907,
-      "sha256": "f0139e281ad3a5ac736f54c2adc0a58dce13fb7429e8696f43e8f223488183a5"
+      "bytes": 371851,
+      "sha256": "4c6254971235e6ec643c2ba223f6442c6912dbbbf559cdc95da30f2278d6c981"
     },
     {
       "path": "invoice-viewer.html",
@@ -367,8 +367,8 @@
     },
     {
       "path": "qdr-handbook.json",
-      "bytes": 13501,
-      "sha256": "ef3b2ea3aeb6d7f352538f10d33ee48fa999c5328e8f0f1a67b9f2779da2eaf5"
+      "bytes": 17111,
+      "sha256": "a13f47b2e79b3415575cdcaa69168ba95577c55ebfe06d0bff1d53f6491a4280"
     },
     {
       "path": "quickbooks-import-controller.js",
@@ -387,8 +387,8 @@
     },
     {
       "path": "quote-builder.html",
-      "bytes": 1522093,
-      "sha256": "654bea56987c334d33af2e3cadbd4a09fe8cf980238a73dda46c10948ac23108"
+      "bytes": 1524272,
+      "sha256": "bff79fd162f06e00c74038143e8eb25b02193bbad75442b3f21bf79c0d928522"
     },
     {
       "path": "quote-calculators.js",
@@ -456,9 +456,14 @@
       "sha256": "70a715fff0c8c2c781d4f1722d6d85d27220093de2e29fe516ad84c8f7864ea0"
     },
     {
+      "path": "quote-pdf-export.js",
+      "bytes": 5371,
+      "sha256": "0beeb4dfc95f310856cad09f2e41d5e4d26aaa053957b3f3d984a46ee71d3f85"
+    },
+    {
       "path": "quote-portal-readiness.js",
-      "bytes": 6193,
-      "sha256": "e897e5272dbec2d63ef937bda3b2b673d32d3a1b3d592dd49ec481a821fa7b6c"
+      "bytes": 8310,
+      "sha256": "823407bfd15a516c9302602aefa3a5b380aa0f6e52789296d34a765ee03b0471"
     },
     {
       "path": "quote-profit-report.js",
@@ -487,8 +492,8 @@
     },
     {
       "path": "quote-style.js",
-      "bytes": 99280,
-      "sha256": "74351cbc138dd9cd1ae023072a2a0a5414cfc221d2329a2c25a64474c89f765d"
+      "bytes": 102518,
+      "sha256": "7b4631ee85344f4e907ad942d64b030b6691e01d08a685cd8c5827bb6fdd150c"
     },
     {
       "path": "quote-template-files.js",

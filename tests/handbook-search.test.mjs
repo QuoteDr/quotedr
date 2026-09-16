@@ -4,6 +4,12 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Export PDF for my records with profit report','pdf-client-and-internal-records'],
+ ['Does the client PDF include my margin and material costs?','pdf-client-and-internal-records'],
+ ['Internal export expired how do I retry?','pdf-client-and-internal-records'],
+ ['Can I send an expired quote?','quote-expiry-and-send-time-validity'],
+ ['Start the 30 day validity clock when sharing not drafting','quote-expiry-and-send-time-validity'],
+ ['Will resending renew the deadline?','quote-expiry-and-send-time-validity'],
  ['I want to highlight a bunch of line items at once, can I do that?','bulk-editing-and-highlight-colours'],
  ['How do I colour several rows yellow?','bulk-editing-and-highlight-colours'],
  ['How do I back up to a folder?','saving-backups-and-recovery'],

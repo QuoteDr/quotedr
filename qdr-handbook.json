@@ -1,7 +1,23 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-15.3",
+  "version": "2026-09-16.1",
   "articles": [
+    {
+      "id": "pdf-client-and-internal-records",
+      "title": "PDF export for clients or internal records and profit reports",
+      "verifiedAt": "2026-09-16",
+      "release": "2026-09-16.1",
+      "sources": ["quote-pdf-export.js", "quote-profit-report.js", "quote-builder.html", "quote-style.js", "interactive-quote-viewer.html"],
+      "body": "File > Export as PDF asks who the PDF is for. Client is selected every time and never includes the private appendix. Choose My records (internal) to label the document INTERNAL — NOT FOR CLIENT and add export timestamp, quote number and status. Optionally tick Include profit report, which requires profit_tracking access. Continue to PDF opens the authenticated contractor preview and the browser print dialog; choose Save as PDF. Internal title suggests an INTERNAL filename, but the browser controls the final filename. The appendix starts on a new page and uses the existing private report calculations: revenue less estimated materials, before labour and overhead, not net profit. It includes per-line costs and warns about zero material estimates. Tax, payments and quote-wide adjustments are not allocated to individual lines; change-order profit is unsupported. Internal report data stays temporarily in this browser tab and is not added to client share data or sent to the client. The handoff expires after five minutes and is consumed once; if missing or expired, start export again from the builder. Normal cloud saving and authenticated preview access must succeed before export; this is not an offline PDF workflow. A PDF is a record, not an editable recovery backup: retain JSON or folder backups. Review every PDF before sharing, and never send a copy marked INTERNAL to a client. Browser print rendering and live authenticated chatbot answers still require release verification."
+    },
+    {
+      "id": "quote-expiry-and-send-time-validity",
+      "title": "Quote expiry and send-time validity",
+      "verifiedAt": "2026-09-16",
+      "release": "2026-09-16.1",
+      "sources": ["quote-style.js", "quote-portal-readiness.js", "quote-builder.html", "dashboard.html", "interactive-quote-viewer.html"],
+      "body": "In Send Quote Settings > Quote Expiry, choose Days from first client sharing, Fixed expiry date, or No expiry. New quotes without existing preferences default to 30 days; existing quote dates and saved preferences are preserved. Choose 30, 60 or 90 days, or enter 1–365 days. Preset buttons ask whether to Save as Default or use This Quote Only. Use these settings for future quotes also saves defaults. Automatic validity starts when first published to the client portal, not while drafting or previewing; publication itself makes the quote available, even before emailing. Editing or resending does not renew an already-started deadline. Renew Expiry explicitly resets the duration for the next sharing; portal-locked quotes must first follow the normal remove-from-portal editing workflow. Expired or invalid dates block quote sharing and quote email; open settings and update the date. Fewer than seven calendar days remaining, including today, warns with Send Anyway or Go Back & Review. Exactly seven days does not warn. No expiry is allowed. Invoice and Change Order expiry are not changed by this quote check. The date displays as the selected calendar day, without UTC shifting it to the previous day. Wait for cloud-save confirmation; opening settings or saving defaults is not confirmation that a client-facing change was saved. Previously distributed links cannot be recalled by a send blocker."
+    },
     {
       "id": "quote-builder-basics",
       "title": "Quote Builder basics",
