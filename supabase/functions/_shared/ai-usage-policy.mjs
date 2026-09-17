@@ -49,6 +49,14 @@ export const AI_USAGE_LIMITS = Object.freeze({
     maxInputChars: 3500,
     maxOutputTokens: 500,
   }),
+  ai_refine_guided: Object.freeze({
+    feature: 'ai_refine_guided',
+    label: 'Guided description',
+    hourlyLimit: 40,
+    dailyLimit: 200,
+    maxInputChars: 24000,
+    maxOutputTokens: 800,
+  }),
   voice_item_wizard: Object.freeze({
     feature: 'voice_item_wizard',
     label: 'AI guided pricing item',

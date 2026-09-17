@@ -34,6 +34,10 @@ const cases=[
  ['Where is AI Voice Memory?','ai-voice-to-quote'],
 ];
 for(const [q,id] of cases) assert(searchHandbook(book,q).some(a=>a.id===id),q);
+for (const q of ['Guided description follow-up questions', 'Can I skip questions and generate with what I have?', 'Guided description questions timed out are my answers lost?']) {
+ assert(searchHandbook(book,q).some(a=>a.id==='guided-description-follow-up-questions'),q);
+}
+assert(searchHandbook(book,'Can I skip those?', 'Guided description follow-up questions').some(a=>a.id==='guided-description-follow-up-questions'));
 assert(searchHandbook(book,'Can I do all of them?','highlight several items').some(a=>a.id==='bulk-editing-and-highlight-colours'));
 assert(searchHandbook(book,'Will it ask again when I resend?','deposit choice for each quote').some(a=>a.id==='deposit-choice-per-quote'));
 assert.equal(searchHandbook(book,'quantum banana telescope').length,0);

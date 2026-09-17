@@ -62,7 +62,7 @@ const refineFunction = items.slice(
 );
 assert(refineFunction.indexOf('await openAiDescriptionModeDialog') < refineFunction.indexOf("requireProFeature('ai_refine'"), 'choice should happen before the usage gate');
 assert(refineFunction.includes("if (!request.sourceText.trim()) { qdAlert('Please enter a description first.'); return; }"), 'empty refine input should retain current validation');
-assert(refineFunction.includes("body: JSON.stringify({ feature: 'ai_refine', refineMode: request.mode"), 'client should send mode in the existing usage bucket');
+assert(refineFunction.includes("body: JSON.stringify({ feature: 'ai_refine', refineMode: request.guided ? 'guided_create' : request.mode"), 'client should retain normal modes and explicitly identify guided generation');
 assert(
   /textareaEl\.closest && textareaEl\.closest\('#manageItemsModal'\)[\s\S]*markPricingDirty\(textareaEl\)/.test(refineFunction),
   'AI Refine should mark pricing dirty only inside Manage Items, not before an Add Line Item is saved'

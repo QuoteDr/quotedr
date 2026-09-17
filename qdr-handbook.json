@@ -1,7 +1,15 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-16.4",
+  "version": "2026-09-17.1",
   "articles": [
+    {
+      "id": "guided-description-follow-up-questions",
+      "title": "Guided description: AI follow-up questions from rough task notes",
+      "verifiedAt": "2026-09-17",
+      "release": "2026-09-17.1",
+      "sources": ["quote-items.js", "quote-builder.html", "supabase/functions/ai-assistant/index.ts", "supabase/functions/_shared/ai-usage-policy.mjs"],
+      "body": "AI Refine > tick Guided mode — Ask follow-up questions, then choose Describe the task to create the description. Enter rough notes and choose Create Description. Guided mode is off by default and requires signed-in AI Refine access and an internet connection. It asks up to four relevant questions at a time, each with an answer box and Skip ×; Skipped — Undo restores a skipped question. Answer or skip the current questions, then choose Ask follow-up questions for another round. Generate with what I have is always available, including with unanswered questions. The AI stops offering questions when it finds no useful missing details; it must not repeat answered or skipped topics. Skipped or blank answers remain unspecified, not promised work or exclusions. Review Preview description, then Use Description or Keep Original. Cancel or Close leaves the original unchanged; interview answers are temporary and are not a saved quote backup. Each question round and final generation uses AI usage, with guided limits of 40 requests hourly and 200 daily and a bounded input size. For a long interview, generate with the details collected rather than starting unlimited rounds. If questions fail or time out, answers remain in the open dialog; retry or generate. Check all AI wording for invented scope before applying. If the editor changes or closes meanwhile, the result cannot overwrite it. Applying a description does not itself save the line item or confirm cloud saving: finish Add Line Item or Save Changes and verify the save status. Ordinary Refine what I've written and non-guided creation remain available. Source and local tests are not proof of live AI answer quality."
+    },
     {
       "id": "highlight-explanations-cloud-recovery",
       "title": "Highlight descriptions missing after switching quotes",
@@ -77,9 +85,9 @@
     },
     {
       "id": "old-quote-import-and-writing-assistance",
-      "title": "Old quote import and writing assistance",
-      "verifiedAt": "2026-09-15",
-      "release": "6c4ba1f",
+      "title": "Old quote import and AI Refine writing assistance for notes",
+      "verifiedAt": "2026-09-17",
+      "release": "2026-09-17.1",
       "sources": [
         "quote-builder.html",
         "quote-items.js"

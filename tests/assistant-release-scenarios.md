@@ -46,3 +46,10 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Ask: "I switched quotes and my yellow and orange explanations vanished." Explain the cloud payload omission and the fix; colours and explanations are separate fields.
 - Follow up: "Will updating bring my missing text back?" No automatic reconstruction; compare the same quote's versioned backup and re-enter only recovered wording. Never overwrite newer work wholesale or clear storage.
 - Verify on a disposable quote: Apply Highlight, cloud save, switch to a quote with different explanations, return, reload. Also verify intentional clearing and legend-only display. Do not edit customer records for this check.
+# Guided description release checks (2026-09-17)
+
+- Ask how to turn "I built a deck" into a description with follow-up questions. Expect AI Refine > optional Guided mode > Describe the task, individual answers and Skip, not automatic scope additions.
+- Follow up "Can I ignore railings and finish now?" Expect Generate with what I have; skipping leaves railings unspecified, not excluded or included.
+- Ask whether Cancel saves the interview. Expect temporary answers discarded and original description unchanged, not a cloud-save promise.
+- Ask about a question timeout. Expect retry or generate from retained answers while dialog stays open; no claim that AI always finds every missing detail.
+- Authenticated runtime: test multiple rounds, skip and undo, no useful questions, failed request, Keep Original, manual edits while generation runs, and Use Description. Never use real customer records for these checks. These checks require the matching Edge Function deployment; retrieval tests alone are insufficient.

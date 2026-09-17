@@ -6097,6 +6097,85 @@
             return String(reply || '').replace(/^["']|["']$/g, '').trim();
         }
 
+        function parseGuidedDescriptionQuestions(reply, history) {
+            var parsed = JSON.parse(reply);
+            if (!parsed || !Array.isArray(parsed.questions) || parsed.questions.length > 4) throw new Error('The question list was not valid. Retry or generate with your existing details.');
+            var key = function(text) { return String(text).toLowerCase().replace(/[^a-z0-9]/g, ''); };
+            var seen = new Set((history || []).flatMap(function(q) { return [key(q.topic), key(q.question)]; }));
+            return parsed.questions.filter(function(q) {
+                if (!q || typeof q.topic !== 'string' || typeof q.question !== 'string' || !q.topic.trim() || !q.question.trim() || q.topic.length > 80 || q.question.length > 300) throw new Error('The question list was not valid. Please retry.');
+                if (seen.has(key(q.topic)) || seen.has(key(q.question))) return false;
+                seen.add(key(q.topic)); seen.add(key(q.question)); return true;
+            }).map(function(q) { return {topic:q.topic, question:q.question, answer:'', skipped:false}; });
+        }
+
+        function guidedDescriptionDetails(notes, history) {
+            return 'Task notes: ' + notes + '\nConfirmed answers (use only these and the task notes as facts):\n' +
+                JSON.stringify(history.filter(function(q) { return !q.skipped && q.answer.trim(); }).map(function(q) { return {question:q.question, answer:q.answer}; })) +
+                '\nUnspecified topics (do not infer inclusion, exclusion, or facts from these):\n' +
+                JSON.stringify(history.filter(function(q) { return q.skipped || !q.answer.trim(); }).map(function(q) { return q.question; }));
+        }
+
+        function openGuidedDescriptionDialog(notes) {
+            return new Promise(function(resolve) {
+                var el = document.createElement('div');
+                el.className = 'modal fade'; el.tabIndex = -1;
+                el.setAttribute('aria-labelledby', 'guidedDescriptionTitle');
+                el.innerHTML = '<div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 id="guidedDescriptionTitle">Guided description</h5><button class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><p>Answer what matters. Skip × leaves a detail unspecified. Each question round uses AI usage. Your original description stays unchanged until you approve the preview.</p><div role="status" aria-live="polite" data-status></div><div data-questions></div></div><div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-outline-primary" data-generate>Generate with what I have</button><button class="btn btn-primary" data-next>Ask follow-up questions</button></div></div></div>';
+                document.body.appendChild(el);
+                var modal = new bootstrap.Modal(el), history = [], result = null, closed = false, controller = null, requestId = 0;
+                var list = el.querySelector('[data-questions]'), status = el.querySelector('[data-status]'), next = el.querySelector('[data-next]');
+                function renderQuestions(batch) {
+                    batch.forEach(function(q) {
+                        history.push(q);
+                        var row = document.createElement('div'); row.className = 'border rounded p-3 my-2';
+                        var label = document.createElement('label'); label.className = 'form-label fw-semibold'; label.textContent = q.question;
+                        var input = document.createElement('textarea'); input.className = 'form-control'; input.rows = 2; input.maxLength = 1500;
+                        input.id = 'guidedAnswer' + history.length; label.htmlFor = input.id;
+                        input.addEventListener('input', function() { q.answer = input.value; });
+                        var skip = document.createElement('button'); skip.type = 'button'; skip.className = 'btn btn-sm btn-outline-secondary mt-2'; skip.textContent = 'Skip ×';
+                        skip.setAttribute('aria-label', 'Skip: ' + q.question);
+                        skip.onclick = function() { q.skipped = !q.skipped; input.disabled = q.skipped; skip.textContent = q.skipped ? 'Skipped — Undo' : 'Skip ×'; };
+                        row.append(label, input, skip); list.appendChild(row);
+                    });
+                    if (batch.length) list.children[list.children.length - batch.length].querySelector('textarea').focus();
+                }
+                async function ask() {
+                    if (next.disabled || closed) return;
+                    // Each round is explicitly requested; no autonomous request loop.
+                    if (history.some(function(q) { return !q.skipped && !q.answer.trim(); })) {
+                        status.textContent = 'Answer or skip the remaining questions, or generate with what you have.'; return;
+                    }
+                    var payload = JSON.stringify({task:notes, history:history});
+                    if (payload.length > 22000) { status.textContent = 'This interview is getting long. Generate with what you have to preserve these details.'; return; }
+                    next.disabled = true; status.textContent = 'Finding useful missing details…';
+                    controller = new AbortController(); var token = ++requestId;
+                    var timeout = setTimeout(function() { if (controller) controller.abort(); }, 45000);
+                    try {
+                        var response = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/ai-assistant', {
+                            method:'POST', headers:await getSupabaseFunctionAuthHeaders(), signal:controller.signal,
+                            body:JSON.stringify({feature:'ai_refine', refineMode:'guided_questions', messages:[{role:'user', content:payload}]})
+                        });
+                        var data = await response.json();
+                        if (closed || token !== requestId) return;
+                        if (!response.ok || data.error) throw new Error(data.error || 'Could not load questions.');
+                        var batch = parseGuidedDescriptionQuestions(data.reply, history);
+                        renderQuestions(batch);
+                        status.textContent = batch.length ? 'Answer or skip, then continue for another round—or generate now.' : 'No new useful questions. You can generate your description now.';
+                        next.hidden = !batch.length;
+                    } catch (error) {
+                        if (!closed && token === requestId) status.textContent = 'Questions unavailable: ' + (error.name === 'AbortError' ? 'Request timed out.' : error.message) + ' Your answers are kept. Retry or generate with what you have.';
+                    } finally { clearTimeout(timeout); if (!closed && token === requestId) next.disabled = false; }
+                }
+                next.onclick = ask;
+                el.querySelector('[data-generate]').onclick = function() { result = guidedDescriptionDetails(notes, history); modal.hide(); };
+                el.addEventListener('hide.bs.modal', function() { closed = true; requestId++; if (controller) controller.abort(); });
+                el.addEventListener('hidden.bs.modal', function() { modal.dispose(); el.remove(); resolve(result); }, {once:true});
+                el.addEventListener('shown.bs.modal', ask, {once:true});
+                modal.show();
+            });
+        }
+
         function aiDescriptionModeChoiceMarkup() {
             return '' +
                 '<div id="aiDescriptionChoicePane">' +
@@ -6109,10 +6188,11 @@
                 '</button>' +
                 '</div>' +
                 '<div class="col-12 col-md-6">' +
-                '<button type="button" class="btn btn-outline-primary ai-description-mode-choice w-100 h-100 p-3 text-start" data-ai-description-mode="create_from_task">' +
+                '<button type="button" class="btn btn-outline-primary ai-description-mode-choice w-100 p-3 text-start" data-ai-description-mode="create_from_task">' +
                 '<strong class="d-block mb-1">Describe the task to create the description</strong>' +
                 '<span class="small text-muted d-block">Turn a task explanation or rough notes into a polished, client-ready description.</span>' +
                 '</button>' +
+                '<label class="d-block text-end small mt-2"><input type="checkbox" id="aiDescriptionGuided"> Guided mode — Ask follow-up questions</label>' +
                 '</div>' +
                 '</div></div>';
         }
@@ -6217,7 +6297,7 @@
                         taskNotes.focus();
                         return;
                     }
-                    result = { mode: 'create_from_task', sourceText: notes };
+                    result = { mode: 'create_from_task', sourceText: notes, guided: !!document.getElementById('aiDescriptionGuided')?.checked };
                     modal.hide();
                 });
 
@@ -6251,12 +6331,19 @@
             const highlightContext = highlightOptions ? highlightOptions.outerHTML : null;
             const noteRequestId = textareaEl.id === 'lineNotes' ? (textareaEl._refineRequestId = (textareaEl._refineRequestId || 0) + 1) : null;
             const currentText = textareaEl.value || '';
+            const guidedEditor = textareaEl.closest && textareaEl.closest('.modal');
+            const guidedVersion = textareaEl._guidedVersion = (textareaEl._guidedVersion || 0) + 1;
+            if (guidedEditor) guidedEditor.addEventListener('hidden.bs.modal', function() { textareaEl._guidedVersion++; }, {once:true});
             const request = await openAiDescriptionModeDialog(currentText);
             if (!request) return;
             if (!request.sourceText.trim()) { qdAlert('Please enter a description first.'); return; }
             if (typeof requireProFeature === 'function') {
                 var allowed = await requireProFeature('ai_refine', 'AI Refine');
                 if (!allowed) return;
+            }
+            if (request.guided) {
+                request.sourceText = await openGuidedDescriptionDialog(request.sourceText);
+                if (request.sourceText === null) return;
             }
             const originalBtnHTML = btnEl.innerHTML;
             btnEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + (request.mode === 'create_from_task' ? 'Creating...' : 'Refining...');
@@ -6268,12 +6355,18 @@
                 const response = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/ai-assistant', {
                     method: 'POST',
                     headers: await getSupabaseFunctionAuthHeaders(),
-                    body: JSON.stringify({ feature: 'ai_refine', refineMode: request.mode, messages: [{ role: 'user', content: prompt }] })
+                    body: JSON.stringify({ feature: 'ai_refine', refineMode: request.guided ? 'guided_create' : request.mode, messages: [{ role: 'user', content: prompt }] })
                 });
                 const data = await response.json();
                 if (!response.ok || data.error) throw new Error(data.error || 'AI description request failed');
                 const refinedText = normalizeAiDescriptionReply(data.reply);
                 if (!refinedText) throw new Error('AI did not return a description. Please try again.');
+                if (request.guided) {
+                    if (!await qdConfirm(refinedText, {title:'Preview description', okText:'Use Description', cancelText:'Keep Original'})) return;
+                    if (!textareaEl.isConnected || textareaEl.value !== currentText || textareaEl._guidedVersion !== guidedVersion) {
+                        qdAlert('The description changed while Guided mode was open. Your current text was kept.'); return;
+                    }
+                }
                 if (highlightOptions && (textareaEl.value !== currentText || highlightOptions.outerHTML !== highlightContext || !textareaEl.closest('.modal.show'))) {
                     qdAlert('The highlight selection or text changed while AI was working. Your current text was kept.');
                     return;
