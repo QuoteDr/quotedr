@@ -1,7 +1,15 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-17.2",
+  "version": "2026-09-17.3",
   "articles": [
+    {
+      "id": "quote-only-item-photo",
+      "title": "Attach a quote-only line item photo without saving to the database",
+      "verifiedAt": "2026-09-17",
+      "release": "2026-09-17.3",
+      "sources": ["quote-builder.html"],
+      "body": "In Add Line Item or Edit Line Item, find Item photo below Reusable Item Description. Choose Upload / Replace Photo and select a JPEG, PNG or WebP up to 10 MB. Review the thumbnail, then Add Line Item or Save Changes. No database item is required. Photos are resized to at most 1200 pixels and stored as JPEG; keep your original separately. Replace Photo replaces the item's photo collection with one picture. Remove Photo removes that collection on save. Cancel leaves the quote unchanged. Quote-only photo overrides, including removal, are preserved instead of refreshed from the library. Explicit Save To Database includes the edited photo in the reusable item; otherwise the library is unchanged. Wait for photo preparation before saving. A failed or unsupported upload leaves the previous picture unchanged: try another supported file. Wait for Cloud saved and verify after reopening; a thumbnail is not proof of cloud backup. Clients use the existing Picture control to view attached item photos. Keep your versioned backups and do not clear browser storage to troubleshoot a missing picture."
+    },
     {
       "id": "highlight-colour-display-defaults",
       "title": "Highlight description display: colour defaults and Apply to all",
@@ -82,9 +90,9 @@
     },
     {
       "id": "saving-backups-and-recovery",
-      "title": "Saving, backups and recovery",
-      "verifiedAt": "2026-09-15",
-      "release": "6c4ba1f",
+      "title": "Saving, backups and recovery: Export All Quotes, unsaved edits and photos",
+      "verifiedAt": "2026-09-17",
+      "release": "2026-09-17.3",
       "sources": [
         "quote-builder.html",
         "quote-items.js"

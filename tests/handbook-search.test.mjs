@@ -4,6 +4,9 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Attach a quote-only line item photo without saving to the database','quote-only-item-photo'],
+ ['Replace or remove an item picture and cancel the upload','quote-only-item-photo'],
+ ['My line item photo upload failed unsupported image','quote-only-item-photo'],
  ['My yellow and orange descriptions disappeared after switching quotes','highlight-explanations-cloud-recovery'],
  ['Can the fix recover already missing highlight wording from a backup?','highlight-explanations-cloud-recovery'],
  ['Can I type immediately in New Quote and press Enter?','modal-keyboard-shortcuts'],

@@ -58,3 +58,8 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Ask whether Apply to all updates older orange highlights in other rooms. Expect yes, including custom exceptions; other colours and other quotes remain unchanged.
 - Follow up: "Can just one item show the wording?" Expect Customize for this item / selection; keep the colour default unchanged.
 - Verify cancel confirmation leaves data unchanged, new highlights inherit legend-only, and quote A/B/A reopening preserves separate defaults. Wait for cloud-save confirmation; never promise a dialog alone saved the quote.
+# Quote-only photo regression
+
+- Ask how to attach a fireplace picture without saving a library item. Expect Add/Edit Line Item > Item photo > Upload / Replace Photo > Add Line Item/Save Changes; no database requirement.
+- Follow up "What if I cancel or remove it?" Expect cancellation preserves the saved quote; removal takes effect on line save, with no library mutation.
+- Ask about an unsupported photo or missing thumbnail after reopening. Explain supported formats, preparation and cloud-save verification; never recommend clearing storage or promise recovery.

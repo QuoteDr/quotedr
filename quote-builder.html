@@ -3923,6 +3923,15 @@ Example:
                             </div>
                         </div>
                         <textarea id="lineItemDescription" class="form-control item-description-textarea" rows="6" placeholder="Describe the reusable scope shown to clients. This saves with the item database, unlike the job note below." spellcheck="true"></textarea>
+                        <div class="border rounded p-3 mt-3">
+                            <strong>Item photo (optional)</strong>
+                            <p class="small text-muted">For this quote only. Save To Database explicitly includes your photo in the reusable item. JPEG, PNG or WebP, up to 10 MB; resized for the quote.</p>
+                            <img id="linePhotoPreview" alt="Line item photo preview" hidden style="max-width:160px;max-height:120px" class="rounded mb-2">
+                            <div><button type="button" class="btn btn-outline-primary btn-sm" id="linePhotoChoose" onclick="document.getElementById('linePhotoFile').click()">Upload / Replace Photo</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="removeLinePhoto()">Remove Photo</button></div>
+                            <input id="linePhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="readLinePhoto(this)">
+                            <div id="linePhotoStatus" class="small" role="status" aria-live="polite"></div>
+                        </div>
                     </div>
 
                     <div class="row">
@@ -8350,7 +8359,76 @@ Example:
             handleNewLineUnitPromptResult(newUnit, previousUnit);
         }
 
+        let linePhotoDraft = { changed: false, busy: false, photo: '', generation: 0 };
+        function resetLinePhotoDraft(item) {
+            linePhotoDraft = { changed: false, busy: false, photo: item?.photo || item?.photos?.[0] || '', generation: linePhotoDraft.generation + 1 };
+            renderLinePhotoDraft();
+        }
+        function renderLinePhotoDraft() {
+            const preview = document.getElementById('linePhotoPreview');
+            preview.hidden = !linePhotoDraft.photo;
+            if (linePhotoDraft.photo) preview.src = linePhotoDraft.photo;
+            else preview.removeAttribute('src');
+            document.getElementById('linePhotoStatus').textContent = linePhotoDraft.busy ? 'Preparing photo…' : (linePhotoDraft.changed ? 'Photo changes will apply when you save this line item.' : '');
+        }
+        function removeLinePhoto() {
+            linePhotoDraft.generation++;
+            linePhotoDraft.busy = false;
+            linePhotoDraft.photo = '';
+            linePhotoDraft.changed = true;
+            renderLinePhotoDraft();
+        }
+        async function readLinePhoto(input) {
+            const file = input.files?.[0];
+            input.value = '';
+            if (!file) return;
+            if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
+                document.getElementById('linePhotoStatus').textContent = 'Choose a JPEG, PNG or WebP image no larger than 10 MB.';
+                return;
+            }
+            const generation = ++linePhotoDraft.generation;
+            linePhotoDraft.busy = true;
+            renderLinePhotoDraft();
+            const url = URL.createObjectURL(file);
+            try {
+                const img = new Image();
+                await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url; });
+                const scale = Math.min(1, 1200 / Math.max(img.naturalWidth, img.naturalHeight));
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+                canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+                const context = canvas.getContext('2d');
+                context.fillStyle = '#fff';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.drawImage(img, 0, 0, canvas.width, canvas.height);
+                if (generation !== linePhotoDraft.generation) return;
+                linePhotoDraft.photo = canvas.toDataURL('image/jpeg', 0.8);
+                linePhotoDraft.changed = true;
+                linePhotoDraft.busy = false;
+                renderLinePhotoDraft();
+            } catch (_) {
+                if (generation !== linePhotoDraft.generation) return;
+                linePhotoDraft.busy = false;
+                document.getElementById('linePhotoStatus').textContent = 'Could not read this image. Your previous photo is unchanged; try another file.';
+            } finally { URL.revokeObjectURL(url); }
+        }
+        function applyLinePhotoDraft(item) {
+            if (!linePhotoDraft.changed) return;
+            item.photo = linePhotoDraft.photo;
+            item.photos = linePhotoDraft.photo ? [linePhotoDraft.photo] : [];
+            item.photoFull = null;
+            item.photosFull = [];
+            item.quotePhotoOverride = true;
+            if (Object.prototype.hasOwnProperty.call(item, '_basePhoto')) {
+                item._basePhoto = item.photo;
+                item._basePhotos = item.photos.slice();
+                item._basePhotoFull = null;
+                item._basePhotosFull = [];
+            }
+        }
+
         function addLine(roomId) {
+            resetLinePhotoDraft();
             quoteReviewLineItemReturnContext = null;
             resetLineItemEditState();
             window.resetLineItemUpgradeDraft?.({});
@@ -9358,6 +9436,7 @@ Example:
             if (!room || !room.items[itemIndex]) return;
 
             const item = room.items[itemIndex];
+            resetLinePhotoDraft(item);
             if (typeof resetLineItemDescriptionRefineState === 'function') resetLineItemDescriptionRefineState();
 
             // Populate form with existing data
@@ -9507,6 +9586,7 @@ Example:
 
         function hydrateQuoteLineItemPhotoFromSavedItem(item) {
             if (!item) return item;
+            if (item.quotePhotoOverride) return item;
             const savedMatch = findSavedItemForQuoteEdit(item);
             const saved = savedMatch && savedMatch.item;
             if (saved && saved.photo && !item.photo) {
@@ -9585,6 +9665,7 @@ Example:
         }
 
         function syncQuotePhotoFields(target, source, syncBaseCache) {
+            if (target?.quotePhotoOverride) return;
             if (!target || !source) return;
             var photos = quotePhotoArray(source.photos, source.photo);
             var photosFull = quoteFullPhotoArray(source.photosFull, source.photoFull, photos.length);
@@ -9630,6 +9711,7 @@ Example:
 
         function syncQuoteItemPhotosFromSavedItem(item, savedItem) {
             if (!item || !savedItem) return false;
+            if (item.quotePhotoOverride) return false;
             var before = JSON.stringify(quoteItemSavedPhotoState(item));
             syncQuotePhotoFields(item, savedItem, true);
             if (item.upgrade && savedItem.upgrade) syncQuotePhotoFields(item.upgrade, savedItem.upgrade, false);
@@ -9858,6 +9940,7 @@ Example:
         }
 
         async function confirmAddLine() {
+            if (linePhotoDraft.busy) { document.getElementById('linePhotoStatus').textContent = 'Please wait for the photo to finish.'; return; }
             const roomId = parseInt(document.getElementById('currentRoomId').value);
             if (!validateAddLineItemRequiredFields()) return;
             const savNewItemBtn = document.getElementById('saveNewItemBtn');
@@ -9922,9 +10005,11 @@ Example:
                         laborTime: item.laborTime
                     });
                     if (savedItemForEdit) {
-                        item.photo = savedItemForEdit.photo || item.photo || '';
-                        item.photoFull = savedItemForEdit.photoFull || item.photoFull || null;
-                        item.photosFull = Array.isArray(savedItemForEdit.photosFull) ? savedItemForEdit.photosFull : (item.photosFull || []);
+                        if (!item.quotePhotoOverride) {
+                            item.photo = savedItemForEdit.photo || item.photo || '';
+                            item.photoFull = savedItemForEdit.photoFull || item.photoFull || null;
+                            item.photosFull = Array.isArray(savedItemForEdit.photosFull) ? savedItemForEdit.photosFull : (item.photosFull || []);
+                        }
                         item.upgrade = savedItemForEdit.upgrade || null;
                         item.upgradeGroups = normalizeQuoteItemUpgradeGroups(savedItemForEdit);
                         item.selectedUpgradeOptionIds = [];
@@ -9933,6 +10018,7 @@ Example:
                     }
                     item.total = priceTbd ? 0 : (quantity * rate);
                     applyLineItemUpgradeDraft(item, previousUpgradeGroups);
+                    applyLinePhotoDraft(item);
                     delete item._undiscountedTotal;
                     applyLineDiscountFields(item);
                     coRefreshItemDelta(item);
@@ -9971,6 +10057,7 @@ Example:
                         savedItemFingerprint: dbItem ? getSavedItemFingerprintForQuoteSync(dbItem) : '',
                         total: priceTbd ? 0 : (quantity * rate)
                     };
+                    applyLinePhotoDraft(newItem);
                     applyLineDiscountFields(newItem);
                     const itemsToAdd = await autoGroupQuoteItem(newItem, rooms[roomIndex]);
                     for (const itemToAdd of itemsToAdd) {
@@ -10014,9 +10101,11 @@ Example:
                         if (savedUpdateResult && savedUpdateResult.item) {
                             const previousUpgradeGroups = normalizeQuoteItemUpgradeGroups(editedQuoteItem);
                             editedQuoteItem.serviceName = savedUpdateResult.item.name || editedQuoteItem.serviceName;
-                            editedQuoteItem.photo = savedUpdateResult.item.photo || editedQuoteItem.photo || '';
-                            editedQuoteItem.photoFull = savedUpdateResult.item.photoFull || editedQuoteItem.photoFull || null;
-                            editedQuoteItem.photosFull = Array.isArray(savedUpdateResult.item.photosFull) ? savedUpdateResult.item.photosFull : (editedQuoteItem.photosFull || []);
+                            if (!editedQuoteItem.quotePhotoOverride) editedQuoteItem.photo = savedUpdateResult.item.photo || editedQuoteItem.photo || '';
+                            if (!editedQuoteItem.quotePhotoOverride) {
+                                editedQuoteItem.photoFull = savedUpdateResult.item.photoFull || editedQuoteItem.photoFull || null;
+                                editedQuoteItem.photosFull = Array.isArray(savedUpdateResult.item.photosFull) ? savedUpdateResult.item.photosFull : (editedQuoteItem.photosFull || []);
+                            }
                             editedQuoteItem.upgrade = savedUpdateResult.item.upgrade || null;
                             editedQuoteItem.upgradeGroups = normalizeQuoteItemUpgradeGroups(savedUpdateResult.item);
                             editedQuoteItem.selectedUpgradeOptionIds = [];
@@ -10060,6 +10149,7 @@ Example:
         }
 
         async function saveLineItemToDatabase() {
+            if (linePhotoDraft.busy) return false;
             if (!validateAddLineItemRequiredFields()) return false;
             const copilotContext = typeof quoteReviewLineItemContext !== 'undefined' ? quoteReviewLineItemContext : null;
             if (isLineItemOneTimeCategory()) {
@@ -10099,6 +10189,8 @@ Example:
                 newItem.pricingMode = priceTbd ? 'tbd' : 'fixed';
                 newItem.supplierUrl = supplierUrl;
                 newItem.itemDescription = itemDescription;
+                applyLinePhotoDraft(newItem);
+                delete newItem.quotePhotoOverride;
                 if (copilotContext && copilotContext.starterSourceId) {
                     newItem.starterSourceId = copilotContext.starterSourceId;
                     newItem.starterCatalogVersion = copilotContext.starterCatalogVersion;
