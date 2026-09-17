@@ -2,6 +2,31 @@
 (function() {
     'use strict';
 
+    // Explicit opt-in: never infer a send, payment or destructive action.
+    function modalEnterSubmit(event) {
+        if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.repeat || event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
+        var target = event.target;
+        if (!target || target.tagName !== 'INPUT' || target.isContentEditable || !/^(text|email|tel|number|search|url|password)$/.test(target.type)) return;
+        if (target.getAttribute('aria-expanded') === 'true' || target.hasAttribute('list')) return;
+        var popup = target.getAttribute('data-enter-popup');
+        var dropdown = popup && document.querySelector(popup);
+        if (dropdown && dropdown.getClientRects().length && getComputedStyle(dropdown).display !== 'none') return;
+        var modal = target.closest('.modal[data-enter-submit]');
+        if (!modal || !modal.classList.contains('show')) return;
+        var button = modal.querySelector(modal.getAttribute('data-enter-submit'));
+        if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true' || !button.getClientRects().length) return;
+        event.preventDefault();
+        button.click();
+    }
+    window.qdModalEnterSubmit = modalEnterSubmit;
+    document.addEventListener('shown.bs.modal', function(event) {
+        var modal = event.target;
+        var selector = modal.getAttribute && modal.getAttribute('data-initial-focus');
+        if (!selector) return;
+        var input = modal.querySelector(selector);
+        if (input && !input.disabled && input.getClientRects().length) input.focus({ preventScroll: true });
+    });
+
     function ensureStyles() {
         if (document.getElementById('qdDialogStyles')) return;
         var style = document.createElement('style');
@@ -205,6 +230,7 @@
             }
             function onEnterSubmit(event) {
                 if (!opts.enterSubmits) return;
+                if (event.defaultPrevented || event.repeat || event.isComposing || event.keyCode === 229) return;
                 if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
                 var target = event.target;
                 var tagName = target && target.tagName ? target.tagName : '';
@@ -236,9 +262,9 @@
             };
             el.addEventListener('hidden.bs.modal', onHidden, { once: true });
             el.addEventListener('keydown', onEnterSubmit);
+            if (opts.prompt) el.addEventListener('shown.bs.modal', function() { input.focus(); input.select(); }, { once: true });
             modal.show();
             stackAboveOpenModal(el, hasOtherOpenModal);
-            if (opts.prompt) setTimeout(function(){ input.focus(); input.select(); }, 180);
         });
     }
 

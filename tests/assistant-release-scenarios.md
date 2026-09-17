@@ -35,3 +35,14 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 
 - "Why am I asked about Stripe when exporting a PDF for myself?" Explain the corrected PDF path skips Card Payment Review for both audiences. Do not tell the user to turn off their account payment prompts.
 - Follow-up: "Will it still ask when I share the interactive quote?" Yes, the configured sharing review remains. Export does not mark an unanswered choice reviewed or change it to No card payment.
+# Keyboard-first dialogs (2026-09-16.4)
+
+- Ask: "Can I start typing immediately in New Quote?" Expect Client Name autofocus, Enter activates Create & Open Builder, normal validation/save requirements remain.
+- Follow up: "Why does Enter do nothing with suggestions showing?" Expect choose a suggestion with Tab/Enter or move to another field, not a claim that Enter is broken.
+- Failure/safety: "Will Enter send a quote or delete it? What about notes?" Expect no new blanket confirmation for sensitive actions; notes retain newlines.
+- Runtime: test New Quote open/reopen, invalid blank submission, delayed opening, suggestions, Add Room, Add/Edit Item, shared prompts and nested dialogs. Do not use real customer records. These checks are not implied by retrieval tests.
+# Highlight cloud round-trip (2026-09-16.4)
+
+- Ask: "I switched quotes and my yellow and orange explanations vanished." Explain the cloud payload omission and the fix; colours and explanations are separate fields.
+- Follow up: "Will updating bring my missing text back?" No automatic reconstruction; compare the same quote's versioned backup and re-enter only recovered wording. Never overwrite newer work wholesale or clear storage.
+- Verify on a disposable quote: Apply Highlight, cloud save, switch to a quote with different explanations, return, reload. Also verify intentional clearing and legend-only display. Do not edit customer records for this check.

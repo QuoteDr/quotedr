@@ -1,0 +1,34 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const listeners = {};
+const context = {window: {}, document: {addEventListener: (name, fn) => listeners[name] = fn, querySelector: () => null}, getComputedStyle: () => ({display:'block'})};
+vm.runInNewContext(fs.readFileSync('quote-dialogs.js','utf8'), context);
+let clicks = 0;
+const button = {disabled:false, getAttribute:()=>null, getClientRects:()=>[{}], click:()=>clicks++};
+const modal = {classList:{contains:()=>true}, getAttribute:()=> '#primary', querySelector:()=>button};
+const input = {tagName:'INPUT',type:'text', getAttribute:()=>null,hasAttribute:()=>false,closest:()=>modal};
+function enter(overrides={}, target=input) {
+  let prevented = false;
+  context.window.qdModalEnterSubmit({key:'Enter',target,preventDefault(){prevented=true},...overrides});
+  return prevented;
+}
+assert.equal(enter(),true);
+assert.equal(clicks,1);
+for (const flag of ['repeat','isComposing','defaultPrevented','shiftKey','ctrlKey','altKey','metaKey']) assert.equal(enter({[flag]:true}),false,flag);
+assert.equal(enter({keyCode:229}),false);
+for(const tagName of ['TEXTAREA','SELECT','BUTTON','A']) assert.equal(enter({}, {...input,tagName}),false,tagName);
+assert.equal(enter({}, {...input,type:'checkbox'}),false);
+assert.equal(enter({}, {...input,getAttribute:()=> 'true'}),false);
+button.disabled=true;
+assert.equal(enter(),false);
+button.disabled=false;
+context.document.querySelector=()=>({getClientRects:()=>[{}]});
+assert.equal(enter({}, {...input,getAttribute:name=>name==='data-enter-popup'?'#suggestions':null}),false);
+let focused=0;
+listeners['shown.bs.modal']({target:{getAttribute:()=> '#name',querySelector:()=>({getClientRects:()=>[{}],focus:()=>focused++})}});
+assert.equal(focused,1);
+const dashboard=fs.readFileSync('dashboard.html','utf8');
+assert.match(dashboard,/id="newQuoteModal"[^>]*data-initial-focus="#newQuoteClientName"[^>]*data-enter-submit="#newQuoteCreateBtn"/);
+assert(!dashboard.includes("if (e.key === 'Enter') createAndOpenQuote()"));
+console.log('Modal keyboard: focus, submission, dropdown, composition, repeat, disabled and multiline guards passed');

@@ -2657,7 +2657,7 @@
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="card-payment-rules.js?v=2026080301"></script>
-    <script src="supabase-v2.js?v=2026091404"></script>
+    <script src="supabase-v2.js?v=2026091604"></script>
     <script src="account-access.js?v=2026080701"></script>
     <script src="document-numbering.js?v=2026081901"></script>
     <script src="ai-voice-rule-matcher.js?v=2026081902"></script>
@@ -3762,7 +3762,7 @@ Example:
     </div>
 
     <!-- Add Room Modal -->
-    <div class="modal fade" id="addRoomModal" tabindex="-1" data-enter-submit="#addRoomBreakBtn">
+    <div class="modal fade" id="addRoomModal" tabindex="-1" data-initial-focus="#newRoomName" data-enter-submit="#addRoomBreakBtn">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -3860,7 +3860,7 @@ Example:
     </div>
 
     <!-- Add Line Item Modal -->
-    <div class="modal fade" id="addLineModal" tabindex="-1" data-enter-submit="#addLineItemBtn">
+    <div class="modal fade" id="addLineModal" tabindex="-1" data-initial-focus="#itemQuickSearch" data-enter-submit="#addLineItemBtn">
         <div class="modal-dialog modal-xl modal-dialog-scrollable line-item-editor-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -3874,7 +3874,7 @@ Example:
                     <!-- Quick search across saved items -->
                     <div class="mb-3 position-relative">
                         <label><strong>Quick Search:</strong></label>
-                        <input type="text" id="itemQuickSearch" class="form-control" placeholder="e.g., drywall, tile, baseboard..." oninput="handleItemQuickSearchInput()" onblur="hideItemSearchDropdown()" autocomplete="off">
+                        <input type="text" id="itemQuickSearch" data-enter-popup="#itemSearchDropdown" class="form-control" placeholder="e.g., drywall, tile, baseboard..." oninput="handleItemQuickSearchInput()" onblur="hideItemSearchDropdown()" autocomplete="off">
                         <div id="itemSearchDropdown" style="display:none; position:absolute; left:0; right:0; z-index:2000; background:white; border:1px solid #dee2e6; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); max-height:220px; overflow-y:auto;"></div>
                         <div id="lineItemQuickSearchTip" class="alert alert-info py-2 px-3 mt-2 mb-0 small d-flex align-items-start gap-2">
                             <button type="button" id="lineItemQuickSearchTipToggle" class="btn btn-sm btn-outline-primary rounded-circle flex-shrink-0" style="width:24px;height:24px;padding:0;line-height:1;" aria-label="Hide saved items tip" aria-expanded="true" title="Hide saved items tip" onclick="toggleLineItemQuickSearchTip()">
@@ -4315,7 +4315,7 @@ Example:
     </div>
 
     <!-- Manage Clients Modal -->
-    <div class="modal fade" id="manageClientsModal" tabindex="-1">
+    <div class="modal fade" id="manageClientsModal" tabindex="-1" data-initial-focus="#clientSearchFilter">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
@@ -4405,7 +4405,7 @@ Example:
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="quote-dialogs.js?v=2026071501"></script>
+    <script src="quote-dialogs.js?v=2026091604"></script>
     <script src="quote-discounts.js?v=2026081602"></script>
     <script src="quote-profit-report.js?v=2026091601"></script>
     <script src="quote-pdf-export.js?v=2026091601"></script>
@@ -5460,19 +5460,7 @@ Example:
         });
 
         function handleModalEnterSubmit(event) {
-            if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
-            var target = event.target;
-            if (!target) return;
-            var tagName = target.tagName || '';
-            if (tagName === 'TEXTAREA' || target.isContentEditable) return;
-            if (tagName === 'BUTTON' || tagName === 'A') return;
-            var modal = target.closest && target.closest('.modal[data-enter-submit]');
-            if (!modal) return;
-            var selector = modal.getAttribute('data-enter-submit');
-            var button = selector ? modal.querySelector(selector) : null;
-            if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true') return;
-            event.preventDefault();
-            button.click();
+            if (window.qdModalEnterSubmit) window.qdModalEnterSubmit(event);
         }
 
         document.addEventListener('keydown', handleModalEnterSubmit);
@@ -24354,7 +24342,7 @@ Example:
 
     <!-- Save Quote Dialog Modal -->
         <!-- Save Quote Dialog -->
-    <div class="modal fade" id="saveQuoteModal" tabindex="-1">
+    <div class="modal fade" id="saveQuoteModal" tabindex="-1" data-initial-focus="#saveQuoteNameInput">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header" style="background:#1a56a0; color:white;">

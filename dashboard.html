@@ -509,7 +509,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="quote-dialogs.js?v=2026082001"></script>
+    <script src="quote-dialogs.js?v=2026091604"></script>
     <script src="quote-portal-readiness.js?v=2026091502"></script>
     <script src="quote-deposit-review.js?v=2026091602"></script>
     <script src="quote-discounts.js"></script>
@@ -519,7 +519,7 @@
     <script src="modal-help.js?v=1777741200"></script>
     <script src="change-orders.js?v=1778060200"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026091404"></script>
+    <script src="supabase-v2.js?v=2026091604"></script>
     <script src="quote-backups.js?v=2026091404"></script>
     <script src="quote-folder-backups.js?v=2026091501"></script>
     <script src="birthday-rewards.js?v=2026082401"></script>
@@ -5676,6 +5676,7 @@ function renderBusinessInsights(quotes) {
             var dropdown = document.getElementById('newQuoteClientDropdown');
             if (!dropdown) return;
             setTimeout(function() {
+                if (dropdown.contains(document.activeElement)) return;
                 dropdown.style.display = 'none';
             }, 160);
         }
@@ -5706,9 +5707,13 @@ function renderBusinessInsights(quotes) {
                 if (details.textContent) item.appendChild(details);
                 item.addEventListener('mousedown', function(event) {
                     event.preventDefault();
+                });
+                item.addEventListener('click', function() {
                     applyNewQuoteClientSelection(client);
                     dropdown.style.display = 'none';
+                    document.getElementById('newQuoteFileName').focus();
                 });
+                item.addEventListener('blur', hideNewQuoteClientSuggestions);
                 dropdown.appendChild(item);
             });
             dropdown.style.display = 'block';
@@ -6025,8 +6030,7 @@ function renderBusinessInsights(quotes) {
             var btn = document.getElementById('newQuoteCreateBtn');
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-arrow-right me-1"></i>Create & Open Builder';
-            new bootstrap.Modal(document.getElementById('newQuoteModal')).show();
-            setTimeout(function() { document.getElementById('newQuoteClientName').focus(); }, 400);
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('newQuoteModal')).show();
         }
 
         async function createAndOpenQuote() {
@@ -6147,7 +6151,7 @@ function renderBusinessInsights(quotes) {
             ['newQuoteClientName','newQuoteAddress','newQuoteClientEmail','newQuoteClientPhone','newQuoteNumber','newQuoteFileName'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el) el.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter') createAndOpenQuote();
+                    if (window.qdModalEnterSubmit) window.qdModalEnterSubmit(e);
                 });
             });
             var newQuoteClientName = document.getElementById('newQuoteClientName');
@@ -6479,7 +6483,7 @@ function renderBusinessInsights(quotes) {
 </div>
 
 <!-- New Quote Modal (must be at top level) -->
-<div class="modal fade" id="newQuoteModal" tabindex="-1">
+    <div class="modal fade" id="newQuoteModal" tabindex="-1" data-initial-focus="#newQuoteClientName" data-enter-submit="#newQuoteCreateBtn">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header" style="background:#1a56a0; color:white;">
@@ -6491,7 +6495,7 @@ function renderBusinessInsights(quotes) {
         <div class="mb-3">
           <label class="form-label fw-semibold">Client Name <span class="text-danger">*</span></label>
           <div class="portal-client-typeahead">
-            <input type="text" id="newQuoteClientName" class="form-control" placeholder="e.g. John Smith" autocomplete="off" autofocus>
+            <input type="text" id="newQuoteClientName" data-enter-popup="#newQuoteClientDropdown" class="form-control" placeholder="e.g. John Smith" autocomplete="off" autofocus>
             <div id="newQuoteClientDropdown" class="portal-client-dropdown"></div>
           </div>
         </div>

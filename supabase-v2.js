@@ -1587,6 +1587,10 @@ async function saveQuote(quoteData) {
             parentQuoteTotal: quoteData.parentQuoteTotal || 0,
             changeOrderNumber: quoteData.changeOrderNumber || null,
             changeReason: quoteData.changeReason || '',
+            // Keep quote-level explanations with the coloured line items on cloud reload.
+            // An explicit empty legend is intentional; never borrow another quote's state.
+            highlightLegend: JSON.parse(JSON.stringify(quoteData.highlightLegend || quoteData.changeOrderHighlightLegend || {})),
+            changeOrderHighlightLegend: JSON.parse(JSON.stringify(quoteData.changeOrderHighlightLegend || quoteData.highlightLegend || {})),
             status: quoteData.status || 'draft',
             quoteTitle: quoteData.quoteTitle || '',
             clientName: quoteData.clientName || '',

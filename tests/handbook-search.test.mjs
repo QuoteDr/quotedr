@@ -4,6 +4,11 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['My yellow and orange descriptions disappeared after switching quotes','highlight-explanations-cloud-recovery'],
+ ['Can the fix recover already missing highlight wording from a backup?','highlight-explanations-cloud-recovery'],
+ ['Can I type immediately in New Quote and press Enter?','modal-keyboard-shortcuts'],
+ ['Keyboard autofocus client name and Tab between fields','modal-keyboard-shortcuts'],
+ ['Enter does not submit while client suggestions are open','modal-keyboard-shortcuts'],
  ['Does exporting a PDF ask me about card payment?','pdf-client-and-internal-records'],
  ['Will a PDF export answer my Stripe payment review?','pdf-client-and-internal-records'],
  ['Ask me for each quote whether to request a deposit','deposit-choice-per-quote'],

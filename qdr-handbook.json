@@ -1,7 +1,23 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-16.3",
+  "version": "2026-09-16.4",
   "articles": [
+    {
+      "id": "highlight-explanations-cloud-recovery",
+      "title": "Highlight descriptions missing after switching quotes",
+      "verifiedAt": "2026-09-16",
+      "release": "2026-09-16.4",
+      "sources": ["supabase-v2.js", "quote-storage.js", "quote-builder.html"],
+      "body": "Highlight explanations belong to each quote, not the account. An earlier cloud-save omission could retain line-item colours while losing yellow or orange descriptions after opening another quote and returning. Cloud saves now include highlightLegend and the legacy changeOrderHighlightLegend field. Apply Highlight, wait for Cloud saved, then reopen to verify. The fix does not recreate already missing text. Keep local JSON and versioned folder backups; compare the same quote's older backup for the wording. Do not overwrite a newer quote wholesale just to restore a legend, and do not clear browser storage. Re-enter recovered wording in Highlight Item and Apply Highlight, then verify cloud saving. Intentional clearing remains supported; another quote's descriptions are never used as fallback. If wording disappears again, retain backups and report the quote and save status."
+    },
+    {
+      "id": "modal-keyboard-shortcuts",
+      "title": "Keyboard shortcuts: autofocus and Enter in quote dialogs",
+      "verifiedAt": "2026-09-16",
+      "release": "2026-09-16.4",
+      "sources": ["dashboard.html", "quote-builder.html", "quote-dialogs.js"],
+      "body": "Dashboard > New Quote focuses Client Name after the modal opens. Type the client name, then press Enter from a single-line field to activate Create & Open Builder; required-field validation and normal cloud saving still apply. Tab moves between fields. When client suggestions are open, choose a suggestion with Tab then Enter, or Tab to another field before submitting your typed name. Enter does not create a quote while suggestions are open or the Create button is disabled. Builder Add Room focuses Room Name; Enter adds the room. Add/Edit Line Item focuses Quick Search; Enter from a single-line field activates the editor's primary action, but not while search suggestions are visible. Select a saved item or move to another field first. Manage Clients focuses its filter; Save Quote focuses File Name without automatically choosing a save destination. Shared text prompts focus their input after opening. Notes keep Enter as a newline; dropdowns, buttons, composing text and held-down keys retain their normal behavior. Payment, sending, deletion and multi-action dialogs have no new blanket Enter confirmation. Wait for the displayed cloud-save confirmation before leaving; a keyboard shortcut is not evidence of a successful save."
+    },
     {
       "id": "deposit-choice-per-quote",
       "title": "Ask me for each quote: request a deposit or no deposit",
