@@ -53,3 +53,8 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Ask whether Cancel saves the interview. Expect temporary answers discarded and original description unchanged, not a cloud-save promise.
 - Ask about a question timeout. Expect retry or generate from retained answers while dialog stays open; no claim that AI always finds every missing detail.
 - Authenticated runtime: test multiple rounds, skip and undo, no useful questions, failed request, Keep Original, manual edits while generation runs, and Use Description. Never use real customer records for these checks. These checks require the matching Edge Function deployment; retrieval tests alone are insufficient.
+# Highlight colour display checks (2026-09-17)
+
+- Ask whether Apply to all updates older orange highlights in other rooms. Expect yes, including custom exceptions; other colours and other quotes remain unchanged.
+- Follow up: "Can just one item show the wording?" Expect Customize for this item / selection; keep the colour default unchanged.
+- Verify cancel confirmation leaves data unchanged, new highlights inherit legend-only, and quote A/B/A reopening preserves separate defaults. Wait for cloud-save confirmation; never promise a dialog alone saved the quote.

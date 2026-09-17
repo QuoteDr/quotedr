@@ -1,0 +1,24 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('quote-builder.html','utf8');
+const elements={lineItemHighlightOptions:{getAttribute:k=>({'data-candidate-color':'orange','data-room-id':'1','data-item-index':'0'}[k])},changeOrderHighlightMeaning:{value:'New work'},highlightDescriptionLegendOnly:{checked:true},highlightDescriptionOnItems:{checked:false},highlightDisplayCustom:{checked:false},highlightDisplayApplyAll:{checked:true},lineItemHighlightModal:{}};
+const ctx={window:{},rooms:[{id:1,items:[{}, {highlightColor:'orange',highlightDescriptionOnItem:true}]},{id:2,items:[{highlightColor:'orange',highlightDescriptionOnItem:true,highlightDescriptionCustom:true},{highlightColor:'yellow',highlightDescriptionOnItem:true}]}],document:{getElementById:id=>elements[id]},LINE_ITEM_HIGHLIGHTS:{orange:{}},quoteHighlightLabel:()=> 'New work',qdConfirm:async()=>true,quoteHighlightLegend:()=>({}),setLineItemHighlight:(r,i,c)=>{ctx.rooms[0].items[i].highlightColor=c;}};
+vm.createContext(ctx);
+vm.runInContext(source.slice(source.indexOf('function highlightColourDisplayDefault('),source.indexOf('function changeOrderCustomHighlightLabel(')),ctx);
+vm.runInContext(source.slice(source.indexOf('async function applyActiveLineItemHighlight('),source.indexOf('async function applyActiveChangeOrderHighlight(')),ctx);
+(async()=>{
+ await ctx.applyActiveLineItemHighlight();
+ assert.equal(ctx.rooms[0].items[1].highlightDescriptionOnItem,false);
+ assert.equal(ctx.rooms[1].items[0].highlightDescriptionOnItem,false,'older custom item in another room updated');
+ assert.equal(ctx.rooms[1].items[0].highlightDescriptionCustom,false);
+ assert.equal(ctx.rooms[1].items[1].highlightDescriptionOnItem,true,'other colours untouched');
+ ctx.loadHighlightDisplayDraft('orange',[]);
+ assert.equal(elements.highlightDescriptionLegendOnly.checked,true,'new highlight inherits default');
+ elements.highlightDisplayCustom.checked=true;elements.highlightDescriptionLegendOnly.checked=false;
+ await ctx.applyActiveLineItemHighlight();
+ assert.equal(ctx.rooms[0].items[0].highlightDescriptionOnItem,true);
+ assert.equal(ctx.rooms[0].items[1].highlightDescriptionOnItem,false);
+ assert.equal(ctx.window._quoteHighlightDisplayDefaults.orange,false,'exception does not change default');
+ elements.highlightDisplayApplyAll.checked=true;ctx.qdConfirm=async()=>false;
+ const before=JSON.stringify(ctx.rooms);await ctx.applyActiveLineItemHighlight();assert.equal(JSON.stringify(ctx.rooms),before);
+ console.log('Colour defaults, existing cross-room items, custom exceptions and cancelled Apply All passed');
+})().catch(e=>{console.error(e);process.exitCode=1});

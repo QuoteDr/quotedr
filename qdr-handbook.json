@@ -1,7 +1,15 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-17.1",
+  "version": "2026-09-17.2",
   "articles": [
+    {
+      "id": "highlight-colour-display-defaults",
+      "title": "Highlight description display: colour defaults and Apply to all",
+      "verifiedAt": "2026-09-17",
+      "release": "2026-09-17.2",
+      "sources": ["quote-builder.html", "quote-storage.js", "supabase-v2.js"],
+      "body": "Open Highlight Item and select a colour. Choose Show description on each item or Only show description in legend. With Customize for this item / selection unchecked, Apply Highlight saves the colour's default for this quote and updates matching items without custom exceptions. New highlights inherit this default. Tick Customize for this item / selection to make an exception without changing the colour default. Tick Apply to all with this colour, click Apply Highlight, then confirm Apply to All to update EVERY existing matching item across all rooms, including older highlights and custom exceptions, as well as the selected items. Other colours and other quotes are unchanged. Apply to all takes priority over Customize and establishes the default for future highlights. Cancel confirmation keeps the editor open without applying. Colour choices and Clear remain drafts until Apply Highlight. Shared wording is preserved unless explicitly cleared. Legacy quotes without a saved default infer legend-only if all matching items are legend-only, otherwise inline; use Apply to all to reconcile mixed older items. Save and wait for cloud confirmation before switching quotes. Defaults are included in local and cloud quote data; retain recovery backups and do not clear browser storage to resolve save problems."
+    },
     {
       "id": "guided-description-follow-up-questions",
       "title": "Guided description: AI follow-up questions from rough task notes",

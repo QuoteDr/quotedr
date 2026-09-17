@@ -34,6 +34,7 @@ const cases=[
  ['Where is AI Voice Memory?','ai-voice-to-quote'],
 ];
 for(const [q,id] of cases) assert(searchHandbook(book,q).some(a=>a.id===id),q);
+assert(searchHandbook(book,'Apply to all highlight colour descriptions including older items').some(a=>a.id==='highlight-colour-display-defaults'));
 for (const q of ['Guided description follow-up questions', 'Can I skip questions and generate with what I have?', 'Guided description questions timed out are my answers lost?']) {
  assert(searchHandbook(book,q).some(a=>a.id==='guided-description-follow-up-questions'),q);
 }

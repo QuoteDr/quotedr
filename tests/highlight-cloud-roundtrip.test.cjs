@@ -10,9 +10,12 @@ function load(id){ctx.data=rows.get(id);vm.runInContext(restore,ctx);return JSON
 (async()=>{
  const a={supabaseId:'A',highlightLegend:{yellow:'Scope changed',orange:'New item'},rooms:[{items:[{highlightColor:'orange',highlightDescriptionOnItem:false}]}]};
  await ctx.saveQuote(a);
+ await ctx.saveQuote({...a,highlightDisplayDefaults:{orange:false}});
  await ctx.saveQuote({supabaseId:'B',highlightLegend:{yellow:'Different meaning'}});
  assert.deepEqual(load('A'),a.highlightLegend);
+ assert.equal(ctx.window._quoteHighlightDisplayDefaults.orange,false);
  assert.deepEqual(load('B'),{yellow:'Different meaning'});
+ assert.deepEqual(JSON.parse(JSON.stringify(ctx.window._quoteHighlightDisplayDefaults)),{},'another quote does not inherit defaults');
  assert.deepEqual(load('A'),a.highlightLegend,'A → B → A preserves quote-local wording');
  assert.equal(rows.get('A').rooms[0].items[0].highlightDescriptionOnItem,false);
  await ctx.saveQuote({...a,highlightLegend:{},changeOrderHighlightLegend:{}});

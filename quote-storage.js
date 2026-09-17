@@ -1052,6 +1052,7 @@
                 changeOrderScopeAiOwned: window._changeOrderScopeAiOwned === true,
                 changeOrderScopeFingerprint: window._changeOrderScopeFingerprint || '',
                 highlightLegend: window._quoteHighlightLegend || window._changeOrderHighlightLegend || {},
+                highlightDisplayDefaults: window._quoteHighlightDisplayDefaults || {},
                 changeOrderHighlightLegend: window._quoteDocumentType === 'change_order'
                     ? (window._quoteHighlightLegend || window._changeOrderHighlightLegend || {})
                     : {},
@@ -1287,6 +1288,7 @@
                 ? data.highlightLegend
                 : (data.changeOrderHighlightLegend && typeof data.changeOrderHighlightLegend === 'object' ? data.changeOrderHighlightLegend : {});
             window._quoteHighlightLegend = JSON.parse(JSON.stringify(restoredHighlightLegend));
+            window._quoteHighlightDisplayDefaults = JSON.parse(JSON.stringify(data.highlightDisplayDefaults || {}));
             window._changeOrderHighlightLegend = window._quoteHighlightLegend;
             window._quoteServerUpdatedAt = data._serverUpdatedAt || data.serverUpdatedAt || data.updated_at || null;
             window._quoteLocalEditAt = data._clientEditedAt || data._saveMeta && data._saveMeta.clientEditedAt || data.savedAt || null;

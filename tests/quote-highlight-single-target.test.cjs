@@ -6,6 +6,7 @@ const attrs = {'data-room-id':'7','data-item-index':'3','data-highlight-mode':'s
 const options = {getAttribute: key => attrs[key],setAttribute: (key,value) => {attrs[key]=value;}};
 let rendered, cleared;
 const ctx = {
+  loadHighlightDisplayDraft:()=>{},
   document:{getElementById: id => id === 'lineItemHighlightOptions' ? options : null},
   window:{}, LINE_ITEM_HIGHLIGHTS:{green:{}}, quoteHighlightLabel:()=>'',
   renderLineItemHighlightModalOptions:(...args)=>{rendered=args;},

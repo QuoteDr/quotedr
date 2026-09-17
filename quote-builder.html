@@ -2657,7 +2657,7 @@
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="card-payment-rules.js?v=2026080301"></script>
-    <script src="supabase-v2.js?v=2026091604"></script>
+    <script src="supabase-v2.js?v=2026091702"></script>
     <script src="account-access.js?v=2026080701"></script>
     <script src="document-numbering.js?v=2026081901"></script>
     <script src="ai-voice-rule-matcher.js?v=2026081902"></script>
@@ -3311,6 +3311,10 @@ if (location.search.includes('debug')) {
                             <div class="form-text" id="lineItemHighlightMeaningHelp">Optional. Add one meaning per colour and QuoteDr will show it in the client’s highlight legend.</div>
                             <fieldset class="mt-3">
                                 <legend class="form-label fw-semibold mb-2">Where should the description appear?</legend>
+                                <label class="d-block mb-2"><input type="checkbox" id="highlightDisplayCustom"> Customize for this item / selection</label>
+                                <small class="d-block text-muted mb-2">Unchecked: use and update this colour’s default for this quote. New highlights follow it.</small>
+                                <label class="d-block mb-3"><input type="checkbox" id="highlightDisplayApplyAll"> Apply to all with this colour</label>
+                                <small class="d-block text-muted mb-2">Updates all matching items across every room, including older highlights and custom exceptions, when you click Apply Highlight.</small>
                                 <div class="d-grid gap-2">
                                     <label class="highlight-description-display-option" for="highlightDescriptionOnItems">
                                         <span class="d-flex align-items-start gap-2">
@@ -10247,6 +10251,22 @@ Example:
             return String(quoteHighlightLegend()[colorKey] || '').trim();
         }
 
+        function highlightColourDisplayDefault(color) {
+            var defaults = window._quoteHighlightDisplayDefaults || {};
+            if (typeof defaults[color] === 'boolean') return defaults[color];
+            var matching = rooms.flatMap(function(room) { return room.items || []; }).filter(function(item) { return item.highlightColor === color; });
+            return !matching.length || !matching.every(function(item) { return item.highlightDescriptionOnItem === false; });
+        }
+
+        function loadHighlightDisplayDraft(color, items) {
+            var custom = !!(items && items.length && items.every(function(item) { return item.highlightDescriptionCustom === true; }));
+            var show = custom ? !items.every(function(item) { return item.highlightDescriptionOnItem === false; }) : highlightColourDisplayDefault(color);
+            document.getElementById('highlightDescriptionOnItems').checked = show;
+            document.getElementById('highlightDescriptionLegendOnly').checked = !show;
+            document.getElementById('highlightDisplayCustom').checked = custom;
+            document.getElementById('highlightDisplayApplyAll').checked = false;
+        }
+
         function changeOrderCustomHighlightLabel(colorKey) {
             return quoteHighlightLabel(colorKey);
         }
@@ -10347,6 +10367,7 @@ Example:
                 optionsEl._meaningDrafts = optionsEl._meaningDrafts || {};
                 if (previousColor && meaning) optionsEl._meaningDrafts[previousColor] = meaning.value;
                 optionsEl.setAttribute('data-candidate-color', colorKey);
+                loadHighlightDisplayDraft(colorKey, []);
                 if (meaning) meaning.value = Object.prototype.hasOwnProperty.call(optionsEl._meaningDrafts, colorKey) ? optionsEl._meaningDrafts[colorKey] : quoteHighlightLabel(colorKey);
                 renderLineItemHighlightModalOptions(
                     parseInt(optionsEl.getAttribute('data-room-id'), 10),
@@ -12843,6 +12864,7 @@ Example:
             if (meaning) meaning.value = activeColor ? quoteHighlightLabel(activeColor) : '';
             if (onItemsRadio) onItemsRadio.checked = showDescriptionOnItems;
             if (legendOnlyRadio) legendOnlyRadio.checked = !showDescriptionOnItems;
+            loadHighlightDisplayDraft(activeColor, items);
             if (optionsEl) optionsEl._meaningDrafts = {};
             var modal = document.getElementById('lineItemHighlightModal');
             modal._highlightInitial = highlightDraftState();
@@ -12865,7 +12887,7 @@ Example:
         }
 
         function highlightDraftState() {
-            return JSON.stringify([document.getElementById('lineItemHighlightOptions').getAttribute('data-candidate-color'), document.getElementById('changeOrderHighlightMeaning').value, document.getElementById('highlightDescriptionLegendOnly').checked]);
+            return JSON.stringify([document.getElementById('lineItemHighlightOptions').getAttribute('data-candidate-color'), document.getElementById('changeOrderHighlightMeaning').value, document.getElementById('highlightDescriptionLegendOnly').checked, document.getElementById('highlightDisplayCustom').checked, document.getElementById('highlightDisplayApplyAll').checked]);
         }
 
         async function applyActiveLineItemHighlight() {
@@ -12891,6 +12913,9 @@ Example:
                     return;
                 }
             }
+            var applyAll = !!document.getElementById('highlightDisplayApplyAll').checked;
+            var customDisplay = !applyAll && !!document.getElementById('highlightDisplayCustom').checked;
+            if (colorKey && applyAll && !await qdConfirm('Apply this description display rule to every ' + colorKey + ' item in this quote, including older highlights and custom exceptions?', {title:'Apply to All with This Colour?',okText:'Apply to All',cancelText:'Keep Editing'})) return;
             if (colorKey && meaning) quoteHighlightLegend()[colorKey] = meaning.slice(0, 240);
             else if (colorKey) delete quoteHighlightLegend()[colorKey];
             window._changeOrderHighlightLegend = window._quoteHighlightLegend;
@@ -12901,8 +12926,21 @@ Example:
             var room = rooms.find(function(candidate) { return candidate.id === roomId; });
             var showDescriptionOnItems = !document.getElementById('highlightDescriptionLegendOnly')?.checked;
             var targetIndexes = isBulk ? selectedIndexes : [itemIndex];
+            if (colorKey && !customDisplay) {
+                window._quoteHighlightDisplayDefaults = window._quoteHighlightDisplayDefaults || {};
+                window._quoteHighlightDisplayDefaults[colorKey] = showDescriptionOnItems;
+                rooms.forEach(function(otherRoom) { (otherRoom.items || []).forEach(function(item) {
+                    if (item.highlightColor === colorKey && (applyAll || item.highlightDescriptionCustom !== true)) {
+                        item.highlightDescriptionOnItem = showDescriptionOnItems;
+                        item.highlightDescriptionCustom = false;
+                    }
+                }); });
+            }
             targetIndexes.forEach(function(index) {
-                if (room && room.items[index]) room.items[index].highlightDescriptionOnItem = showDescriptionOnItems;
+                if (room && room.items[index]) {
+                    room.items[index].highlightDescriptionOnItem = showDescriptionOnItems;
+                    room.items[index].highlightDescriptionCustom = customDisplay;
+                }
             });
             if (isBulk) setSelectedLineItemHighlights(roomId, selectedIndexes, colorKey);
             else setLineItemHighlight(roomId, itemIndex, colorKey);
@@ -19519,6 +19557,7 @@ Example:
             if (document.getElementById('changeOrderReason')) document.getElementById('changeOrderReason').value = '';
             setQuotePaymentsReceived(null);
             window._quoteHighlightLegend = {};
+            window._quoteHighlightDisplayDefaults = {};
             window._changeOrderHighlightLegend = window._quoteHighlightLegend;
             window._changeOrderContinuePayment = null;
             window._changeOrderScopeAutomatic = getChangeOrderScopePreferences().automaticDefault !== false;
@@ -19548,7 +19587,7 @@ Example:
     <script src="change-orders.js?v=1778152100"></script>
     <script src="quote-backups.js?v=2026091404"></script>
     <script src="quote-folder-backups.js?v=2026091501"></script>
-    <script src="quote-storage.js?v=2026091405"></script>
+    <script src="quote-storage.js?v=2026091702"></script>
     <script src="property-memory.js?v=2026081001"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
