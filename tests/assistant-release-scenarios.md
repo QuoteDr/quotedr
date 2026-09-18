@@ -63,3 +63,15 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Ask how to attach a fireplace picture without saving a library item. Expect Add/Edit Line Item > Item photo > Upload / Replace Photo > Add Line Item/Save Changes; no database requirement.
 - Follow up "What if I cancel or remove it?" Expect cancellation preserves the saved quote; removal takes effect on line save, with no library mutation.
 - Ask about an unsupported photo or missing thumbnail after reopening. Explain supported formats, preparation and cloud-save verification; never recommend clearing storage or promise recovery.
+# Split Quote regression
+
+- Ask to separate basement rooms from a renovation quote. Explain Save/Cloud saved, Quote Actions > Split Quote / Related Quotes, room selection, new name, Copy/Move and review totals.
+- Follow up "Does that tell me what she owes?" Distinguish scope value from balance; payments/invoices never transfer and quote-wide adjustments stay on the original.
+- Ask to move accepted/shared work. Do not recommend silently editing the accepted scope; Copy is the safe option, Move is restricted.
+- Simulate a new draft saved with original update unconfirmed. Do not advise repeating Split; resolve Sync and Recovery, retain/download the pre-split recovery copy and review both documents before sharing.
+# PDF layout size
+
+- Ask: "My quote prints 39 pages. Can I shrink the font?" Expect Clean PDF Settings > PDF text and layout size; Large 100%, Standard 85%, Compact 75%, then Continue to Print. Do not promise a page count.
+- Follow up: "Will that change what my client sees online or remove notes?" Expect print-only, complete content and no quote-data changes.
+- Failure: "It is tiny now." Expect check browser Scale 100% (avoid double shrinking), cancel and choose Large again. No clearing browser storage or customer-data changes.
+- Ask about internal reports: same scaling, private appendix remains internal-only; does not add profit information to client PDFs.

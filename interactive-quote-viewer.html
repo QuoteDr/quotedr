@@ -1514,6 +1514,10 @@
             }
         }
         @media print {
+            /* Print-only scaling: includes private appendices without changing quote data. */
+            body[data-pdf-size="standard"] { zoom: 0.85; }
+            body[data-pdf-size="compact"] { zoom: 0.75; }
+            .modal, .modal-backdrop { display: none !important; }
             body,
             .proposal-shell,
             .proposal-hero,
@@ -1871,6 +1875,13 @@ if (location.search.includes('debug')) {
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
+                        <label for="quotePdfSize" class="form-label fw-bold">PDF text and layout size</label>
+                        <select id="quotePdfSize" class="form-select mb-2" aria-describedby="quotePdfSizeHelp">
+                            <option value="large">Large (100%) — current easy-to-read layout</option>
+                            <option value="standard">Standard (85%) — smaller text, fewer pages</option>
+                            <option value="compact">Compact (75%) — most compact layout</option>
+                        </select>
+                        <p id="quotePdfSizeHelp" class="small text-muted mb-3">Print/PDF only; all content is retained. Leave browser Scale at 100% to avoid shrinking twice. Check readability and the final page count in print preview.</p>
                         <p class="mb-3">In the print window, open <strong>More settings</strong> and use these options for the cleanest saved PDF:</p>
                         <div class="pdf-print-tip-visual mb-3" aria-label="Recommended Chrome print settings">
                             <div class="pdf-print-tip-row">
@@ -2156,21 +2167,29 @@ if (location.search.includes('debug')) {
             portalActivityTimer = setInterval(function() { flushPortalActivityDuration(false); }, 30000);
         }
 
-        function printQuote() {
+        var quotePrintPending = false;
+        async function printQuote() {
+            if (quotePrintPending) return;
             if (quoteStudioMode) {
                 qdAlert('Printing is disabled inside the live preview. Generate or open the quote preview to print it.');
                 return;
             }
-            logPortalDocumentActivity('pdf_opened', { metadata: { action: 'print_save_pdf' } });
+            quotePrintPending = true;
             try {
+                if (!await showQuotePdfPrintTip()) return;
+                logPortalDocumentActivity('pdf_opened', { metadata: { action: 'print_save_pdf' } });
                 if (window.QuoteDrAndroid && typeof window.QuoteDrAndroid.printCurrentPage === 'function') {
-                    window.QuoteDrAndroid.printCurrentPage();
-                    return;
+                    try {
+                        window.QuoteDrAndroid.printCurrentPage();
+                        return;
+                    } catch (e) {
+                        console.warn('Native Android print bridge failed, falling back to browser print.', e);
+                    }
                 }
-            } catch(e) {
-                console.warn('Native Android print bridge failed, falling back to browser print.', e);
+                window.print();
+            } finally {
+                quotePrintPending = false;
             }
-            window.print();
         }
 
         function printQuoteIfRequested() {
@@ -5620,6 +5639,8 @@ if (location.search.includes('debug')) {
                 }
                 function onContinue() {
                     if (settled || waitingForHidden) return;
+                    var size = document.getElementById('quotePdfSize').value;
+                    document.body.dataset.pdfSize = ['standard', 'compact'].includes(size) ? size : 'large';
                     waitingForHidden = true;
                     modal.hide();
                 }
@@ -5639,17 +5660,7 @@ if (location.search.includes('debug')) {
                 return;
             }
             updateTotal();
-            var shouldPrint = await showQuotePdfPrintTip();
-            if (!shouldPrint) return;
-            try {
-                if (window.QuoteDrAndroid && typeof window.QuoteDrAndroid.printCurrentPage === 'function') {
-                    window.QuoteDrAndroid.printCurrentPage();
-                    return;
-                }
-            } catch (e) {
-                console.warn('Native Android print bridge failed, falling back to browser print.', e);
-            }
-            window.print();
+            await printQuote();
         }
 
         function hasConsultationUpgradeSelections() {

@@ -4,6 +4,12 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['PDF smaller text fewer printed pages compact formatting','pdf-print-layout-size'],
+ ['Does compact PDF shrink my interactive quote too?','pdf-print-layout-size'],
+ ['PDF too small browser scale shrinking twice','pdf-print-layout-size'],
+ ['Split my basement rooms into a separate phase quote','split-quote-rooms'],
+ ['Move versus copy rooms to another quote','split-quote-rooms'],
+ ['Split quote failed but new draft exists should I retry?','split-quote-rooms'],
  ['Attach a quote-only line item photo without saving to the database','quote-only-item-photo'],
  ['Replace or remove an item picture and cancel the upload','quote-only-item-photo'],
  ['My line item photo upload failed unsupported image','quote-only-item-photo'],

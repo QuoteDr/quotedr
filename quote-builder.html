@@ -2657,7 +2657,7 @@
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="card-payment-rules.js?v=2026080301"></script>
-    <script src="supabase-v2.js?v=2026091702"></script>
+    <script src="supabase-v2.js?v=2026091703"></script>
     <script src="account-access.js?v=2026080701"></script>
     <script src="document-numbering.js?v=2026081901"></script>
     <script src="ai-voice-rule-matcher.js?v=2026081902"></script>
@@ -2750,6 +2750,7 @@ if (location.search.includes('debug')) {
                         </button>
                         <ul class="dropdown-menu w-100 quote-actions-menu">
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteCompletenessReview()"><i class="fas fa-clipboard-check me-2 text-primary"></i>Review Quote</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openSplitQuote()"><i class="fas fa-code-branch me-2 text-primary"></i>Split Quote / Related Quotes</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteSendSettingsModal(true)"><i class="fas fa-sliders-h me-2 text-primary"></i>Quote Settings</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="generateInteractiveLink()"><i class="fas fa-folder-tree me-2 text-success"></i><span id="quoteGenerateLinkLabel">Share in Client Portal</span></a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="createChangeOrderFromCurrentQuote()" id="createChangeOrderMenuItem" style="display:none;"><i class="fas fa-file-circle-plus me-2 text-warning"></i>Create Change Order</a></li>
@@ -19679,7 +19680,7 @@ Example:
     <script src="change-orders.js?v=1778152100"></script>
     <script src="quote-backups.js?v=2026091404"></script>
     <script src="quote-folder-backups.js?v=2026091501"></script>
-    <script src="quote-storage.js?v=2026091702"></script>
+    <script src="quote-storage.js?v=2026091703"></script>
     <script src="property-memory.js?v=2026081001"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------

@@ -1,7 +1,23 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-17.3",
+  "version": "2026-09-18.1",
   "articles": [
+    {
+      "id": "pdf-print-layout-size",
+      "title": "PDF formatting: smaller text and fewer printed pages",
+      "verifiedAt": "2026-09-18",
+      "release": "2026-09-18.1",
+      "sources": ["interactive-quote-viewer.html"],
+      "body": "Use Download / Print PDF in an opened quote, or File > Export as PDF in the builder and complete the Client or My records choice. Clean PDF Settings appears before the browser print window. Choose PDF text and layout size: Large (100%) is the default, Standard (85%) is smaller, or Compact (75%) is most compact. Continue to Print applies the selection; Cancel or X does not print or apply a new selection. The choice stays in the open viewer only and resets to Large on a fresh page. Scaling affects print output including internal appendices, not the interactive quote, saved quote content, prices or text completeness. It does not add private reports to client PDFs. Leave browser Scale at 100% to avoid shrinking twice; turn off Headers and footers and enable Background graphics. Choose Save as PDF or your printer. Check readability, page breaks and final page count in browser preview; no specific reduction is guaranteed because paper size, margins and browser rendering differ. If too small, cancel the browser dialog and choose Large through Download / Print PDF again. Browser Ctrl+P bypasses QDR's formatting dialog. Live editor previews cannot print: open the quote preview first. Keep normal quote backups; PDFs do not replace editable recovery files."
+    },
+    {
+      "id": "split-quote-rooms",
+      "title": "Split Quote: move or copy basement rooms into a separate phase quote",
+      "verifiedAt": "2026-09-17",
+      "release": "2026-09-17.4",
+      "sources": ["quote-builder.html", "quote-storage.js", "supabase-v2.js"],
+      "body": "Save the original and wait for Cloud saved, then open Quote Actions > Split Quote / Related Quotes. Enter New quote name, check rooms/phases and choose Copy or Move. Copy is the default and leaves the original unchanged. Move is restricted to unshared drafts without payment or acceptance history and must leave at least one room. Invoices and change orders cannot be split here. Review the displayed new draft and original totals, then Review & Create Draft > Create Draft. These are scope values, not amounts owing. Room notes, photos, highlights and line pricing are copied; quote-wide adjustments stay on the original and are not apportioned to the new draft. The new quote has its own number and is unsent. No payments, signatures, invoices or portal access are transferred, and no client message is sent. Review its payment settings and expiry before sharing: expiry starts afresh, and deposit review does not carry over. The new draft must be cloud-saved and its rooms read back before Move updates the original. A full pre-split local recovery copy is retained; Download pre-split recovery copy is available in this dialog. Storage failure blocks the operation before either write. Original and split drafts are linked under Split Quote / Related Quotes; links open separately. If saving is unconfirmed, check Sync and Recovery and the dashboard before retrying: a queued draft may still sync. If the draft exists but reducing the original fails, do not split again or share either document until resolving the pending save/conflict. Keep the recovery copy and never overwrite a newer quote wholesale to recover selected rooms. Local recovery is not a guaranteed off-device backup; preserve your normal backups."
+    },
     {
       "id": "quote-only-item-photo",
       "title": "Attach a quote-only line item photo without saving to the database",

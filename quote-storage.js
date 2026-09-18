@@ -1,6 +1,183 @@
 // Quote Dr save/load, autosave, and startup session helpers.
 // Extracted from quote-builder.html while preserving the existing global API.
 
+function splitQuoteCanMove(data) {
+    return data && (data.type || data.documentType || 'quote') === 'quote' &&
+        data.status === 'draft' && !data.portal_visible && !data.portal_id &&
+        !data.portal_added_at && !data.accepted_total_cents && !data.deposit_paid &&
+        !data.manual_payment_reported && !data.paymentStatus && !data.invoiceNumber && !data.invoiceId &&
+        !data.acceptedAt && !data.accepted_at && !data.signature && !(data.payments || []).length &&
+        !(Number(data.paymentsReceived?.amount) > 0);
+}
+
+function splitQuoteTotal(data, selectedRooms, keepAdjustment) {
+    const subtotal = selectedRooms.reduce((sum, room) => sum + (room.items || []).reduce((amount, item) =>
+        amount + (quoteOptionalItemIncludedByDefault(item) ? quoteItemMarkedAmount(room, item, itemChargedTotal(item)) : 0), 0), 0);
+    const adjustment = keepAdjustment ? data.quoteAdjustment || {} : {};
+    const value = adjustment.basis === 'amount' ? Number(adjustment.amount) || 0 : subtotal * (Number(adjustment.percent) || 0) / 100;
+    return QuoteDrPayableTotal.calculate({ subtotal, adjustment: adjustment.type === 'discount' ? -value : value,
+        taxRate: data.taxRate, taxEnabled: data.taxEnabled !== false, paid: 0 }).payableTotalCents / 100;
+}
+
+function buildSplitQuoteDraft(source, indices, title, number, operationId) {
+    if (!indices.length || indices.some(i => !Number.isInteger(i) || !source.rooms[i]) || new Set(indices).size !== indices.length) throw new Error('Select valid rooms.');
+    const draft = {};
+    // Allowlist content: never clone signatures, invoices, payment history or portal credentials.
+    ['clientName','clientId','clientNumber','projectAddress','clientPhone','clientEmail','terms','termsExplicit',
+        'currency','taxEnabled','taxRate','taxLabel','categoryStyles','highlightLegend','highlightDisplayDefaults',
+        'businessProfile','hiddenProfileFields','dividerSingular','dividerPlural','quoteDividerLabels'].forEach(key => {
+        if (source[key] !== undefined) draft[key] = JSON.parse(JSON.stringify(source[key]));
+    });
+    draft.rooms = indices.map(i => JSON.parse(JSON.stringify(source.rooms[i])));
+    draft.roomCounter = Math.max(0, ...draft.rooms.map(r => Number(r.id) || 0));
+    draft.type = draft.documentType = 'quote';
+    draft.status = 'draft';
+    draft.quoteTitle = title;
+    draft.quoteNumber = number;
+    draft.forceNew = true;
+    draft.portal_visible = false;
+    draft.quoteAdjustment = null;
+    draft.paymentsReceived = {name: 'Deposit paid', amount: 0};
+    draft.style = JSON.parse(JSON.stringify(source.style || {}));
+    ['expiryDate','expiryStartedAt','depositReviewedAt','depositReviewed','depositReviewedFor','cardPaymentReviewedAt','card_payment','cardPayment'].forEach(key => delete draft.style[key]);
+    draft.style.depositMode = 'auto';
+    delete draft.style.cardPaymentMode;
+    if (draft.style.expiryMode !== 'none') draft.style.expiryMode = 'automatic';
+    draft.style.expiryDurationDays = Number(draft.style.expiryDurationDays) || 30;
+    draft.grandTotal = draft.total = splitQuoteTotal(source, draft.rooms, false);
+    draft.splitSource = {quoteId: source.supabaseId, quoteNumber: source.quoteNumber, title: source.quoteTitle,
+        operationId, createdAt: new Date().toISOString()};
+    draft._editorInstanceId = operationId;
+    draft._clientEditedAt = draft.savedAt = new Date().toISOString();
+    return draft;
+}
+
+async function openSplitQuote() {
+    if (window._quoteSplitBusy || document.getElementById('splitQuoteModal')) return;
+    calculateTotals();
+    const source = JSON.parse(JSON.stringify(collectQuoteData()));
+    if (!source.supabaseId || unsavedChanges || quoteCloudSaveUnconfirmed) {
+        await qdAlert('Save this quote and wait for Cloud saved before splitting. This protects the original and gives the new quote a reliable link back.'); return;
+    }
+    if ((source.type || 'quote') !== 'quote') { await qdAlert('Split Quote is available for quotes, not invoices or change orders.'); return; }
+    const modalEl = document.createElement('div');
+    modalEl.id = 'splitQuoteModal'; modalEl.className = 'modal fade'; modalEl.tabIndex = -1;
+    modalEl.innerHTML = '<div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">' +
+        '<div class="modal-header"><h5 class="modal-title">Split Quote</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>' +
+        '<div class="modal-body"><p>Select the rooms/phases for a separate, unsent draft. Notes, photos, highlights and line pricing travel with them.</p>' +
+        '<div id="splitRelated" class="mb-3"></div><label for="splitTitle">New quote name</label><input id="splitTitle" class="form-control mb-3" maxlength="200">' +
+        '<fieldset id="splitRooms"><legend class="h6">Rooms / phases</legend></fieldset>' +
+        '<label for="splitMode" class="mt-3">What should happen to the original?</label><select id="splitMode" class="form-select"><option value="copy">Copy — keep the original unchanged</option><option value="move">Move — remove selected rooms from the original</option></select>' +
+        '<p class="small text-muted">Move is only available for unshared drafts with no payment history. Payments, deposits, invoices and signatures never transfer. Quote-wide adjustments stay on the original. Totals are scope values, not amounts owing. Review payment and expiry settings before sharing the new draft.</p>' +
+        '<div id="splitTotals" class="alert alert-info"></div><div id="splitStatus" role="status" aria-live="polite"></div></div>' +
+        '<div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button><button type="button" id="splitConfirm" class="btn btn-primary">Review & Create Draft</button></div></div></div>';
+    document.body.appendChild(modalEl);
+    const modal = new bootstrap.Modal(modalEl, {backdrop: 'static', keyboard: false});
+    const title = modalEl.querySelector('#splitTitle'); title.value = (source.quoteTitle || 'Quote') + ' — Next phase';
+    const mode = modalEl.querySelector('#splitMode'); mode.options[1].disabled = !splitQuoteCanMove(Object.assign({}, window._loadedQuoteData, source));
+    const selected = () => Array.from(modalEl.querySelectorAll('[data-split-room]:checked')).map(el => Number(el.dataset.splitRoom));
+    const money = value => new Intl.NumberFormat(undefined, {style:'currency', currency: source.currency || 'CAD'}).format(value);
+    const update = () => {
+        const ids = selected();
+        const remaining = mode.value === 'move' ? source.rooms.filter((_, i) => !ids.includes(i)) : source.rooms;
+        modalEl.querySelector('#splitTotals').textContent = 'New draft: ' + money(splitQuoteTotal(source, ids.map(i => source.rooms[i]), false)) +
+            ' • Original after ' + mode.value + ': ' + money(splitQuoteTotal(source, remaining, true));
+    };
+    source.rooms.forEach((room, index) => {
+        const label = document.createElement('label'); label.className = 'd-block mb-2';
+        const check = document.createElement('input'); check.type = 'checkbox'; check.className = 'form-check-input me-2'; check.dataset.splitRoom = index;
+        check.addEventListener('change', update); label.append(check, document.createTextNode((room.name || 'Room') + ' (' + (room.items || []).length + ' items)'));
+        modalEl.querySelector('#splitRooms').append(label);
+    });
+    mode.addEventListener('change', update); update();
+    modalEl.addEventListener('hide.bs.modal', event => { if (window._quoteSplitBusy) event.preventDefault(); });
+    modalEl.addEventListener('hidden.bs.modal', () => { modal.dispose(); modalEl.remove(); });
+    modal.show();
+    const related = modalEl.querySelector('#splitRelated');
+    const addRecovery = (key, snapshot) => {
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-sm btn-outline-secondary my-2';
+        button.textContent = 'Download pre-split recovery copy';
+        button.onclick = () => {
+            const url = URL.createObjectURL(new Blob([JSON.stringify(snapshot.source, null, 2)], {type:'application/json'}));
+            const link = document.createElement('a'); link.href = url; link.download = 'QuoteDr-before-split-' + key.replace('qdr_split_recovery_', '') + '.json'; link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        };
+        related.append(button);
+    };
+    Object.keys(localStorage).filter(key => key.startsWith('qdr_split_recovery_')).forEach(key => {
+        try { const snapshot = JSON.parse(localStorage.getItem(key)); if (snapshot.source?.supabaseId === source.supabaseId) addRecovery(key, snapshot); } catch (_) {}
+    });
+    const addLink = (id, name) => {
+        if (!/^[0-9a-f-]{36}$/i.test(id || '')) return;
+        const link = document.createElement('a'); link.className = 'd-block'; link.target = '_blank'; link.rel = 'noopener';
+        link.href = 'quote-builder.html?load=' + encodeURIComponent(id); link.textContent = name; related.append(link);
+    };
+    if (source.splitSource) addLink(source.splitSource.quoteId, 'Original: ' + (source.splitSource.title || source.splitSource.quoteNumber));
+    try {
+        const result = await listQuotesFromSupabase();
+        if (result.error) throw new Error('Related quotes unavailable');
+        (result.data || []).filter(row => row.data?.splitSource?.quoteId === source.supabaseId).forEach(row => addLink(row.id, 'Split draft: ' + (row.data.quoteTitle || row.quote_number)));
+    } catch (_) { related.append(document.createTextNode('Related quotes could not be loaded.')); }
+    modalEl.querySelector('#splitConfirm').onclick = async function() {
+        const ids = selected(); const moving = mode.value === 'move';
+        if (!ids.length || !title.value.trim()) { await qdAlert('Choose at least one room and enter a name.'); return; }
+        if (moving && (!splitQuoteCanMove(source) || ids.length === source.rooms.length)) { await qdAlert('Move requires an unshared draft and must leave at least one room in the original. Use Copy instead.'); return; }
+        if (!await qdConfirm(modalEl.querySelector('#splitTotals').textContent + '\nCreate this separate draft? No client message will be sent.', {title:'Confirm Split Quote',okText:'Create Draft'})) return;
+        window._quoteSplitBusy = true;
+        modalEl.querySelectorAll('input,select,button').forEach(el => el.disabled = true);
+        const status = modalEl.querySelector('#splitStatus');
+        let created = null;
+        try {
+            const fresh = await loadQuoteFromSupabase(source.supabaseId);
+            if (fresh.error || !fresh.data || fresh.data.updated_at !== source._serverUpdatedAt) throw new Error('The cloud quote changed. Reload and review it before splitting.');
+            if (moving && !splitQuoteCanMove(Object.assign({}, fresh.data.data, {status:fresh.data.status, type:fresh.data.type}))) throw new Error('This quote is no longer an editable draft. Use Copy.');
+            const current = collectQuoteData();
+            if (current.supabaseId !== source.supabaseId || JSON.stringify(current.rooms) !== JSON.stringify(source.rooms) || unsavedChanges) throw new Error('The quote changed while this dialog was open. Close and reopen Split Quote.');
+            const operationId = crypto.randomUUID();
+            // Abort before writes if a full local recovery snapshot cannot be retained.
+            const recovery = {source, selected:ids, mode:mode.value, createdAt:new Date().toISOString()};
+            localStorage.setItem('qdr_split_recovery_' + operationId, JSON.stringify(recovery));
+            addRecovery('qdr_split_recovery_' + operationId, recovery);
+            const reservation = await QuoteDrDocumentNumbers.reserve('quote', {id:source.clientId,clientNumber:source.clientNumber,name:source.clientName,email:source.clientEmail,phone:source.clientPhone,address:source.projectAddress});
+            const draft = buildSplitQuoteDraft(source, ids, title.value.trim(), reservation.documentNumber, operationId);
+            draft.clientId = reservation.client?.id || draft.clientId;
+            status.textContent = 'Saving the new draft first…';
+            const result = await saveQuoteToSupabase(draft);
+            created = Array.isArray(result?.data) ? result.data[0] : result?.data;
+            if (result?.error || result?.state !== 'cloud_saved' || !created?.id) throw new Error('New draft cloud save is not confirmed. Original rooms were not removed. Check Sync and Recovery and the dashboard before trying again; a queued draft may still sync.');
+            addLink(created.id, 'Open new draft: ' + draft.quoteTitle);
+            if (moving) {
+                const verified = await loadQuoteFromSupabase(created.id);
+                if (verified.error || verified.data?.data?.splitSource?.operationId !== operationId ||
+                    JSON.stringify(verified.data.data.rooms) !== JSON.stringify(draft.rooms)) throw new Error('New draft saved, but its room content could not be verified. Original rooms were not removed. Review the new draft before retrying.');
+                if (JSON.stringify(collectQuoteData().rooms) !== JSON.stringify(source.rooms) || window._supabaseQuoteId !== source.supabaseId) throw new Error('New draft saved, but the original changed meanwhile. Nothing was removed. Review both quotes before continuing.');
+                const reduced = JSON.parse(JSON.stringify(source));
+                reduced.rooms = source.rooms.filter((_, i) => !ids.includes(i));
+                reduced.grandTotal = reduced.total = splitQuoteTotal(source, reduced.rooms, true);
+                reduced._editorInstanceId = operationId; // Never silently adopt another editor's newer version.
+                reduced._clientEditedAt = reduced.savedAt = new Date().toISOString();
+                status.textContent = 'New draft saved. Saving the reduced original…';
+                const saved = await saveQuoteToSupabase(reduced);
+                if (saved?.error || saved?.state !== 'cloud_saved') {
+                    // Keep the intended remaining scope locally, matching any durable queued save.
+                    applyQuoteData(reduced); unsavedChanges = true; saveSessionQuote();
+                    throw new Error('New draft exists, but the reduced original is not confirmed in cloud. Do not split again. Resolve Sync and Recovery before sharing either quote. The pre-split recovery snapshot is retained.');
+                }
+                const row = Array.isArray(saved.data) ? saved.data[0] : saved.data;
+                reduced._serverUpdatedAt = row.updated_at;
+                applyQuoteData(reduced); window._quoteServerUpdatedAt = row.updated_at;
+                unsavedChanges = false; saveSessionQuote(); updateSaveStatus('saved','Split confirmed in cloud');
+            }
+            status.textContent = moving ? 'Split complete. Both quotes are saved. Use the link above to open the new draft.' : 'New draft saved. The original is unchanged. Use the link above to open it.';
+        } catch (error) { status.textContent = error.message || String(error); }
+        finally {
+            window._quoteSplitBusy = false;
+            // No retry in-place: an ambiguous network result may already have queued a new draft.
+            modalEl.querySelectorAll('[data-bs-dismiss]').forEach(el => el.disabled = false);
+        }
+    };
+}
+
         // -- Save / Load / Auto-save ---------------------------------------------
 
         let saveFileHandle = null;
@@ -1058,6 +1235,7 @@
                     : {},
                 status: status,
                 quoteTitle:     document.getElementById('quoteTitle')?.value     || '',
+                splitSource: loadedData.splitSource || null,
                 clientName:     document.getElementById('clientName')?.value     || '',
                 clientId:       selectedClient.id || loadedData.clientId || loadedData.client_id || '',
                 clientNumber:   selectedClient.clientNumber || selectedClient.client_number || loadedData.clientNumber || loadedData.client_number || null,
@@ -1986,6 +2164,7 @@ async function saveQuote() {
         }
 
         async function doAutoSave(options) {
+            if (window._quoteSplitBusy) return { state: 'skipped', reason: 'split_in_progress' };
             options = options || {};
             if (quoteStoragePortalExitActive()) return { state: 'skipped', reason: 'portal_locked' };
             if (!quoteStorageHasOpenDocument()) return { state: 'skipped', reason: 'no_open_quote' };
