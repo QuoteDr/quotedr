@@ -2750,7 +2750,7 @@ if (location.search.includes('debug')) {
                         </button>
                         <ul class="dropdown-menu w-100 quote-actions-menu">
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteCompletenessReview()"><i class="fas fa-clipboard-check me-2 text-primary"></i>Review Quote</a></li>
-                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openSplitQuote()"><i class="fas fa-code-branch me-2 text-primary"></i>Split Quote / Related Quotes</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openSplitQuote()"><i class="fas fa-code-branch me-2 text-primary"></i>Split / Combine Quotes</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteSendSettingsModal(true)"><i class="fas fa-sliders-h me-2 text-primary"></i>Quote Settings</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="generateInteractiveLink()"><i class="fas fa-folder-tree me-2 text-success"></i><span id="quoteGenerateLinkLabel">Share in Client Portal</span></a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="createChangeOrderFromCurrentQuote()" id="createChangeOrderMenuItem" style="display:none;"><i class="fas fa-file-circle-plus me-2 text-warning"></i>Create Change Order</a></li>
@@ -4939,7 +4939,7 @@ Example:
         function applyItemUpgradeGroupsToItem(item) {
             if (!item) return item;
             item.upgradeGroups = normalizeQuoteItemUpgradeGroups(item);
-            if (!item.upgradeGroups.length) return item;
+            if (!item.upgradeGroups.length && !item._itemUpgradeBaseCaptured) return item;
             ensureItemUpgradeBaseState(item);
             clearInvalidItemUpgradeSelections(item);
             var quantity = getQuoteItemUpgradeBaseQuantity(item);
@@ -8890,9 +8890,11 @@ Example:
             item.laborTime = normalizeLaborTime(savedItem.laborTime);
             var previousUpgradeGroups = normalizeQuoteItemUpgradeGroups(item);
             var savedUpgradeGroups = normalizeQuoteItemUpgradeGroups(savedItem);
-            item.upgradeGroups = mergeQuoteItemUpgradeGroupRuntimeState(savedUpgradeGroups, previousUpgradeGroups);
+            if (!item.quoteUpgradeOverride) item.upgradeGroups = mergeQuoteItemUpgradeGroupRuntimeState(savedUpgradeGroups, previousUpgradeGroups);
             item.selectedUpgradeOptionIds = getAllSelectedItemUpgradeOptionIds(item);
-            if (savedItem.upgrade) {
+            if (item.quoteUpgradeOverride) {
+                item.upgrade = null;
+            } else if (savedItem.upgrade) {
                 item.upgrade = cloneSavedItemForQuoteSync(savedItem.upgrade);
             } else {
                 delete item.upgrade;
@@ -9925,10 +9927,14 @@ Example:
 
         function applyLineItemUpgradeDraft(item, previousGroups) {
             if (!window.getLineItemUpgradeDraft) return;
-            item.upgradeGroups = mergeQuoteItemUpgradeGroupRuntimeState(window.getLineItemUpgradeDraft(), previousGroups || []);
-            if (window.lineItemUpgradesWereEdited?.()) item.upgrade = null;
+            item.quoteUpgradeCatalog = window.getLineItemUpgradeDraft();
+            item.quoteDisabledUpgrades = window.getLineItemDisabledUpgrades ? window.getLineItemDisabledUpgrades() : [];
+            item.quoteUpgradeOverride = true;
+            const enabledGroups = window.getLineItemOfferedUpgradeDraft();
+            item.upgradeGroups = mergeQuoteItemUpgradeGroupRuntimeState(enabledGroups, previousGroups || []);
+            item.upgrade = null; // Legacy upgrades are represented in the catalog; never resurrect a disabled option.
             clearInvalidItemUpgradeSelections(item);
-            if (item.upgradeGroups.length) applyItemUpgradeGroupsToItem(item);
+            if (item.upgradeGroups.length || item._itemUpgradeBaseCaptured) applyItemUpgradeGroupsToItem(item);
             else item.upgraded = false;
             if (window.lineItemUpgradesWereEdited?.() && item.choiceGroup) {
                 const selected = getChoiceGroupSelectedOptions(item.choiceGroup)[0];
@@ -9936,6 +9942,8 @@ Example:
                     selected.upgradeGroups = cloneSavedItemForQuoteSync(item.upgradeGroups);
                     selected.upgrade = null;
                     selected.quoteUpgradeOverride = true;
+                    selected.quoteUpgradeCatalog = cloneSavedItemForQuoteSync(item.quoteUpgradeCatalog);
+                    selected.quoteDisabledUpgrades = item.quoteDisabledUpgrades.slice();
                 }
             }
         }
@@ -10565,6 +10573,8 @@ Example:
                 upgrade: item.upgrade ? cloneSavedItemForQuoteSync(item.upgrade) : null,
                 upgradeGroups: normalizeQuoteItemUpgradeGroups(item),
                 quoteUpgradeOverride: item.quoteUpgradeOverride === true,
+                quoteUpgradeCatalog: Array.isArray(item.quoteUpgradeCatalog) ? cloneSavedItemForQuoteSync(item.quoteUpgradeCatalog) : undefined,
+                quoteDisabledUpgrades: Array.isArray(item.quoteDisabledUpgrades) ? item.quoteDisabledUpgrades.slice() : [],
                 quantityMode: item.quantityMode || 'inherit',
                 quantityOverride: item.quantityOverride || ''
             };
@@ -10921,6 +10931,9 @@ Example:
             item.choiceGroup.selectedOptionIds = selectedOptions.map(function(option) { return option.id; });
             var priorUpgradeGroups = normalizeQuoteItemUpgradeGroups(item);
             var selectedBaseOption = selectedOptions[0] || null;
+            item.quoteUpgradeCatalog = selectedBaseOption?.quoteUpgradeCatalog ? cloneSavedItemForQuoteSync(selectedBaseOption.quoteUpgradeCatalog) : undefined;
+            item.quoteDisabledUpgrades = (selectedBaseOption?.quoteDisabledUpgrades || []).slice();
+            item.quoteUpgradeOverride = selectedBaseOption?.quoteUpgradeOverride === true;
             var optionUpgradeGroups = selectedBaseOption ? normalizeQuoteItemUpgradeGroups(selectedBaseOption) : [];
             optionUpgradeGroups = mergeQuoteItemUpgradeGroupRuntimeState(optionUpgradeGroups, priorUpgradeGroups);
             item.upgradeGroups = optionUpgradeGroups;
@@ -14155,7 +14168,7 @@ Example:
             const preview = {
                 quantity: quantity, materialCost: materialCost,
                 unitType: document.getElementById('lineUnitType')?.value || '',
-                upgradeGroups: mergeQuoteItemUpgradeGroupRuntimeState(window.getLineItemUpgradeDraft?.() || [], normalizeQuoteItemUpgradeGroups(original || {}))
+                upgradeGroups: mergeQuoteItemUpgradeGroupRuntimeState(window.getLineItemOfferedUpgradeDraft?.() || [], normalizeQuoteItemUpgradeGroups(original || {}))
             };
             clearInvalidItemUpgradeSelections(preview);
             const breakdown = getQuoteItemMaterialBreakdown(preview);
@@ -19680,7 +19693,7 @@ Example:
     <script src="change-orders.js?v=1778152100"></script>
     <script src="quote-backups.js?v=2026091404"></script>
     <script src="quote-folder-backups.js?v=2026091501"></script>
-    <script src="quote-storage.js?v=2026091703"></script>
+    <script src="quote-storage.js?v=2026091802"></script>
     <script src="property-memory.js?v=2026081001"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
@@ -19786,7 +19799,7 @@ Example:
     </script>
     <script src="quote-review-construction-knowledge.js?v=2026080201"></script>
     <script src="quote-starter-item-library.js?v=2026080201"></script>
-    <script src="quote-items.js?v=2026091701"></script>
+    <script src="quote-items.js?v=2026091802"></script>
     <script src="quote-import.js?v=2026091403"></script>
     <script src="quote-find.js?v=2026091801"></script>
     <script src="supplier-materials.js?v=2026090101"></script>

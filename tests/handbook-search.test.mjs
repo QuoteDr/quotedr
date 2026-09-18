@@ -4,6 +4,12 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Combine basement rooms into an existing dashboard quote','combine-existing-quotes'],
+ ['Combine failed or highlight meanings conflict should I retry?','combine-existing-quotes'],
+ ['Can I merge quotes for different clients?','combine-existing-quotes'],
+ ['Turn off an upgrade for this quote only','quote-only-upgrade-offers'],
+ ['Will hidden upgrade still charge or change my saved database?','quote-only-upgrade-offers'],
+ ['Re-enable an upgrade after reopening the item editor','quote-only-upgrade-offers'],
  ['Find in Quote Show Values drywall quantities and prices','find-quote-show-values'],
  ['Can search add square feet and linear feet together?','find-quote-show-values'],
  ['Why is a search result Price TBD not zero?','find-quote-show-values'],

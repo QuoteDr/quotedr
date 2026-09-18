@@ -33,7 +33,7 @@ async function runFlow(failure) {
  const savedSource={...original,payments:[],signature:undefined,invoiceId:undefined,_serverUpdatedAt:'v1'};
  const calls=[];let createdDraft;let applied;
  const status={textContent:''};
- const c={...ctx,source:savedSource,selected:()=>[1],mode:{value:'move'},title:{value:'Basement'},
+ const c={...ctx,source:savedSource,selected:()=>[1],mode:{value:'move'},title:{value:'Basement'},destinationSelect:{value:''},
   window:{_supabaseQuoteId:'original'},crypto:{randomUUID:()=> 'operation'},
   localStorage:{setItem(){calls.push('recovery');if(failure==='snapshot')throw Error('storage full');}},
   modalEl:{querySelector:selector=>selector==='#splitStatus'?status:{textContent:'totals'},querySelectorAll:()=>[]},

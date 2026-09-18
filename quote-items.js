@@ -25,9 +25,13 @@
         var manageUpgradeWizardState = null;
         var lineItemUpgradeDraft = [];
         var lineItemUpgradeDraftChanged = false;
+        var lineItemDisabledUpgrades = [];
 
         function resetLineItemUpgradeDraft(item) {
-            lineItemUpgradeDraft = cloneManageUpgradeGroups(normalizeManageItemUpgradeGroups(JSON.parse(JSON.stringify(item || {}))));
+            const source = JSON.parse(JSON.stringify(item || {}));
+            if (Array.isArray(source.quoteUpgradeCatalog)) source.upgradeGroups = source.quoteUpgradeCatalog;
+            lineItemUpgradeDraft = cloneManageUpgradeGroups(normalizeManageItemUpgradeGroups(source));
+            lineItemDisabledUpgrades = Array.isArray(source.quoteDisabledUpgrades) ? source.quoteDisabledUpgrades.slice() : [];
             lineItemUpgradeDraftChanged = false;
             const panel = document.getElementById('lineItemUpgradePanel');
             if (panel) panel.open = false;
@@ -38,6 +42,25 @@
             return cloneManageUpgradeGroups(lineItemUpgradeDraft);
         }
 
+        window.getLineItemDisabledUpgrades = function() { return lineItemDisabledUpgrades.slice(); };
+        window.getLineItemOfferedUpgradeDraft = function() {
+            return getLineItemUpgradeDraft().map(function(group) {
+                group.options = group.options.filter(option => !lineItemDisabledUpgrades.includes(group.id + '/' + option.id));
+                group.selectedOptionIds = [];
+                return group;
+            }).filter(group => group.options.length);
+        };
+        window.toggleLineItemUpgradeForQuote = function(groupIndex, optionIndex, enabled) {
+            const group = lineItemUpgradeDraft[groupIndex];
+            const option = group && group.options[optionIndex];
+            if (!option) return;
+            const key = group.id + '/' + option.id;
+            lineItemDisabledUpgrades = lineItemDisabledUpgrades.filter(id => id !== key);
+            if (!enabled) lineItemDisabledUpgrades.push(key);
+            lineItemUpgradeDraftChanged = true;
+            renderLineItemUpgradePanel();
+        };
+
         function renderLineItemUpgradePanel() {
             if (typeof window.calculateMaterialTotal === 'function') window.calculateMaterialTotal();
             const target = document.getElementById('lineItemUpgradeSummary');
@@ -47,7 +70,10 @@
                     '<button type="button" class="btn btn-sm btn-outline-primary" data-upgrade-wizard-action="edit-existing" data-upgrade-group-id="' + manageItemsAttr(group.id) + '">Edit in Wizard</button> ' +
                     '<button type="button" class="btn btn-sm btn-outline-danger" onclick="removeLineItemUpgradeGroup(' + index + ')">Remove group</button></div></div>' +
                     '<div class="small text-muted">' + (group.type === 'multiple' ? 'Pick Multiple' : 'Pick One') + '</div>' +
-                    '<ul class="mb-0">' + (group.options || []).map(function(option) { return '<li>' + manageItemsEscape(option.name) + '</li>'; }).join('') + '</ul></div>';
+                    '<ul class="mb-0">' + (group.options || []).map(function(option, optionIndex) {
+                        const enabled = !lineItemDisabledUpgrades.includes(group.id + '/' + option.id);
+                        return '<li>' + manageItemsEscape(option.name) + ' <label class="ms-2 small"><input type="checkbox" ' + (enabled ? 'checked ' : '') + 'onchange="toggleLineItemUpgradeForQuote(' + index + ',' + optionIndex + ',this.checked)"> Offer on this quote</label>' + (enabled ? '' : ' <span class="text-muted">Hidden; not charged</span>') + '</li>';
+                    }).join('') + '</ul></div>';
             }).join('') : '<div class="small text-muted">No upgrades yet. Use the wizard to add optional upgrades or stackable add-ons.</div>';
         }
 

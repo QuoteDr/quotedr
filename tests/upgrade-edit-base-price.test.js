@@ -51,3 +51,25 @@ assert.equal(freeBase.total,0,'zero base is not replaced by effective price');
 const editSource=source.slice(source.indexOf('function editLineItem('),source.indexOf('function editLineItemNote('));
 assert(editSource.includes('if (hasRecordedItemUpgradeBase(item))'));
 console.log('Legacy and grouped upgrades: 2100 base + 400 selected, edit/reload/deselect/reselect and zero-base checks passed.');
+const disabled=fixture();
+ctx.ensureItemUpgradeBaseState(disabled);
+disabled.upgradeGroups=[];
+ctx.applyItemUpgradeGroupsToItem(disabled);
+assert.equal(disabled.total,2100,'disabling the last selected option restores base charge');
+assert.equal(disabled.materialCost,600,'disabled upgrade materials are not charged');
+
+// Exercise the real editor apply path, not just its pricing helper.
+const catalog=[{id:'g',selectedOptionIds:[],options:[{id:'addon',name:'Add-on',rate:400,upgradeType:'add_on'}]}];
+Object.assign(ctx, {window:{getLineItemUpgradeDraft:()=>JSON.parse(JSON.stringify(catalog)),getLineItemDisabledUpgrades:()=>['g/addon'],getLineItemOfferedUpgradeDraft:()=>[],lineItemUpgradesWereEdited:()=>true},
+ cloneSavedItemForQuoteSync:value=>JSON.parse(JSON.stringify(value)),mergeQuoteItemUpgradeGroupRuntimeState:groups=>groups,
+ getChoiceGroupSelectedOptions:group=>group.options});
+vm.runInContext(source.slice(source.indexOf('function applyLineItemUpgradeDraft('),source.indexOf('async function confirmAddLine(')),ctx);
+const edited=fixture();ctx.ensureItemUpgradeBaseState(edited);edited.choiceGroup={options:[{}]};
+ctx.applyLineItemUpgradeDraft(edited,edited.upgradeGroups);
+assert.equal(edited.total,2100);
+assert.equal(edited.upgrade,null);
+assert.equal(edited.upgradeGroups.length,0);
+assert.equal(edited.quoteUpgradeCatalog[0].options.length,1);
+assert.equal(edited.choiceGroup.options[0].quoteDisabledUpgrades[0],'g/addon');
+assert.equal(edited.choiceGroup.options[0].quoteUpgradeOverride,true);
+console.log('Real editor apply removes disabled charges and persists choice-group override/catalog');

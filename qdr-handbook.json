@@ -1,7 +1,23 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-18.2",
+  "version": "2026-09-18.3",
   "articles": [
+    {
+      "id": "combine-existing-quotes",
+      "title": "Combine quotes: copy or move rooms into an existing dashboard draft",
+      "verifiedAt": "2026-09-18",
+      "release": "2026-09-18.3",
+      "sources": ["quote-storage.js", "quote-builder.html"],
+      "body": "Save the source quote and wait for Cloud saved. Quote Actions > Split / Combine Quotes offers New quote or an existing dashboard quote in Destination. Use Find an existing dashboard quote to filter by client, name or number, then choose the destination and rooms. Only a different unshared draft with no payment or acceptance history is eligible; invoices, change orders and deleted quotes are excluded. Choose Copy to leave the source intact, or Move for an eligible unshared source draft while leaving at least one source room. Review & Combine shows destination and source totals, then Combine Rooms confirms. Different clients require an extra confirmation. Incoming rooms are appended separately with new room IDs; their notes, photos, pricing and quote-only upgrade settings are retained. Destination client, currency, tax, terms, payment settings, expiry, category styling and quote-wide adjustment remain in effect. Source-wide adjustments and payments do not transfer. Currency mismatches and conflicting highlight meanings block combining; align meanings or change the source colour first. Existing destination content is retained. Already-transferred source rooms are blocked to avoid accidental duplicates. Both pre-operation snapshots are retained locally and available through Download pre-split recovery copy. Destination must save successfully and read back before Move removes source rooms. Close and reopen if either version changed. If a save is unconfirmed, do not repeat: inspect Sync and Recovery and both quotes, since queued changes can still sync. Download recovery copies before troubleshooting; do not clear browser storage or restore an old full quote over newer work. Combining does not send clients messages or combine balances owing. Related source/destination links appear in this dialog."
+    },
+    {
+      "id": "quote-only-upgrade-offers",
+      "title": "Hide or enable an individual upgrade for this quote only",
+      "verifiedAt": "2026-09-18",
+      "release": "2026-09-18.3",
+      "sources": ["quote-items.js", "quote-builder.html"],
+      "body": "In Add Line Item or Edit Line Item, expand Upgrades & Add-ons. Beside each upgrade option, uncheck Offer on this quote, then Add Line Item or Save Changes. The option is retained in the editor with Hidden; not charged, but removed from the offered client choices and pricing calculations. Disabling a selected upgrade restores the applicable base pricing; review the new total. Reopen the editor and check Offer on this quote to offer it again; re-enabling does not automatically select it or charge for it. Other quotes and the saved item database are unchanged. Cancel discards toggle edits. Save To Database or Update Database is a separate explicit action and retains the full reusable upgrade catalog, not this quote's hidden state. Quote-only upgrade definitions are retained instead of refreshed from the library. Wait for Cloud saved before closing or switching quotes and verify after reopening. Existing published copies require the normal quote update workflow; editing does not itself notify a client. Keep normal recovery backups and do not clear browser storage if cloud saving is unconfirmed."
+    },
     {
       "id": "find-quote-show-values",
       "title": "Find in Quote: Show Values for matching quantities and prices",
@@ -21,10 +37,10 @@
     {
       "id": "split-quote-rooms",
       "title": "Split Quote: move or copy basement rooms into a separate phase quote",
-      "verifiedAt": "2026-09-17",
-      "release": "2026-09-17.4",
+      "verifiedAt": "2026-09-18",
+      "release": "2026-09-18.3",
       "sources": ["quote-builder.html", "quote-storage.js", "supabase-v2.js"],
-      "body": "Save the original and wait for Cloud saved, then open Quote Actions > Split Quote / Related Quotes. Enter New quote name, check rooms/phases and choose Copy or Move. Copy is the default and leaves the original unchanged. Move is restricted to unshared drafts without payment or acceptance history and must leave at least one room. Invoices and change orders cannot be split here. Review the displayed new draft and original totals, then Review & Create Draft > Create Draft. These are scope values, not amounts owing. Room notes, photos, highlights and line pricing are copied; quote-wide adjustments stay on the original and are not apportioned to the new draft. The new quote has its own number and is unsent. No payments, signatures, invoices or portal access are transferred, and no client message is sent. Review its payment settings and expiry before sharing: expiry starts afresh, and deposit review does not carry over. The new draft must be cloud-saved and its rooms read back before Move updates the original. A full pre-split local recovery copy is retained; Download pre-split recovery copy is available in this dialog. Storage failure blocks the operation before either write. Original and split drafts are linked under Split Quote / Related Quotes; links open separately. If saving is unconfirmed, check Sync and Recovery and the dashboard before retrying: a queued draft may still sync. If the draft exists but reducing the original fails, do not split again or share either document until resolving the pending save/conflict. Keep the recovery copy and never overwrite a newer quote wholesale to recover selected rooms. Local recovery is not a guaranteed off-device backup; preserve your normal backups."
+      "body": "Save the original and wait for Cloud saved, then open Quote Actions > Split / Combine Quotes. Enter New quote name, check rooms/phases and choose Copy or Move. Copy is the default and leaves the original unchanged. Move is restricted to unshared drafts without payment or acceptance history and must leave at least one room. Invoices and change orders cannot be split here. Review the displayed new draft and original totals, then Review & Create Draft > Create Draft. These are scope values, not amounts owing. Room notes, photos, highlights and line pricing are copied; quote-wide adjustments stay on the original and are not apportioned to the new draft. The new quote has its own number and is unsent. No payments, signatures, invoices or portal access are transferred, and no client message is sent. Review its payment settings and expiry before sharing: expiry starts afresh, and deposit review does not carry over. The new draft must be cloud-saved and its rooms read back before Move updates the original. A full pre-split local recovery copy is retained; Download pre-split recovery copy is available in this dialog. Storage failure blocks the operation before either write. Original and split drafts are linked under Split / Combine Quotes; links open separately. If saving is unconfirmed, check Sync and Recovery and the dashboard before retrying: a queued draft may still sync. If the draft exists but reducing the original fails, do not split again or share either document until resolving the pending save/conflict. Keep the recovery copy and never overwrite a newer quote wholesale to recover selected rooms. Local recovery is not a guaranteed off-device backup; preserve your normal backups."
     },
     {
       "id": "quote-only-item-photo",

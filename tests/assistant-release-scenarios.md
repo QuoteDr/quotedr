@@ -71,6 +71,13 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Simulate a new draft saved with original update unconfirmed. Do not advise repeating Split; resolve Sync and Recovery, retain/download the pre-split recovery copy and review both documents before sharing.
 # PDF layout size
 
+## Combine quotes and per-quote upgrades
+- Combine rooms into an existing quote: direct to Quote Actions > Split / Combine Quotes, search/select Destination from dashboard drafts, choose rooms, Copy/Move, review totals. Explain unshared draft eligibility and no financial-history transfer.
+- Different clients: require explicit confirmation; destination retains its client and tax/settings. Conflicting highlight meanings: block and align first, never silently replace.
+- Failed destination save/readback: source must remain intact; advise checking Sync and Recovery and both records before retrying. Do not suggest clearing storage.
+- Hide Level 5 drywall upgrade on one quote: Edit Line Item > Upgrades & Add-ons > uncheck Offer on this quote > Save Changes. Existing selected charge removed; full catalog retained for re-enable. No database or other-quote change.
+- Follow-up about reopening and re-enabling: choice persists in saved quote, enabled option is offered but not automatically selected. Cancel does not apply edits.
+
 ## Find in Quote values
 - Ask how to see drywall quantities in search: Tools > Find in Quote > Show Values. Explain actual quantity/unit, marked-up rate before discounts, line total before tax.
 - Follow up about adding all results: no automatic sum; incidental text matches and mixed units must be reviewed. Do not infer quantities from description text.
