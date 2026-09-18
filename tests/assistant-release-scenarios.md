@@ -71,6 +71,11 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Simulate a new draft saved with original update unconfirmed. Do not advise repeating Split; resolve Sync and Recovery, retain/download the pre-split recovery copy and review both documents before sharing.
 # PDF layout size
 
+## Find in Quote values
+- Ask how to see drywall quantities in search: Tools > Find in Quote > Show Values. Explain actual quantity/unit, marked-up rate before discounts, line total before tax.
+- Follow up about adding all results: no automatic sum; incidental text matches and mixed units must be reviewed. Do not infer quantities from description text.
+- Ask why a value says TBD or Not included: do not treat TBD as a free item or excluded rows as part of the quote total. Toggle is read-only and session-only.
+
 - Ask: "My quote prints 39 pages. Can I shrink the font?" Expect Clean PDF Settings > PDF text and layout size; Large 100%, Standard 85%, Compact 75%, then Continue to Print. Do not promise a page count.
 - Follow up: "Will that change what my client sees online or remove notes?" Expect print-only, complete content and no quote-data changes.
 - Failure: "It is tiny now." Expect check browser Scale 100% (avoid double shrinking), cancel and choose Large again. No clearing browser storage or customer-data changes.

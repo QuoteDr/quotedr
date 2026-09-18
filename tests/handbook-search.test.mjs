@@ -4,6 +4,9 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Find in Quote Show Values drywall quantities and prices','find-quote-show-values'],
+ ['Can search add square feet and linear feet together?','find-quote-show-values'],
+ ['Why is a search result Price TBD not zero?','find-quote-show-values'],
  ['PDF smaller text fewer printed pages compact formatting','pdf-print-layout-size'],
  ['Does compact PDF shrink my interactive quote too?','pdf-print-layout-size'],
  ['PDF too small browser scale shrinking twice','pdf-print-layout-size'],

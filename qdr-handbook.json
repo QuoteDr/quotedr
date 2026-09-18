@@ -1,7 +1,15 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-18.1",
+  "version": "2026-09-18.2",
   "articles": [
+    {
+      "id": "find-quote-show-values",
+      "title": "Find in Quote: Show Values for matching quantities and prices",
+      "verifiedAt": "2026-09-18",
+      "release": "2026-09-18.2",
+      "sources": ["quote-find.js", "quote-builder.html"],
+      "body": "Open the builder Tools menu > Find in Quote. Search item names, categories, descriptions, job notes or rooms; all search words must match. Turn on Show Values to display each result's actual Quantity and unit, Rate (before discounts) and Line total (before tax). Rate includes applicable markup and the active rate; line totals use the builder's discount and change-order calculations. Price TBD is labelled instead of shown as a zero price. Items excluded from the quote total are labelled Not included in quote total. The toggle starts off and is remembered only within the current page session, including closing and reopening Find in Quote. It does not edit or save quote data or affect client views. Results show stored quantities, not measurements extracted from descriptions. Search can match incidental mentions of drywall or other work: inspect each match before adding quantities and keep square feet, linear feet and other units separate. There is no automatic aggregate total. Toggle off to hide values; the search text and scroll position remain. Click a result title to close search and jump to that item."
+    },
     {
       "id": "pdf-print-layout-size",
       "title": "PDF formatting: smaller text and fewer printed pages",

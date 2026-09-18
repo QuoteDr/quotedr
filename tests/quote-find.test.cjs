@@ -15,3 +15,20 @@ assert.equal(search(rooms,'   ').length,0);
 assert.equal(search([], 'lights').length,0);
 assert.equal(JSON.stringify(rooms),before);
 console.log('Quote find names, scope, notes, categories and read-only tests passed');
+Object.assign(ctx.window, {
+ isQuotePriceTbd: item => item.priceTbd,
+ qdFormatMoney: n => '$' + n.toFixed(2),
+ quoteItemMarkedAmount: (room,item,n) => n * (1 + (room.markup || 0)/100),
+ itemChargedTotal: item => item.quantity * item.rate - (item.discount || 0),
+ qdDiscounts: () => ({activeRate:item => item.rate}),
+ quoteOptionalItemIncludedByDefault: item => !item.excluded,
+ coDisplayLineAmount: () => -50
+});
+const values = ctx.window.QuoteDrQuoteFind.valuesText;
+const sample = {quantity:462.5,unitType:'sq ft',rate:2,discount:25};
+assert.match(values({markup:10},sample), /Quantity: 462.5 sq ft.*\$2.20.*\$990.00/);
+assert.match(values({}, {...sample,quantity:0,priceTbd:true,excluded:true}), /Quantity: 0.*Price TBD.*Not included/);
+assert.match(values({}, {...sample,quantity:null}), /Quantity: Not set/);
+ctx.window._quoteDocumentType='change_order';
+assert.match(values({},sample), /Line total \(before tax\): \$-50.00/);
+console.log('Show Values quantities, markup, discounts, TBD, exclusions and change orders passed');

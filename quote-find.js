@@ -1,6 +1,20 @@
 (function(global) {
     'use strict';
     let lastQuery = '';
+    let showValues = false;
+    function valuesText(room, item) {
+        const quantity = Number(item.quantity);
+        const qty = item.quantity !== '' && item.quantity != null && Number.isFinite(quantity) ? quantity.toLocaleString(undefined, {maximumFractionDigits: 6}) : 'Not set';
+        const unit = item.unitType || item.unit || '';
+        const tbd = typeof global.isQuotePriceTbd === 'function' && global.isQuotePriceTbd(item);
+        const money = value => typeof global.qdFormatMoney === 'function' ? global.qdFormatMoney(value) : Number(value).toFixed(2);
+        const mark = value => global.quoteItemMarkedAmount(room, item, value);
+        const amount = global._quoteDocumentType === 'change_order' ? global.coDisplayLineAmount(item) : global.itemChargedTotal(item);
+        const rate = tbd ? 'Price TBD' : money(mark(global.qdDiscounts().activeRate(item)));
+        const total = tbd ? 'Price TBD' : money(mark(amount));
+        const excluded = typeof global.quoteOptionalItemIncludedByDefault === 'function' && !global.quoteOptionalItemIncludedByDefault(item);
+        return 'Quantity: ' + qty + (unit ? ' ' + unit : '') + ' · Rate (before discounts): ' + rate + ' · Line total (before tax): ' + total + (excluded ? ' · Not included in quote total' : '');
+    }
     const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     function search(rooms, query) {
         const words = normalize(query).trim().split(/\s+/).filter(Boolean);
@@ -26,12 +40,18 @@
         dialog.style.cssText = 'width:min(840px,calc(100% - 24px));max-height:90dvh;border:1px solid #ccd6e0;border-radius:12px;padding:20px;color:#183047;';
         dialog.innerHTML = '<div class="d-flex justify-content-between gap-2"><h4 id="quoteFindTitle">Find in Quote</h4><button type="button" class="btn btn-outline-secondary" data-close>Close</button></div><label for="quoteFindInput">Search item names, categories, descriptions and job notes</label><input id="quoteFindInput" type="search" class="form-control my-2" placeholder="For example: basement pot lights" autocomplete="off"><p class="small text-muted">All search words must match. Includes collapsed descriptions. Ctrl+F (Cmd+F on Mac) opens your browser’s Find for visible page text.</p><p data-count role="status" aria-live="polite"></p><div data-results style="max-height:55dvh;overflow:auto"></div>';
         const input = dialog.querySelector('input');
+        const toggleLabel = document.createElement('label');
+        toggleLabel.className = 'form-check form-switch mb-3';
+        const toggle = document.createElement('input');
+        toggle.type = 'checkbox'; toggle.className = 'form-check-input'; toggle.checked = showValues;
+        toggleLabel.append(toggle, document.createTextNode('Show Values'));
+        input.after(toggleLabel);
         const results = dialog.querySelector('[data-results]');
         const count = dialog.querySelector('[data-count]');
         function close() { dialog.close(); dialog.remove(); if (previousFocus && previousFocus.isConnected) previousFocus.focus(); }
         dialog.querySelector('[data-close]').onclick = close;
         dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
-        input.addEventListener('input', () => {
+        const render = () => {
             lastQuery = input.value;
             results.replaceChildren();
             if (!input.value.trim()) { count.textContent = 'Type to search this quote. Nothing will be changed.'; return; }
@@ -57,12 +77,24 @@
                 const scope = document.createElement('p'); scope.className = 'small mb-0 mt-2'; scope.style.whiteSpace = 'pre-wrap';
                 scope.textContent = [match.category, match.scope].filter(Boolean).join('\n');
                 card.append(button, scope); results.appendChild(card);
+                if (showValues) {
+                    const room = getRooms().find(room => room.id === match.roomId);
+                    const item = room && room.items[match.index];
+                    if (item) {
+                        const values = document.createElement('p');
+                        values.className = 'small fw-bold mt-2 mb-0';
+                        values.textContent = valuesText(room, item);
+                        card.appendChild(values);
+                    }
+                }
             });
-        });
+        };
+        input.addEventListener('input', render);
+        toggle.addEventListener('change', () => { showValues = toggle.checked; const top = results.scrollTop; render(); results.scrollTop = top; });
         document.body.appendChild(dialog); dialog.showModal(); input.focus();
         count.textContent = 'Type to search this quote. Nothing will be changed.';
         input.value = lastQuery;
         if (lastQuery) input.dispatchEvent(new Event('input'));
     }
-    global.QuoteDrQuoteFind = {search, open};
+    global.QuoteDrQuoteFind = {search, open, valuesText};
 })(window);
