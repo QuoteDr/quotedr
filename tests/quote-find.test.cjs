@@ -32,3 +32,20 @@ assert.match(values({}, {...sample,quantity:null}), /Quantity: Not set/);
 ctx.window._quoteDocumentType='change_order';
 assert.match(values({},sample), /Line total \(before tax\): \$-50.00/);
 console.log('Show Values quantities, markup, discounts, TBD, exclusions and change orders passed');
+const builder = fs.readFileSync('quote-builder.html','utf8');
+const deleteCode = builder.slice(builder.indexOf('        function deleteQuoteFindItems('), builder.indexOf('        function deleteItem('));
+const a = {}, b = {}, original = {original:true};
+const room = {items:[a,b,original]};
+let pushes = 0, finishes = 0;
+Object.assign(ctx, {rooms:[room], collectQuoteData:()=>({}), quoteDataIsPortalLockedForBuilder:()=>false,
+ _pushUndo:()=>pushes++, markQuoteBuilderOriginalItemRemoved:item=>{ if(item.original) {item.removed=true;return true;} return false; },
+ finishRoomBulkItemAction:()=>finishes++});
+vm.runInContext(deleteCode,ctx);
+assert.equal(ctx.deleteQuoteFindItems([{room,item:a},{room,item:original}]),true);
+assert.deepEqual(room.items,[b,original]); assert.equal(original.removed,true);
+assert.equal(pushes,1); assert.equal(finishes,1);
+assert.equal(ctx.deleteQuoteFindItems([{room,item:a}]),false);
+ctx.quoteDataIsPortalLockedForBuilder=()=>true;
+assert.equal(ctx.deleteQuoteFindItems([{room,item:b}]),false);
+assert.equal(pushes,1);
+console.log('Bulk find deletion: identity validation, one undo snapshot, retained originals and locked guard passed');

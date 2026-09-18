@@ -1,7 +1,15 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-18.3",
+  "version": "2026-09-18.4",
   "articles": [
+    {
+      "id": "find-quote-delete-selected",
+      "title": "Find in Quote: select and delete matching line items across rooms",
+      "verifiedAt": "2026-09-18",
+      "release": "2026-09-18.4",
+      "sources": ["quote-find.js", "quote-builder.html"],
+      "body": "In the builder Tools menu open Find in Quote and search for the work, such as drywall, EPS panels or framing. Check individual results or Select all results. Inspect each room and item carefully: search also matches incidental words in descriptions and job notes. Show Values helps review quantities and prices. Clear selection deselects everything; changing the search also clears selection so hidden matches cannot be deleted. Delete selected shows a confirmation listing the rooms and items. Cancel leaves them unchanged. Confirm removes only those quote line items, keeps rooms and does not delete saved database items. Change-order original items follow the existing removed-item behaviour rather than being erased. Locked portal quotes and an active Split / Combine operation cannot be edited this way. Immediately use Ctrl+Z or a room Undo button to undo the batch before making further edits; undo history is page-session only and is not a backup after refresh. Normal quote saving applies: review totals and wait for Cloud saved before closing or switching quotes. This does not send client messages. Keep a backup before bulk cleanup; do not clear browser storage if saving is unconfirmed."
+    },
     {
       "id": "combine-existing-quotes",
       "title": "Combine quotes: copy or move rooms into an existing dashboard draft",

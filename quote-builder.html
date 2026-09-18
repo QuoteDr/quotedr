@@ -12573,6 +12573,18 @@ Example:
             showToast('Choice group added to ' + room.name, 'success');
         }
 
+        function deleteQuoteFindItems(entries) {
+            if (window._quoteSplitBusy || quoteDataIsPortalLockedForBuilder(collectQuoteData())) return false;
+            if (!entries.length || entries.some(entry => !rooms.includes(entry.room) || !entry.room.items.includes(entry.item))) return false;
+            _pushUndo();
+            const targets = new Set(entries.map(entry => entry.item));
+            rooms.forEach(room => {
+                room.items = room.items.filter(item => !targets.has(item) || markQuoteBuilderOriginalItemRemoved(item));
+            });
+            finishRoomBulkItemAction('Deleted ' + targets.size + ' selected line items. Undo is available.');
+            return true;
+        }
+
         function deleteItem(roomId, itemIndex) {
             const room = rooms.find(r => r.id === roomId);
             if (room) {
@@ -19801,7 +19813,7 @@ Example:
     <script src="quote-starter-item-library.js?v=2026080201"></script>
     <script src="quote-items.js?v=2026091802"></script>
     <script src="quote-import.js?v=2026091403"></script>
-    <script src="quote-find.js?v=2026091801"></script>
+    <script src="quote-find.js?v=2026091802"></script>
     <script src="supplier-materials.js?v=2026090101"></script>
     <script>
         // Load templates from localStorage on startup

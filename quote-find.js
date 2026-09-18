@@ -48,10 +48,32 @@
         input.after(toggleLabel);
         const results = dialog.querySelector('[data-results]');
         const count = dialog.querySelector('[data-count]');
+        const selected = new Set();
+        const actions = document.createElement('div');
+        actions.className = 'd-flex gap-2 mb-2 align-items-center';
+        actions.innerHTML = '<button type="button" class="btn btn-outline-secondary" data-all>Select all results</button><button type="button" class="btn btn-outline-secondary" data-clear>Clear selection</button><button type="button" class="btn btn-danger" data-delete disabled>Delete selected</button>';
+        count.before(actions);
+        const deleteButton = actions.querySelector('[data-delete]');
+        const updateSelection = () => { deleteButton.disabled = !selected.size; deleteButton.textContent = 'Delete selected (' + selected.size + ')'; };
+        actions.querySelector('[data-clear]').onclick = () => { selected.clear(); render(); };
+        actions.querySelector('[data-all]').onclick = () => {
+            search(getRooms(), input.value).forEach(match => selected.add(getRooms().find(room => room.id === match.roomId).items[match.index]));
+            render();
+        };
+        deleteButton.onclick = () => {
+            const entries = [];
+            getRooms().forEach(room => room.items.forEach(item => { if (selected.has(item)) entries.push({room, item}); }));
+            if (!entries.length) return;
+            const names = entries.map(entry => entry.room.name + ' · ' + (entry.item.description || entry.item.name || 'Unnamed item'));
+            if (!global.confirm('Delete these ' + entries.length + ' line items from this quote? Rooms and saved database items are kept.\n\n' + names.join('\n') + '\n\nYou can undo immediately with Ctrl+Z or the room Undo button.')) return;
+            if (global.deleteQuoteFindItems(entries)) { selected.clear(); render(); }
+            else { selected.clear(); render(); count.textContent = 'Nothing deleted. The quote is locked, busy, or these items changed. Close and review the quote before trying again.'; }
+        };
         function close() { dialog.close(); dialog.remove(); if (previousFocus && previousFocus.isConnected) previousFocus.focus(); }
         dialog.querySelector('[data-close]').onclick = close;
         dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
         const render = () => {
+            updateSelection();
             lastQuery = input.value;
             results.replaceChildren();
             if (!input.value.trim()) { count.textContent = 'Type to search this quote. Nothing will be changed.'; return; }
@@ -60,6 +82,13 @@
             matches.forEach(match => {
                 const card = document.createElement('div');
                 card.className = 'border rounded p-3 mb-2';
+                const item = getRooms().find(room => room.id === match.roomId).items[match.index];
+                const select = document.createElement('input');
+                select.type = 'checkbox'; select.className = 'form-check-input me-2';
+                select.setAttribute('aria-label', 'Select ' + match.roomName + ' · ' + match.title);
+                select.checked = selected.has(item);
+                select.onchange = () => { if (select.checked) selected.add(item); else selected.delete(item); updateSelection(); };
+                card.append(select);
                 const button = document.createElement('button');
                 button.type = 'button'; button.className = 'btn btn-link p-0 text-start fw-bold';
                 button.textContent = match.roomName + ' · ' + match.title;
@@ -89,7 +118,7 @@
                 }
             });
         };
-        input.addEventListener('input', render);
+        input.addEventListener('input', () => { selected.clear(); render(); });
         toggle.addEventListener('change', () => { showValues = toggle.checked; const top = results.scrollTop; render(); results.scrollTop = top; });
         document.body.appendChild(dialog); dialog.showModal(); input.focus();
         count.textContent = 'Type to search this quote. Nothing will be changed.';

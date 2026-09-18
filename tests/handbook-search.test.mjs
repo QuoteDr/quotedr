@@ -11,6 +11,8 @@ const cases=[
  ['Will hidden upgrade still charge or change my saved database?','quote-only-upgrade-offers'],
  ['Re-enable an upgrade after reopening the item editor','quote-only-upgrade-offers'],
  ['Find in Quote Show Values drywall quantities and prices','find-quote-show-values'],
+ ['delete selected drywall search results across rooms','find-quote-delete-selected'],
+ ['bulk cleanup EPS panels clear selection undo deletion','find-quote-delete-selected'],
  ['Can search add square feet and linear feet together?','find-quote-show-values'],
  ['Why is a search result Price TBD not zero?','find-quote-show-values'],
  ['PDF smaller text fewer printed pages compact formatting','pdf-print-layout-size'],

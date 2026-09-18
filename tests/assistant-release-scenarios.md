@@ -87,3 +87,9 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Follow up: "Will that change what my client sees online or remove notes?" Expect print-only, complete content and no quote-data changes.
 - Failure: "It is tiny now." Expect check browser Scale 100% (avoid double shrinking), cancel and choose Large again. No clearing browser storage or customer-data changes.
 - Ask about internal reports: same scaling, private appendix remains internal-only; does not add profit information to client PDFs.
+# Find in Quote bulk cleanup
+
+- Ask: "I combined my drywall costs; how do I delete the old individual lines across rooms?" Expect Tools > Find in Quote, inspect matches, checkbox selection, Delete selected and confirmation; never claim the bot deleted customer data.
+- Follow up: "What if I search for framing next?" Expect selection clears when the search changes; Show Values does not clear it.
+- Ask: "Can I undo after refreshing, and does this delete my saved items?" Expect page-session undo only, saved database unchanged, backups and confirmed cloud saving before leaving.
+- Failure: locked portal quote or stale items must not be described as successfully deleted. Change-order originals retain normal removal semantics.
