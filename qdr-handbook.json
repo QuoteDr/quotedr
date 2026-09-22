@@ -1,7 +1,39 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-18.4",
+  "version": "2026-09-21.2",
   "articles": [
+    {
+      "id": "line-discount-per-unit",
+      "title": "Line Discount: dollars off each unit versus the whole line",
+      "verifiedAt": "2026-09-21",
+      "release": "2026-09-21.1",
+      "sources": ["quote-builder.html", "quote-discounts.js", "interactive-quote-viewer.html", "invoice-viewer.html"],
+      "body": "In Add Line Item or Edit Line Item, open Line Discount and choose $ off each unit. Enter a positive discount amount and an optional label such as Honour original pricing, then Add Line Item or Save Changes. For six doors at $650 with $50 off each unit, the discount is $300 and the line is $3,600 before any applicable markup and tax. Changing quantity automatically changes this discount; fractional quantities work too. $ off line total is the old fixed one-time dollar discount, and % off is unchanged. Per-unit means the line quantity, not one discount for each selected add-on. Leave Apply discount to selected upgrades/add-ons off to cap the discount at the base-item price and leave upgrades at full price; turn it on to allow it against the combined eligible price. Discounts are capped and cannot make an eligible line negative. Price TBD is not a priced discount calculation. Existing markup and tax rules still apply; review the final client preview and totals. Cancel discards editor changes; wait for Cloud saved before closing, refreshing or switching quotes. The quote edit does not itself change the reusable database price; do not choose Update Database unless you intend to change the saved item. Existing quotes with $ off line total retain their old behaviour. Web and dependent backend functions must be released together before using the new type in live client documents."
+    },
+    {
+      "id": "daily-work-push-reminders",
+      "title": "Phone reminders for daily work logs without SMS",
+      "verifiedAt": "2026-09-20",
+      "release": "2026-09-20.2",
+      "sources": ["labor-reminders.js", "labor-tracker.html", "dashboard.html", "sw.js"],
+      "body": "Open Labour Tracker > Optional phone reminders. Deployment and server push configuration must be complete first; otherwise the panel says reminders are not configured. Choose Reminder time and optionally Include weekends, then Enable reminders on this device and allow browser notifications. Default is weekdays at 17:30; quiet hours are 20:00–08:00 in the displayed saved time zone. Re-enable to save schedule changes. One web browser/device per account is supported; enabling another replaces the previous device and disables the older native mobile morning/evening schedule. On iPhone, add QDR to the Home Screen and open it there. Send test notification sends immediately, at most one attempt per five-minute window. Accepted means the push service accepted the request, not confirmed phone delivery. Check permissions, connectivity and phone notification settings if it does not arrive. No SMS number is needed; it is a push notification, not a text-message conversation. Tap it to open Daily Work Check-in, sign in if needed, and manually record tasks and hours against quote items. The dashboard retains a Daily work check-in card and pending review count even without notifications. Any saved check-in for that date suppresses the web reminder; it does not assess whether every job is complete. Failed or uncertain daily sends are not retried that day to avoid duplicates. Turn off reminders disables web delivery but does not restore the old native schedule; an already in-flight notification may still arrive. Never assume a notification recorded hours: save the work log, confirm saving, and approve it separately. AI task matching is not part of this manual form. This release was reviewed against local source; real-device delivery, server setup and authenticated chatbot verification remain separate release checks."
+    },
+    {
+      "id": "labor-line-item-work-checkin",
+      "title": "Daily Work Check-in: actual hours and suggested labour production rates",
+      "verifiedAt": "2026-09-20",
+      "release": "2026-09-20.1",
+      "sources": ["labor-tracker.html", "labor-worklog.js"],
+      "body": "Open Labour Tracker and scroll to Daily Work Check-in. Sign in with access to Labour Tracker; the existing daily-check-in database table must be available. Choose a saved Quote and Room / line item, date and optional worker name. Enter hours worked per person excluding unpaid breaks and the number of people working those hours; four hours with two people is eight labour-hours. For unequal worker hours, enter separate logs. Enter quantity completed today, not the whole quoted quantity. Choose Original scope / normal work, Extra scope, Rework or Waiting / delays and describe the work. Save draft work log does not change a quote estimate, saved item, GPS session or payment. Approve log or Reject log in the review list. Approved normal-work entries alone produce weighted units-per-labour-hour suggestions; rework, extra scope and waiting do not train the rate. The original item labour settings are saved as a snapshot for comparison. To adopt a suggestion manually, open Manage Line Items, find the same category/name/unit, set Labor Time to Units/hr, enter the reviewed suggestion and save the item explicitly. Existing quotes are not automatically rewritten. Future item use and the existing Timeline Report use the saved estimate; this is not a dependency-aware calendar schedule. Suggestions pool identical category/name/unit across the latest 500 check-ins: inspect scope and sample size. Tracker session comparisons use loaded approved sessions from the last 90 days and do not automatically reconcile crews, payroll or breaks. This form is manual: SMS reminders, AI task matching and one-click rate adoption are not available here yet. It does not use the legacy mobile endpoint's automatically learned rates. If saving is unconfirmed, keep the page open and use Retry same draft; it checks the same record ID instead of inserting another. Do not close the tab or enter the same log elsewhere until resolved; pending form recovery after closing is not supported yet. If a record changed during review, reload rather than overwrite it. Historical room/item snapshots are not automatically relinked after items are moved, split or deleted."
+    },
+    {
+      "id": "line-item-negative-rate",
+      "title": "Enter a negative rate or material reimbursement on a phone",
+      "verifiedAt": "2026-09-19",
+      "release": "2026-09-19.1",
+      "sources": ["quote-builder.html"],
+      "body": "In Add Line Item or Edit Line Item, enter the amount in Rate ($), then tap the +/− button beside it to switch between a negative credit and a positive charge. This works without a minus key on the mobile keypad. Enter a nonzero amount first; blank or zero is unchanged. Turn off Price TBD to enable Rate and the sign button. Negative rates show a Credit hint; with a positive quantity they reduce the line total. For a single reimbursement enter quantity 1 and review the resulting total, including existing markup, discounts and tax settings. The button only changes the rate sign, not those settings or the quantity. Tap again to make the rate positive. Add Line Item or Save Changes applies the edit; Cancel discards it. Your saved item database is not changed unless you explicitly choose Save To Database. Wait for Cloud saved before leaving. A negative line is not a payment refund and does not send money. If the button is unavailable on an older page, save your work before refreshing; pasting a negative amount is a temporary workaround."
+    },
     {
       "id": "find-quote-delete-selected",
       "title": "Find in Quote: select and delete matching line items across rooms",
@@ -52,11 +84,11 @@
     },
     {
       "id": "quote-only-item-photo",
-      "title": "Attach a quote-only line item photo without saving to the database",
-      "verifiedAt": "2026-09-17",
-      "release": "2026-09-17.3",
+      "title": "Attach up to three quote-only line item photos without saving to the database",
+      "verifiedAt": "2026-09-21",
+      "release": "2026-09-21.2",
       "sources": ["quote-builder.html"],
-      "body": "In Add Line Item or Edit Line Item, find Item photo below Reusable Item Description. Choose Upload / Replace Photo and select a JPEG, PNG or WebP up to 10 MB. Review the thumbnail, then Add Line Item or Save Changes. No database item is required. Photos are resized to at most 1200 pixels and stored as JPEG; keep your original separately. Replace Photo replaces the item's photo collection with one picture. Remove Photo removes that collection on save. Cancel leaves the quote unchanged. Quote-only photo overrides, including removal, are preserved instead of refreshed from the library. Explicit Save To Database includes the edited photo in the reusable item; otherwise the library is unchanged. Wait for photo preparation before saving. A failed or unsupported upload leaves the previous picture unchanged: try another supported file. Wait for Cloud saved and verify after reopening; a thumbnail is not proof of cloud backup. Clients use the existing Picture control to view attached item photos. Keep your versioned backups and do not clear browser storage to troubleshoot a missing picture."
+      "body": "In Add Line Item or Edit Line Item, find Item photos below Reusable Item Description. Choose Add Photos and select one or several JPEG, PNG or WebP images, up to 10 MB each, with at most three photos per line item. Existing single photos are retained. Add Photos appends; Replace beneath a thumbnail changes only that picture, and Remove removes only that picture. At three photos Add Photos is disabled: remove or replace one first. Selecting too many files or an unsupported image changes nothing; choose fewer supported files and retry. Review the thumbnails, then Add Line Item or Save Changes. No database item is required. New photos are resized to at most 1200 pixels and stored as JPEG; keep originals separately. Cancel leaves the quote unchanged. Quote-only photo overrides, including removal, are preserved instead of refreshed from the library. Explicit Save To Database includes edited photos in the reusable item; otherwise the library is unchanged. Wait for photo preparation before saving. A failed upload leaves previous photos unchanged. Wait for Cloud saved and verify all photos after reopening; a thumbnail is not proof of cloud backup. Use Picture to browse the attached photos in the builder or client viewer. Keep versioned backups and do not clear browser storage to troubleshoot missing pictures."
     },
     {
       "id": "highlight-colour-display-defaults",

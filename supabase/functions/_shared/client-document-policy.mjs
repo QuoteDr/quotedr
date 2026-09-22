@@ -242,7 +242,7 @@ function activeItemTotal(item, options = {}) {
   if (!isRecord(item) || isPriceTbd(item) || item._removed === true) return 0;
   const quantity = Math.max(0, finiteNumber(item.quantity, 0));
   const discountType = cleanString(item.discountType, 30).toLowerCase();
-  const hasDiscount = ['amount', 'percent'].includes(discountType) && finiteNumber(item.discountValue, 0) > 0;
+  const hasDiscount = ['amount', 'percent', 'per_unit'].includes(discountType) && finiteNumber(item.discountValue, 0) > 0;
   const hasExplicitTotal = item.total !== undefined && item.total !== null && item.total !== '';
   const hasBaseState = item._baseRate !== undefined || item._baseTotal !== undefined ||
     item._baseMaterialCost !== undefined || item._baseUnitType !== undefined;
@@ -292,6 +292,12 @@ function activeItemTotal(item, options = {}) {
 
   const discountValue = Math.max(0, finiteNumber(item.discountValue, 0));
   if (discountType === 'amount') total -= Math.min(total, discountValue);
+  if (discountType === 'per_unit') {
+    const baseQuantity = Math.max(0, finiteNumber(item._baseQuantity ?? item.quantity, 0));
+    const eligible = item.discountAppliesToUpgrades === false
+      ? Math.min(total, item._basePriceTbd === true ? 0 : baseQuantity * Math.max(0, finiteNumber(item._baseRate ?? item.rate, 0))) : total;
+    total -= Math.min(Math.max(0, eligible), discountValue * (item.discountAppliesToUpgrades === false ? baseQuantity : quantity));
+  }
   if (discountType === 'percent') total -= Math.min(total, total * discountValue / 100);
   return rounded(Math.max(0, total), 2);
 }
@@ -509,6 +515,7 @@ function sanitizeItem(source, room) {
     if (source[key] !== undefined) output[key] = source[key] === true;
   }
   if (source._basePriceTbd !== undefined) output._basePriceTbd = source._basePriceTbd === true;
+  if (source.discountAppliesToUpgrades !== undefined) output.discountAppliesToUpgrades = source.discountAppliesToUpgrades === true;
   if (Array.isArray(source.selectedUpgradeOptionIds)) output.selectedUpgradeOptionIds = source.selectedUpgradeOptionIds.map(cleanId).filter(Boolean).slice(0, MAX_SELECTION_IDS);
   for (const key of PRICE_KEYS) {
     if (source[key] !== undefined) output[key] = scaled(source[key], factor);
@@ -516,7 +523,7 @@ function sanitizeItem(source, room) {
   if (source.discountType !== undefined) output.discountType = cleanString(source.discountType, 30);
   if (source.discountLabel !== undefined) output.discountLabel = cleanString(source.discountLabel, 500);
   if (source.discountValue !== undefined) {
-    output.discountValue = cleanString(source.discountType, 30).toLowerCase() === 'amount'
+    output.discountValue = ['amount', 'per_unit'].includes(cleanString(source.discountType, 30).toLowerCase())
       ? scaled(source.discountValue, factor)
       : clone(source.discountValue);
   }

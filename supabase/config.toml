@@ -104,3 +104,7 @@ verify_jwt = true
 # User actions are authenticated again inside the function. Gateway JWT
 # verification is disabled so the dedicated cleanup-token cron request can run.
 verify_jwt = false
+
+[functions.labor-web-push]
+# Authenticated user actions or a separately verified cron secret inside handler.
+verify_jwt = false

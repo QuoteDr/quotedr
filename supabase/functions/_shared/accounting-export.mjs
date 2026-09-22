@@ -237,6 +237,12 @@ function discountAmount(item) {
   if (!item || original <= 0) return 0;
   const type = lower(item.discountType || 'none');
   const value = Math.max(0, number(item.discountValue, 0));
+  if (type === 'per_unit') {
+    const baseQuantity = Math.max(0, number(item._baseQuantity ?? item.quantity, 0));
+    const eligible = item.discountAppliesToUpgrades === false
+      ? Math.min(original, item._basePriceTbd === true ? 0 : baseQuantity * Math.max(0, number(item._baseRate ?? item.rate, 0))) : original;
+    return roundMoney(Math.min(Math.max(0, eligible), value * (item.discountAppliesToUpgrades === false ? baseQuantity : quantity(item))));
+  }
   const amount = type === 'amount' ? value : (type === 'percent' ? original * value / 100 : 0);
   return roundMoney(Math.min(original, Math.max(0, amount)));
 }

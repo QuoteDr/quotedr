@@ -183,10 +183,13 @@ async function sendFcm(serviceAccount: any, accessToken: string, device: LaborDe
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  const cronSecret = Deno.env.get("LABOR_REMINDER_CRON_SECRET");
+  if (!cronSecret || req.headers.get("Authorization") !== `Bearer ${cronSecret}`) return json({ error: "Unauthorized" }, 401);
 
   try {
     const body = await req.json().catch(() => ({}));
-    const now = body.now ? new Date(body.now) : new Date();
+    const now = new Date();
     const dryRun = body.dryRun === true;
     const windowMinutes = Math.max(1, Math.min(60, parseInt(body.windowMinutes || "15", 10) || 15));
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "https://axmoffknvblluibuitrq.supabase.co";
@@ -211,6 +214,8 @@ Deno.serve(async (req) => {
     const considered: object[] = [];
 
     for (const setting of (settings || []) as LaborNotificationSetting[]) {
+      const webSetting = await supabase.from('labor_web_push_settings').select('enabled').eq('user_id', setting.user_id).maybeSingle();
+      if (webSetting.error || webSetting.data?.enabled) continue;
       const due = dueTypes(setting, now, windowMinutes);
       if (!due.length) continue;
 
@@ -246,9 +251,15 @@ Deno.serve(async (req) => {
         considered.push({ user_id: setting.user_id, type: item.type, localDate: item.localDate, dryRun });
         if (dryRun) continue;
 
+        const claim = await supabase.from('labor_notification_logs').insert({
+          user_id: setting.user_id, device_id: device.id, notification_type: item.type,
+          local_date: item.localDate, scheduled_for: now.toISOString(), status: 'pending'
+        }).select('id').single();
+        if (claim.error || !claim.data) { skipped++; continue; }
+
         try {
           const providerMessageId = await sendFcm(serviceAccount, accessToken, device, item.type, item.localDate);
-          const { error: logError } = await supabase.from("labor_notification_logs").insert({
+          const { error: logError } = await supabase.from("labor_notification_logs").update({
             user_id: setting.user_id,
             device_id: device.id,
             notification_type: item.type,
@@ -257,12 +268,12 @@ Deno.serve(async (req) => {
             sent_at: new Date().toISOString(),
             status: "sent",
             provider_message_id: providerMessageId,
-          });
+          }).eq('id', claim.data.id);
           if (logError) throw logError;
           sent++;
         } catch (error) {
           errors.push(`${setting.user_id}: ${(error as Error).message}`);
-          await supabase.from("labor_notification_logs").insert({
+          await supabase.from("labor_notification_logs").update({
             user_id: setting.user_id,
             device_id: device.id,
             notification_type: item.type,
@@ -270,7 +281,7 @@ Deno.serve(async (req) => {
             scheduled_for: now.toISOString(),
             status: "failed",
             error: (error as Error).message,
-          });
+          }).eq('id', claim.data.id);
         }
       }
     }

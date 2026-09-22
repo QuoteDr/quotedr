@@ -1,6 +1,22 @@
 // QuoteDr Service Worker
 const CACHE_NAME = 'quotedr-v3';
 
+// No customer details or arbitrary navigation from push payloads.
+self.addEventListener('push', event => {
+  let message;
+  try { message = event.data && event.data.json(); } catch (_) { return; }
+  if (!message || message.type !== 'qdr-labor') return;
+  event.waitUntil(self.registration.showNotification('QDR · Daily work check-in', {
+    body: 'What did you work on today? Tap to record and review your hours.',
+    tag: 'qdr-labor-checkin', data: {type:'qdr-labor'},
+  }));
+});
+self.addEventListener('notificationclick', event => {
+  if (event.notification.data?.type !== 'qdr-labor') return;
+  event.notification.close();
+  event.waitUntil(self.clients.openWindow('/labor-tracker.html#laborWorklog'));
+});
+
 // Only cache static assets — NOT HTML pages (they must always be fresh from server)
 const STATIC_ASSETS = [
   '/manifest.json'

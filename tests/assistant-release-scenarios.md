@@ -93,3 +93,32 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Follow up: "What if I search for framing next?" Expect selection clears when the search changes; Show Values does not clear it.
 - Ask: "Can I undo after refreshing, and does this delete my saved items?" Expect page-session undo only, saved database unchanged, backups and confirmed cloud saving before leaving.
 - Failure: locked portal quote or stale items must not be described as successfully deleted. Change-order originals retain normal removal semantics.
+# Mobile negative rate
+
+- Ask: "My phone has no minus key. How do I deduct materials the client bought?" Expect Add/Edit Line Item, enter amount then +/− beside Rate, positive quantity (1 for a single reimbursement), review totals and save.
+- Follow up: "Why is it disabled? What about zero?" Expect Price TBD disables the control; enter a nonzero amount first.
+- Ask: "Does this refund their card or remove tax automatically?" Expect no; rate sign only, existing pricing and tax settings unchanged. Do not claim physical-phone testing without evidence.
+# Labour feedback first slice
+
+- Ask: "Where do I put the 4 hours two people spent boarding the basement?" Expect Labour Tracker > Daily Work Check-in, explicit quote/room/item, hours per person 4 and people 2 = 8 labour-hours, actual completed quantity, save draft then approve.
+- Follow up: "We also spent two hours fixing someone else's mistakes." Expect separate Rework log, not normal production training; never invent allocation or completed quantity.
+- Ask: "Will my quotes automatically get faster estimates now?" Expect suggestions only; manually review category/name/unit and adopt in Manage Line Items; old quotes unchanged. No dependencies/calendar promise.
+- Ask: "Did you text me? Can I just answer by SMS?" Expect this local first slice is manual and SMS/AI integration is pending; no claim of delivery.
+- Failure: uncertain save uses Retry same draft on the open page; no claim of durable recovery after closing. Changed review version requires reload; never overwrite newer records.
+# Daily work push reminder release checks
+
+- "Can QDR text me for hours without an SMS number?" Explain opt-in push, not SMS/replies. Point to Labour Tracker > Optional phone reminders; do not claim configured or delivered without evidence.
+- Follow-up "It says accepted but nothing arrived": distinguish provider acceptance from receipt; check permission, Home Screen on iPhone, connectivity and phone notification settings. Keep in-app check-in available.
+- "Stop asking me, but keep my hours": Turn off reminders does not delete work logs or re-enable legacy native reminders.
+- "Does tapping the notification automatically attach my hours?": no; enter, save and separately approve the manual work log. No automatic GPS allocation or AI task matching in this slice.
+# Per-unit line discounts
+
+- "Six doors are $650 each but I promised $600": choose Line Discount > $ off each unit, enter 50. Explain $300 discount and $3,600 before applicable markup/tax; do not change the database price automatically.
+- Follow-up "What if I add two more?": the per-unit discount recalculates with quantity. A fixed $ off line total does not.
+- "Can it make the line negative or discount every add-on separately?": no; cap at eligible amount and explain the upgrade-scope checkbox. Verify client preview/reload without real customer edits.
+# Three photos per line item (2026-09-21.2)
+
+- Ask how to attach three pictures without a saved database item. Expect Add/Edit Line Item > Item photos > Add Photos, up to three, then Save Changes/Add Line Item; no mandatory library save.
+- Follow up "Can I replace just the second one?" Expect Replace under that thumbnail, not replacement of the entire collection.
+- Ask why Add Photos is disabled or why selecting four failed. Explain the three-photo limit, no partial import, individual Remove/Replace; do not suggest clearing browser storage.
+- Ask whether Cancel saves uploads or whether a thumbnail proves cloud backup. Both no; save the item, wait for Cloud saved and reopen to verify.

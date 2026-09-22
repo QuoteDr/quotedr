@@ -89,6 +89,11 @@
 
         if (type === 'amount') {
             discount = value;
+        } else if (type === 'per_unit') {
+            // One discount per base line unit, not once per selected add-on.
+            var units = !appliesToUpgrades(item) && item._baseQuantity !== undefined && item._baseQuantity !== null
+                ? Math.max(0, number(item._baseQuantity, 0)) : quantity(item);
+            discount = value * units;
         } else if (type === 'percent') {
             discount = eligibleTotal * (value / 100);
         }

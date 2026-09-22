@@ -3925,12 +3925,11 @@ Example:
                         </div>
                         <textarea id="lineItemDescription" class="form-control item-description-textarea" rows="6" placeholder="Describe the reusable scope shown to clients. This saves with the item database, unlike the job note below." spellcheck="true"></textarea>
                         <div class="border rounded p-3 mt-3">
-                            <strong>Item photo (optional)</strong>
-                            <p class="small text-muted">For this quote only. Save To Database explicitly includes your photo in the reusable item. JPEG, PNG or WebP, up to 10 MB; resized for the quote.</p>
-                            <img id="linePhotoPreview" alt="Line item photo preview" hidden style="max-width:160px;max-height:120px" class="rounded mb-2">
-                            <div><button type="button" class="btn btn-outline-primary btn-sm" id="linePhotoChoose" onclick="document.getElementById('linePhotoFile').click()">Upload / Replace Photo</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="removeLinePhoto()">Remove Photo</button></div>
-                            <input id="linePhotoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="readLinePhoto(this)">
+                            <strong>Item photos (optional, up to 3)</strong>
+                            <p class="small text-muted">For this quote only. Save To Database explicitly includes your photos in the reusable item. JPEG, PNG or WebP, up to 10 MB each; resized for the quote.</p>
+                            <div id="linePhotoPreview" class="d-flex flex-wrap gap-2 mb-2"></div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="linePhotoChoose" onclick="chooseLinePhotos()">Add Photos</button>
+                            <input id="linePhotoFile" type="file" multiple accept="image/jpeg,image/png,image/webp" hidden onchange="readLinePhoto(this)">
                             <div id="linePhotoStatus" class="small" role="status" aria-live="polite"></div>
                         </div>
                     </div>
@@ -3957,7 +3956,11 @@ Example:
                                     <label class="form-check-label small" for="linePriceTbd">Price TBD</label>
                                 </div>
                             </div>
-                            <input type="number" id="lineRate" class="form-control" value="0" step="0.01">
+                            <div class="input-group">
+                                <input type="number" id="lineRate" class="form-control" value="0" step="0.01" aria-describedby="lineRateCreditHint" oninput="syncLineRateSign()">
+                                <button type="button" id="lineRateSign" class="btn btn-outline-primary" style="min-width:48px;min-height:44px" onclick="toggleLineRateSign()" aria-label="Switch rate between charge and credit">+/−</button>
+                            </div>
+                            <div id="lineRateCreditHint" class="small text-success mt-1" role="status" hidden>Credit — negative rate. With a positive quantity, this reduces the line total. Review the quote total.</div>
                         </div>
                     </div>
 
@@ -3972,7 +3975,8 @@ Example:
                             <div class="col-md-4">
                                 <select id="lineDiscountType" class="form-select form-select-sm" onchange="updateLineDiscountControls()">
                                     <option value="none">No discount</option>
-                                    <option value="amount">$ off</option>
+                                    <option value="amount">$ off line total</option>
+                                    <option value="per_unit">$ off each unit</option>
                                     <option value="percent">% off</option>
                                 </select>
                             </div>
@@ -3987,7 +3991,7 @@ Example:
                             <input class="form-check-input" type="checkbox" id="lineDiscountApplyToUpgrades">
                             <label class="form-check-label fw-semibold" for="lineDiscountApplyToUpgrades">Apply discount to selected upgrades/add-ons</label>
                         </div>
-                        <div class="form-text">Leave this off to discount only the base line item. Selected upgrades and add-ons remain full price.</div>
+                        <div class="form-text">Leave this off to discount only the base line item. Selected upgrades and add-ons remain full price. “$ off each unit” multiplies the discount by the line quantity (for example, 6 doors × $50 = $300 off), capped at the eligible price. It does not repeat the discount for each add-on.</div>
                     </div>
 
                     <details id="lineItemUpgradePanel" class="border rounded p-3 mb-3">
@@ -4420,7 +4424,7 @@ Example:
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="quote-dialogs.js?v=2026091604"></script>
-    <script src="quote-discounts.js?v=2026081602"></script>
+    <script src="quote-discounts.js?v=2026092101"></script>
     <script src="quote-profit-report.js?v=2026091601"></script>
     <script src="quote-pdf-export.js?v=2026091601"></script>
     <script src="quote-payable-total.js?v=2026081801"></script>
@@ -8360,38 +8364,73 @@ Example:
             handleNewLineUnitPromptResult(newUnit, previousUnit);
         }
 
-        let linePhotoDraft = { changed: false, busy: false, photo: '', generation: 0 };
+        let linePhotoDraft = { changed: false, busy: false, photos: [], full: [], replaceIndex: null, generation: 0 };
         function resetLinePhotoDraft(item) {
-            linePhotoDraft = { changed: false, busy: false, photo: item?.photo || item?.photos?.[0] || '', generation: linePhotoDraft.generation + 1 };
+            const photos = Array.isArray(item?.photos) && item.photos.length ? item.photos.slice(0, 3) : (item?.photo ? [item.photo] : []);
+            linePhotoDraft = { changed: false, busy: false, photos, full: photos.map((_, i) => item?.photosFull?.[i] || (i === 0 ? item?.photoFull : null) || null), replaceIndex: null, generation: linePhotoDraft.generation + 1 };
             renderLinePhotoDraft();
         }
         function renderLinePhotoDraft() {
             const preview = document.getElementById('linePhotoPreview');
-            preview.hidden = !linePhotoDraft.photo;
-            if (linePhotoDraft.photo) preview.src = linePhotoDraft.photo;
-            else preview.removeAttribute('src');
-            document.getElementById('linePhotoStatus').textContent = linePhotoDraft.busy ? 'Preparing photo…' : (linePhotoDraft.changed ? 'Photo changes will apply when you save this line item.' : '');
+            preview.replaceChildren();
+            linePhotoDraft.photos.forEach((photo, index) => {
+                const card = document.createElement('div');
+                const image = document.createElement('img');
+                image.src = photo;
+                image.alt = 'Line item photo ' + (index + 1);
+                image.style.cssText = 'display:block;max-width:160px;max-height:120px;margin-bottom:6px';
+                card.appendChild(image);
+                ['Replace', 'Remove'].forEach((label) => {
+                    const button = document.createElement('button');
+                    button.type = 'button'; button.className = 'btn btn-outline-secondary btn-sm me-1';
+                    button.textContent = label; button.setAttribute('aria-label', label + ' photo ' + (index + 1));
+                    button.disabled = linePhotoDraft.busy;
+                    button.onclick = () => label === 'Replace' ? chooseLinePhotos(index) : removeLinePhoto(index);
+                    card.appendChild(button);
+                });
+                preview.appendChild(card);
+            });
+            document.getElementById('linePhotoChoose').disabled = linePhotoDraft.busy || linePhotoDraft.photos.length >= 3;
+            document.getElementById('linePhotoStatus').textContent = linePhotoDraft.busy ? 'Preparing photos…' : (linePhotoDraft.photos.length + ' of 3 photos. ' + (linePhotoDraft.changed ? 'Photo changes will apply when you save this line item.' : ''));
         }
-        function removeLinePhoto() {
+        function chooseLinePhotos(index = null) {
+            if (linePhotoDraft.busy) return;
+            linePhotoDraft.replaceIndex = index;
+            const input = document.getElementById('linePhotoFile');
+            input.multiple = index === null;
+            input.value = '';
+            input.click();
+        }
+        function removeLinePhoto(index) {
+            if (linePhotoDraft.busy || !Number.isInteger(index) || index < 0 || index >= linePhotoDraft.photos.length) return;
             linePhotoDraft.generation++;
-            linePhotoDraft.busy = false;
-            linePhotoDraft.photo = '';
+            linePhotoDraft.photos.splice(index, 1);
+            linePhotoDraft.full.splice(index, 1);
             linePhotoDraft.changed = true;
             renderLinePhotoDraft();
         }
         async function readLinePhoto(input) {
-            const file = input.files?.[0];
+            const files = Array.from(input.files || []);
             input.value = '';
-            if (!file) return;
-            if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
-                document.getElementById('linePhotoStatus').textContent = 'Choose a JPEG, PNG or WebP image no larger than 10 MB.';
+            if (!files.length || linePhotoDraft.busy) return;
+            const replaceIndex = linePhotoDraft.replaceIndex;
+            const capacity = replaceIndex === null ? 3 - linePhotoDraft.photos.length : 1;
+            if (files.length > capacity) {
+                document.getElementById('linePhotoStatus').textContent = capacity === 0 ? 'This item already has 3 photos. Remove or replace an existing photo first.' : 'Up to 3 photos per item. Choose at most ' + capacity + ' more, or replace an existing photo.';
+                return;
+            }
+            if (files.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024)) {
+                document.getElementById('linePhotoStatus').textContent = 'Choose JPEG, PNG or WebP images no larger than 10 MB each. No photos were changed.';
                 return;
             }
             const generation = ++linePhotoDraft.generation;
             linePhotoDraft.busy = true;
             renderLinePhotoDraft();
-            const url = URL.createObjectURL(file);
             try {
+                const prepared = [];
+                for (const file of files) {
+                const url = URL.createObjectURL(file);
+                try {
                 const img = new Image();
                 await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url; });
                 const scale = Math.min(1, 1200 / Math.max(img.naturalWidth, img.naturalHeight));
@@ -8403,28 +8442,39 @@ Example:
                 context.fillRect(0, 0, canvas.width, canvas.height);
                 context.drawImage(img, 0, 0, canvas.width, canvas.height);
                 if (generation !== linePhotoDraft.generation) return;
-                linePhotoDraft.photo = canvas.toDataURL('image/jpeg', 0.8);
+                prepared.push(canvas.toDataURL('image/jpeg', 0.8));
+                } finally { URL.revokeObjectURL(url); }
+                }
+                if (generation !== linePhotoDraft.generation) return;
+                if (replaceIndex === null) {
+                    linePhotoDraft.photos.push(...prepared);
+                    linePhotoDraft.full.push(...prepared.map(() => null));
+                } else {
+                    linePhotoDraft.photos[replaceIndex] = prepared[0];
+                    linePhotoDraft.full[replaceIndex] = null;
+                }
                 linePhotoDraft.changed = true;
                 linePhotoDraft.busy = false;
                 renderLinePhotoDraft();
             } catch (_) {
                 if (generation !== linePhotoDraft.generation) return;
                 linePhotoDraft.busy = false;
-                document.getElementById('linePhotoStatus').textContent = 'Could not read this image. Your previous photo is unchanged; try another file.';
-            } finally { URL.revokeObjectURL(url); }
+                renderLinePhotoDraft();
+                document.getElementById('linePhotoStatus').textContent = 'Could not read these images. Your previous photos are unchanged; try another file.';
+            }
         }
         function applyLinePhotoDraft(item) {
             if (!linePhotoDraft.changed) return;
-            item.photo = linePhotoDraft.photo;
-            item.photos = linePhotoDraft.photo ? [linePhotoDraft.photo] : [];
-            item.photoFull = null;
-            item.photosFull = [];
+            item.photos = linePhotoDraft.photos.slice();
+            item.photo = item.photos[0] || '';
+            item.photosFull = linePhotoDraft.full.slice();
+            item.photoFull = item.photosFull[0] || null;
             item.quotePhotoOverride = true;
             if (Object.prototype.hasOwnProperty.call(item, '_basePhoto')) {
                 item._basePhoto = item.photo;
                 item._basePhotos = item.photos.slice();
-                item._basePhotoFull = null;
-                item._basePhotosFull = [];
+                item._basePhotoFull = item.photoFull;
+                item._basePhotosFull = item.photosFull.slice();
             }
         }
 
@@ -8558,11 +8608,39 @@ Example:
             }
         }
 
+        function syncLineRateSign() {
+            const input = document.getElementById('lineRate');
+            const button = document.getElementById('lineRateSign');
+            const hint = document.getElementById('lineRateCreditHint');
+            if (!input || !button || !hint) return;
+            button.disabled = input.disabled;
+            const credit = !input.disabled && Number(input.value) < 0;
+            hint.hidden = !credit;
+            button.setAttribute('aria-label', credit ? 'Make rate positive (charge)' : 'Make rate negative (credit)');
+        }
+
+        function toggleLineRateSign() {
+            const input = document.getElementById('lineRate');
+            if (!input || input.disabled) return;
+            const rate = Number(input.value);
+            if (!input.value.trim() || !Number.isFinite(rate) || rate === 0) {
+                input.focus();
+                return;
+            }
+            input.value = String(-rate);
+            input.dispatchEvent(new Event('input', {bubbles:true}));
+            input.dispatchEvent(new Event('change', {bubbles:true}));
+            syncLineRateSign();
+            calculateMaterialTotal();
+        }
+        document.getElementById('addLineModal').addEventListener('shown.bs.modal', syncLineRateSign);
+
         function setLinePriceTbdState(priceTbd) {
             const checkbox = document.getElementById('linePriceTbd');
             const rateInput = document.getElementById('lineRate');
             if (checkbox) checkbox.checked = priceTbd === true;
             if (rateInput) rateInput.disabled = priceTbd === true;
+            syncLineRateSign();
         }
 
         function autoFillPricing() {
@@ -13967,8 +14045,14 @@ Example:
                 event.preventDefault();
                 event.stopPropagation();
             }
-            var photo = getQuoteLineItemPhoto(roomId, itemIndex, await quoteBuilderFullResolutionPhotosEnabled());
-            if (photo) openPhotoLightbox(photo);
+            var preferFull = await quoteBuilderFullResolutionPhotosEnabled();
+            var room = rooms.find(candidate => candidate.id === roomId);
+            var item = room?.items?.[itemIndex];
+            if (!item) return;
+            var source = item.upgraded && item.upgrade?.photo && !item.upgradeGroups?.length ? item.upgrade : item;
+            var photos = source.photos?.length ? source.photos.slice(0, 3) : (source.photo ? [source.photo] : []);
+            if (preferFull) photos = photos.map((photo, index) => fullResolutionPhotoUrl(source.photosFull?.[index] || (index === 0 ? source.photoFull : null)) || photo);
+            if (photos.length) openPhotoLightbox(photos[0], photos, 0);
         }
 
         // Room photo functions
@@ -14173,6 +14257,7 @@ Example:
         }
 
         function calculateMaterialTotal() {
+            syncLineRateSign();
             const quantity = parseFloat(document.getElementById('lineQuantity').value) || 0;
             const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
             const room = rooms.find(function(candidate) { return candidate.id === parseInt(document.getElementById('currentRoomId')?.value); });

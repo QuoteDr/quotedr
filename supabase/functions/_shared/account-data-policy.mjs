@@ -272,7 +272,7 @@ function transformItemPriceFields(item, factor) {
   for (const key of Object.keys(output)) {
     if (ITEM_PRICE_KEYS.has(key)) output[key] = scaledValue(output[key], factor);
   }
-  if (String(output.discountType || '').toLowerCase() === 'amount') {
+  if (['amount', 'per_unit'].includes(String(output.discountType || '').toLowerCase())) {
     output.discountValue = scaledValue(output.discountValue, factor);
   }
   if (output.upgrade && typeof output.upgrade === 'object') {

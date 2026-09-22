@@ -286,6 +286,8 @@
     </script>
     <div class="container py-4">
         <div id="birthdayRewardDashboard" aria-live="polite"></div>
+        <div id="laborReminderCard"></div>
+        <script src="labor-reminders.js?v=2026092001"></script>
 
         <!-- Stats Cards -->
         <div class="row row-cols-2 row-cols-lg-5 mb-4 g-3">
@@ -512,7 +514,7 @@
     <script src="quote-dialogs.js?v=2026091604"></script>
     <script src="quote-portal-readiness.js?v=2026091502"></script>
     <script src="quote-deposit-review.js?v=2026091602"></script>
-    <script src="quote-discounts.js"></script>
+    <script src="quote-discounts.js?v=2026092101"></script>
     <script src="quote-profit-report.js"></script>
     <script src="portal-activity-visits.js"></script>
     <script src="help-content.js?v=2026080801"></script>
@@ -4536,6 +4538,7 @@
             const { data: { session } } = await _supabase.auth.getSession();
             if (!session) { window.location.href = 'login.html'; return; }
             window.currentUser = session.user;
+            QuoteDrLaborReminders.mount(document.getElementById('laborReminderCard')).catch(() => {});
             refreshDashboardSaveIncidents(session.user);
             const userName = localStorage.getItem('ald_user_name') || 'User';
             document.getElementById('userName').textContent = userName;

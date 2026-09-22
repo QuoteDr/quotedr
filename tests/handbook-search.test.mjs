@@ -4,6 +4,12 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Discount fifty dollars off each door unit honour old pricing','line-discount-per-unit'],
+ ['Does each unit discount change when I change quantity?','line-discount-per-unit'],
+ ['Why is dollar discount not multiplied by six doors?','line-discount-per-unit'],
+ ['Phone reminders for daily work logs without SMS','daily-work-push-reminders'],
+ ['Push test accepted but no notification arrived','daily-work-push-reminders'],
+ ['Turn off reminders will my work log disappear?','daily-work-push-reminders'],
  ['Combine basement rooms into an existing dashboard quote','combine-existing-quotes'],
  ['Combine failed or highlight meanings conflict should I retry?','combine-existing-quotes'],
  ['Can I merge quotes for different clients?','combine-existing-quotes'],
@@ -11,6 +17,10 @@ const cases=[
  ['Will hidden upgrade still charge or change my saved database?','quote-only-upgrade-offers'],
  ['Re-enable an upgrade after reopening the item editor','quote-only-upgrade-offers'],
  ['Find in Quote Show Values drywall quantities and prices','find-quote-show-values'],
+ ['Daily Work Check-in actual hours quote item labour rate','labor-line-item-work-checkin'],
+ ['rework waiting excluded labour rate suggestions approve log','labor-line-item-work-checkin'],
+ ['phone keypad no minus negative rate material reimbursement','line-item-negative-rate'],
+ ['credit sign button disabled Price TBD','line-item-negative-rate'],
  ['delete selected drywall search results across rooms','find-quote-delete-selected'],
  ['bulk cleanup EPS panels clear selection undo deletion','find-quote-delete-selected'],
  ['Can search add square feet and linear feet together?','find-quote-show-values'],
@@ -54,6 +64,10 @@ const cases=[
  ['Where is AI Voice Memory?','ai-voice-to-quote'],
 ];
 for(const [q,id] of cases) assert(searchHandbook(book,q).some(a=>a.id===id),q);
+for (const q of ['Attach three photos to one line item', 'Replace just one line item picture', 'Why is Add Photos disabled after three pictures?']) {
+ assert(searchHandbook(book,q).some(a=>a.id==='quote-only-item-photo'),q);
+}
+assert(searchHandbook(book,'Can I remove only one?', 'line item photos').some(a=>a.id==='quote-only-item-photo'));
 assert(searchHandbook(book,'Apply to all highlight colour descriptions including older items').some(a=>a.id==='highlight-colour-display-defaults'));
 for (const q of ['Guided description follow-up questions', 'Can I skip questions and generate with what I have?', 'Guided description questions timed out are my answers lost?']) {
  assert(searchHandbook(book,q).some(a=>a.id==='guided-description-follow-up-questions'),q);

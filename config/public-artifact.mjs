@@ -32,6 +32,8 @@ export const publicArtifactConfig = Object.freeze({
     'interactive-quote-viewer.html',
     'invoice-viewer.html',
     'labor-tracker.html',
+    'labor-worklog.js',
+    'labor-reminders.js',
     'landing.html',
     'login.html',
     'material-calculator.html',

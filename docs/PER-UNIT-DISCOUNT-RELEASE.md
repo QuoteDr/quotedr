@@ -1,0 +1,9 @@
+# Per-unit discount — local change, September 21, 2026
+
+Add/Edit Line Item now offers `$ off each unit` (stored as `discountType: per_unit`). Existing `amount` is still a one-time discount, relabelled `$ off line total`. Example: quantity 6, rate 650, per-unit discount 50 -> 300 discount and 3,600 before markup/tax. The amount follows quantity and is capped at the eligible total. With upgrades excluded, base quantity and base price define that cap; there is not a separate discount for every upgrade option.
+
+Shared browser maths, client-document authoritative totals/projection, restricted team price projection and accounting export understand the new type. Preserve `discountAppliesToUpgrades` in client projection. Dollar discounts continue to follow existing markup scaling. Existing percent and fixed-amount calculations are not otherwise redesigned.
+
+Release the web assets together with Edge Functions `client-document` and `team-account`, including current shared dependencies. No migration or native build is required for this discount feature. Do not release new per-unit quote data to an older backend or stale client. Fetch/integrate latest main and rerun tests before deployment. The same worktree contains undeployed reminder work; its migration, credentials and scheduler have separate gates in LABOUR-PUSH-SETUP.md. Do not activate reminders as a side effect of this change.
+
+Owner/runtime check after coordinated deployment: use a disposable quote with six $650 doors, enter $50 off each unit, save, reopen, change quantity to eight, and confirm $400 off. Verify client preview, PDF, invoice, selected upgrades, tax/markup and restricted-user/accounting views. No customer messages or records are needed. Browser and live backend checks remain unperformed; local tests are not deployment proof.

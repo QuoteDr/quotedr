@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 133,
-  "totalBytes": 27819478,
-  "treeSha256": "4f51b295e4ac0325af239c53d7283f6bfb35ce47cf473c243626deafb6cde4c5",
+  "fileCount": 135,
+  "totalBytes": 27853468,
+  "treeSha256": "8b74378f4f3fa06b10c07be05a8b393745e113bee95ac70df1bf440b7530d619",
   "files": [
     {
       "path": "404.html",
@@ -172,8 +172,8 @@
     },
     {
       "path": "dashboard.html",
-      "bytes": 414733,
-      "sha256": "30ec7e780f31dc81969c319d09ff1530f4da4613e885e85fd112bd66a5b297e8"
+      "bytes": 414956,
+      "sha256": "2a833d66a52a49ab15f550f308de90e32ca4f46a083dcca75115057ab8763942"
     },
     {
       "path": "data/whats-new.json",
@@ -258,17 +258,27 @@
     {
       "path": "interactive-quote-viewer.html",
       "bytes": 372982,
-      "sha256": "1903f58a291201c996bcb9ed2c1bcb4f297a469ecec07a8ab716b8a4297fd10d"
+      "sha256": "ffd180cad4cc5595691aa0e1789ea5af647a53f952f3060e450d1466f465e6ba"
     },
     {
       "path": "invoice-viewer.html",
       "bytes": 139296,
-      "sha256": "22c01ea9632ef0315aace0b5c90b33bcfb13d7b437174ce837e3076abb1477ab"
+      "sha256": "488759bdc1f72b4e7d692210a1a00bc7a37fa7cde44501149849ade2a49fb835"
+    },
+    {
+      "path": "labor-reminders.js",
+      "bytes": 5989,
+      "sha256": "91dc05ccc6c66beb56e3f4f6350a726f234bbb64ad272fa769d19ba8e082be65"
     },
     {
       "path": "labor-tracker.html",
-      "bytes": 53407,
-      "sha256": "549898d1f9794c9ea92c6bd434cbdeb08420572af074d8a22b509f8c7bf98466"
+      "bytes": 54036,
+      "sha256": "bacf61eeafcaa01fa21062a911504a13c5e7b8da9d045e33d08fffa433bb66cc"
+    },
+    {
+      "path": "labor-worklog.js",
+      "bytes": 12583,
+      "sha256": "da7a18af4a6839e42a54a5bfd3ca279f32df348fdb0c4977e39c75a95c41c89e"
     },
     {
       "path": "landing.html",
@@ -367,8 +377,8 @@
     },
     {
       "path": "qdr-handbook.json",
-      "bytes": 36924,
-      "sha256": "95ccf4a52527f0a4cbfd611f6f1ce242e9039f64a681a67aab0f5de832cc385c"
+      "bytes": 44756,
+      "sha256": "99b423a8675968ea969681a7928d42b823efa97a43dca0ef07b6aef59f477be7"
     },
     {
       "path": "quickbooks-import-controller.js",
@@ -387,8 +397,8 @@
     },
     {
       "path": "quote-builder.html",
-      "bytes": 1535547,
-      "sha256": "c6193b458fbc38c3b129eedb4fb213e9a6fb71fb39b4541153c8ca6f2898d554"
+      "bytes": 1541214,
+      "sha256": "b522c820bc391ea349f52cf28a4f5d5e2b9d01d9177a4afa1ba69664eeaf55d2"
     },
     {
       "path": "quote-calculators.js",
@@ -427,8 +437,8 @@
     },
     {
       "path": "quote-discounts.js",
-      "bytes": 5374,
-      "sha256": "d383386eee0dcb987c67e3e4a43e3924647932f7f592921c246db587fe86ca65"
+      "bytes": 5727,
+      "sha256": "9a3175549bf8f07a6715d69b7471952b749bc7dc713437cb0672127764c6c455"
     },
     {
       "path": "quote-find.js",
@@ -557,8 +567,8 @@
     },
     {
       "path": "sw.js",
-      "bytes": 1626,
-      "sha256": "db3450b7bad14ecd05e65ea90aee4105a8bae82b9c1241eee6f18e096b378cd6"
+      "bytes": 2340,
+      "sha256": "4dbad1d98100691204dd244b1924cfdc81c7d6396fe116999dbb403f0caf23da"
     },
     {
       "path": "team-invite.html",
