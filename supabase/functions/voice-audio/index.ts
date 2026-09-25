@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+import { budgetedSignedUpload, storageUsage, storageBudgetMessage } from '../_shared/storage-budget.ts';
 import {
   VOICE_AUDIO_ACCOUNT_CAP_BYTES,
   VOICE_AUDIO_BUCKET,
@@ -132,7 +133,7 @@ function mapDatabaseError(error: any): never {
   throw error;
 }
 
-async function startAudit(service: any, values: Record<string, unknown>) {
+async function startAudit(service: any, values: Record<string, unknown>): Promise<number> {
   const { data, error } = await service
     .from('ai_voice_audio_access_audit')
     .insert({ ...values, outcome: 'started' })
@@ -181,6 +182,7 @@ function requirePlaybackReady(record: any) {
 
 async function removeStorageObject(service: any, path: string) {
   if (!path) return;
+  await storageUsage(service,path.split('/')[0]);
   const { error } = await service.storage.from(VOICE_AUDIO_BUCKET).remove([path]);
   if (error) throw error;
 }
@@ -436,14 +438,13 @@ serve(async (req) => {
       if (record.deleted_at || record.upload_status !== 'upload_pending' || new Date(record.upload_deadline) <= new Date()) {
         throw new OperationError('This upload session expired. Retry with a new recording.', 409, 'upload_expired');
       }
-      const { data: upload, error: uploadError } = await service.storage
-        .from(VOICE_AUDIO_BUCKET)
-        .createSignedUploadUrl(record.object_path, { upsert: true });
-      if (uploadError || !upload?.token) throw uploadError || new Error('Signed upload token was not created');
+      const { data: upload, error: uploadError } = await budgetedSignedUpload(service,user.id,VOICE_AUDIO_BUCKET,record.object_path,VOICE_AUDIO_MAX_BYTES);
+      if (uploadError || (!upload?.token&&!upload?.alreadyUploaded)) throw uploadError || new Error('Signed upload token was not created');
       await completeAudit(service, auditId);
       return json({
         success: true,
         alreadyFinalized: false,
+        alreadyUploaded: upload?.alreadyUploaded===true,
         recording: safeVoiceAudioRecording(record),
         upload: {
           bucket: VOICE_AUDIO_BUCKET,
@@ -876,12 +877,13 @@ serve(async (req) => {
     throw new OperationError('Unknown action.', 400, 'unknown_action');
   } catch (error) {
     const operation = error instanceof OperationError ? error : null;
+    const budgetMessage=storageBudgetMessage(error);
     const code = operation?.code || 'voice_audio_request_failed';
     if (service && auditId) await failAudit(service, auditId, operation?.status === 403 || operation?.status === 409 ? 'denied' : 'failed', code);
     return json({
-      error: operation?.message || 'Voice audio request failed.',
+      error: budgetMessage || operation?.message || 'Voice audio request failed.',
       code,
       ...(operation?.details || {}),
-    }, operation?.status || 500);
+    }, budgetMessage ? 409 : operation?.status || 500);
   }
 });

@@ -2635,6 +2635,16 @@
     const supabaseUrl = 'https://axmoffknvblluibuitrq.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
     const _sbClient = supabase.createClient(supabaseUrl, supabaseKey);
+    const portalStorageOriginalFrom = _sbClient.storage.from.bind(_sbClient.storage);
+    const portalStorageReady = import('./storage-budget-client.mjs').then(m => m.installStorageBudget(_sbClient));
+    _sbClient.storage.from = function(bucket) {
+      const api = portalStorageOriginalFrom(bucket);
+      if (['item-full-res-photos','room-photos','portal-job-assets'].includes(bucket)) {
+        api.upload = async (...args) => { await portalStorageReady; return _sbClient.storage.from(bucket).upload(...args); };
+        api.remove = async (...args) => { await portalStorageReady; return _sbClient.storage.from(bucket).remove(...args); };
+      }
+      return api;
+    };
 
     // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
@@ -2913,17 +2923,21 @@
     async function portalDesignRequest(body){
       let bearer=supabaseKey;
       if(portalIsAdminView){const auth=await _sbClient.auth.getSession();bearer=auth.data?.session?.access_token||supabaseKey;}
-      const response=await fetch(supabaseUrl+'/functions/v1/portal-designs',{
-        method:'POST',headers:{'Content-Type':'application/json',apikey:supabaseKey,Authorization:'Bearer '+bearer},
-        body:JSON.stringify({contractorId,portalId,ownerMode:portalIsAdminView,session:sessionStorage.getItem(portalDesignSessionKey()),...body})
-      });
+      const {file,...metadata}=body;
+      const payload={contractorId,portalId,ownerMode:portalIsAdminView,session:sessionStorage.getItem(portalDesignSessionKey()),...metadata,binary:true};
+      const headers={apikey:supabaseKey,Authorization:'Bearer '+bearer};
+      let content;
+      if(file instanceof Blob){content=new FormData();content.append('metadata',JSON.stringify(payload));content.append('file',file,'design');}
+      else {headers['Content-Type']='application/json';content=JSON.stringify(payload);}
+      const response=await fetch(supabaseUrl+'/functions/v1/portal-designs',{method:'POST',headers,body:content});
+      if(response.ok&&response.headers.get('Content-Type')?.startsWith('application/octet-stream'))return {file:await response.blob(),kind:response.headers.get('X-Design-Kind'),mime:response.headers.get('X-Design-Mime')};
       const result=await response.json();
       if(!response.ok||result.error)throw new Error(result.error||'Design library unavailable. Please try again.');
       return result;
     }
 
     async function secureClientDocumentRequest(body) {
-      body=Object.assign({},body,{designViewerId:qdDesignViewerId()});
+      body=Object.assign({},body,{designViewerId:qdDesignViewerId(),binary:true});
       let bearer = supabaseKey;
       try {
         const sessionResult = await _sbClient.auth.getSession();
@@ -2939,6 +2953,7 @@
         },
         body: JSON.stringify(body || {})
       });
+      if(resp.ok&&resp.headers.get('Content-Type')?.startsWith('application/octet-stream'))return {file:await resp.blob(),kind:resp.headers.get('X-Design-Kind'),mime:resp.headers.get('X-Design-Mime')};
       const data = await resp.json().catch(function() { return {}; });
       if (!resp.ok || data.error) throw new Error(data.error || 'Secure portal request failed');
       return data;
@@ -4476,8 +4491,13 @@
         return sum + (Number(file.size || 0) || 0);
       }, 0);
       if (portalAccountAssetBytes + conservativeIncomingBytes > PORTAL_JOB_ACCOUNT_HARD_LIMIT_BYTES) {
-        portalJobAssetStatus(kind, 'This account is at the 10 GB QuoteDr storage safety limit. Use file/video links or delete older uploads before adding more.', 'text-danger fw-bold');
-        return;
+        await portalStorageReady;
+        const budgetStatus = await _sbClient.__qdrBudget.usage();
+        if (budgetStatus.error || budgetStatus.usage?.warningOnly !== true) {
+          portalJobAssetStatus(kind, 'This account is at the 10 GB QuoteDr storage safety limit. Review storage before adding more.', 'text-danger fw-bold');
+          return;
+        }
+        portalJobAssetStatus(kind, 'Storage threshold exceeded. Your warning-only account can continue uploading.', 'text-warning fw-bold');
       }
       if (portalAccountAssetBytes + conservativeIncomingBytes >= PORTAL_JOB_ACCOUNT_SOFT_WARNING_BYTES) {
         portalJobAssetStatus(kind, 'Storage is over 5 GB. Uploading is allowed, but links are recommended for large media.', 'text-warning fw-bold');

@@ -1,7 +1,63 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-21.2",
+  "version": "2026-09-25.3",
   "articles": [
+    {
+      "id": "invoice-preview-read-only",
+      "title": "Preview Invoice without creating dashboard duplicates",
+      "verifiedAt": "2026-09-25",
+      "release": "2026-09-25.3",
+      "sources": ["quote-builder.html", "invoice-viewer.html"],
+      "body": "In the builder choose Invoice Actions > Preview Invoice or the file menu > Preview Invoice PDF. This opens a local browser snapshot labelled Preview — not issued. Repeated previews do not save an invoice to the cloud, reserve invoice numbers, change the source quote status or ask for a card-payment review. Preview does not replace a pending invoice-sharing session. Signing, payment reporting, Stripe checkout and QuickBooks sending are unavailable in this unissued preview. Print / Save as PDF is available, but a local preview URL is not a client-sharing link and its data exists only in this browser's local storage. Use Share Invoice in Client Portal when you actually intend to create/save and share an invoice; that separate workflow still performs its normal numbering and checks. Preview is not a backup: save the source quote normally and confirm Cloud saved before leaving. If preview cannot store its local snapshot, keep the builder open and report the error; do not repeatedly issue invoices as a workaround. Refresh after the matching release if previews still create duplicates. Existing duplicate invoices are not automatically removed, merged or renumbered because they may have payments or signatures; review those records separately before any cleanup."
+    },
+    {
+      "id": "accepted-document-dates",
+      "title": "Accepted quotes do not expire: accepted and signed dates",
+      "verifiedAt": "2026-09-25",
+      "release": "2026-09-25.2",
+      "sources": ["interactive-quote-viewer.html", "invoice-viewer.html"],
+      "body": "Open an already accepted quote in Client View or its existing portal link. The acceptance deadline banner is hidden after acceptance, even when its original date is now in the past. The header displays Accepted On using the recorded acceptance/signature date instead of today's Prepared On date. Older accepted records without a usable timestamp show Accepted without inventing a signing date. Signed invoice headers display Signed on with their recorded date, or Signed if it is unavailable. Invoice payment due dates, balances, overdue payments, invalidation and superseded-document notices are separate and unchanged; signing does not mean payment was received. Unsigned quotes still display their validity deadline and expiry warnings. No setting, renewal, resend or save is required for this display change. If an accepted quote still looks expired after release, refresh and report the document and view used; do not remove it from the portal, re-sign or edit the customer record to repair the display. Keep normal backups before making any actual document changes. Local regression tests are not authenticated production verification."
+    },
+    {
+      "id": "invoice-viewer-wide-layout",
+      "title": "Invoice viewer: wider screen layout and wrapping discounts",
+      "verifiedAt": "2026-09-25",
+      "release": "2026-09-25.1",
+      "sources": ["invoice-viewer.html"],
+      "body": "Open the invoice viewer through your existing invoice link or preview. The invoice automatically uses nearly the full available screen width; no setting or save is required. Discount explanations wrap within the Total column instead of extending over the page edge. Pricing and discount calculations are unchanged. Print / Save as PDF uses the printable page width rather than the desktop screen width; review the browser print preview before saving. On a phone the available width is still limited, so long discount explanations can take several lines. If the old narrow layout remains after release, refresh the viewer and check browser zoom. This display-only change does not edit, resend, accept or pay an invoice; retain normal invoice backups and do not modify customer records to test it."
+    },
+    {
+      "id": "storage-warning-only-exception",
+      "title": "Warning-only storage accounts: thresholds without quota blocks",
+      "verifiedAt": "2026-09-24",
+      "release": "2026-09-24.3",
+      "sources": ["storage-budget-client.mjs", "quote-items.js", "client-portal.html", "portal-designs.js", "supabase/functions/portal-designs/index.ts", "supabase/migrations/20260924163345_shared_storage_budget.sql"],
+      "body": "A server-authorized warning-only storage account continues uploading beyond its shared retained-storage and monthly upload thresholds. Dashboard > Check storage labels this mode explicitly; normal thresholds remain visible and usage is still counted. Warnings continue at 80%, 95% and above the threshold. Render saves display usage beside their success message. Older saved-photo and portal-file account-cap checks also honour the verified exception. It is not a self-service toggle, cannot be enabled through an editable email or browser preference, and does not change other customers' limits. It does not disable file-size, file-count-per-item, file-format, security, voice retention, service-provider or unrelated AI/payment limits. The 30 MB render file cap remains until larger-transfer support is released. No automatic purchase or deletion happens. Keep originals and verify saved files after interrupted uploads. This option becomes available only with its matching storage release; a local change is not proof that a live account is exempt."
+    },
+    {
+      "id": "shared-storage-budget",
+      "title": "Check storage: shared account space and monthly upload bytes",
+      "verifiedAt": "2026-09-24",
+      "release": "2026-09-24.2",
+      "sources": ["dashboard.html", "storage-budget-client.mjs", "supabase/functions/storage-budget/index.ts", "supabase/functions/_shared/storage-budget.ts", "supabase/migrations/20260924163345_shared_storage_budget.sql"],
+      "body": "After the coordinated storage-budget release, sign in to the appropriate account and click Dashboard > Check storage. The result shows retained storage and uploaded/reserved bytes this UTC calendar month. New owners receive 10 GB retained storage and 2 GB monthly uploaded bytes; existing accounts keep at least their previous combined allowances, so read your displayed limit. Photos, portal job files, designs, thumbnails, payment proof and voice evidence share the managed budget; their existing per-file restrictions still apply. Legacy signatures and embedded database images are not newly metered by this release. This is not a cap on downloads, bandwidth, database costs or total billing. Warnings appear at 80% and 95%; exceeding either allowance blocks new managed uploads but does not delete existing files or prevent reading them. No automatic storage purchase or charge occurs. Successful replacements and thumbnails count. Metadata edits, external links and local previews do not upload bytes. Failed or interrupted uploads may reserve capacity for three hours; a successful transfer still counts if a later save fails. Signed payment/voice uploads temporarily reserve their bucket maximum and are reconciled to actual bytes. Retries on the same immutable path do not charge twice. Monthly usage resets at the start of the next UTC calendar month; pending uploads still reserve capacity. Deleting an eligible file frees retained space but does not refund uploaded bytes; retained model versions still occupy storage. Do not delete customer files just to test quota. Keep originals and backups, refresh after a lost save response, and verify the saved attachment before retrying. If Check storage fails, refresh and retry; the migration, web app and all upload functions must be deployed together. No paid add-on or larger-file transfer capability is implied by the shared allowance."
+    },
+    {
+      "id": "expired-quote-portal-activity",
+      "title": "View an expired quote's existing portal and activity",
+      "verifiedAt": "2026-09-24",
+      "release": "2026-09-24.1",
+      "sources": ["dashboard.html", "quote-portal-readiness.js"],
+      "body": "On the Dashboard, find the already-shared quote and click its green Client Portal button, then Activity in the portal window. An expired quote can still open its existing portal and recorded activity; viewing does not renew its expiry, republish the document, or require a deposit or zero-price review. Sign in with the appropriate account access; the document must still be assigned and visible in its portal. Opening the window can copy its existing link, but does not email the client. Publishing a document or Email Portal Follow-up still runs send-readiness checks and blocks expired or invalid quote dates. Do not renew, remove or resend a quote merely to inspect its history. If opening an existing portal shows Update Quote Expiry, refresh after the fix is deployed; if it persists, report the action and error instead of changing customer records. Activity requires a successful authenticated load; an error or empty history is not proof the client never viewed it. Keep normal save and backup precautions when making any actual quote edits."
+    },
+    {
+      "id": "portal-render-upload-limits",
+      "title": "Designs and Renderings: 30 MB walkthroughs and monthly uploads",
+      "verifiedAt": "2026-09-24",
+      "release": "2026-09-24.2",
+      "sources": ["portal-designs.js", "portal-design-prepare.mjs", "portal-design-policy.mjs", "client-portal.html", "supabase/functions/portal-designs/index.ts", "supabase/functions/client-document/index.ts", "supabase/migrations/20260922025938_portal_render_upload_allowance.sql"],
+      "body": "After the matching web, Edge Functions and migration release, a contractor with quotes.send permission can open Designs & Renderings > Add design in the client portal. Choose Image rendering, PDF drawing or Interactive HTML (automatic preparation), enter a title and select a file up to 30 MB (30,000,000 bytes). Model geometry, textures and embedded still images are not downscaled; the optional card thumbnail is resized separately. Click Prepare & preview selected file for HTML, test controls, close preview and tick I previewed this interactive design and its controls work, then Add to portal. The shared storage-budget release replaces the old three-files-per-month rule with retained bytes and monthly upload bytes across managed files; use Dashboard > Check storage. Replacements and thumbnails count, including successful transfers whose later save fails. Previews, metadata edits and links do not upload bytes. Withdrawing does not delete retained versions or refund monthly bytes. Existing designs remain readable at the limit. Keep originals and a ZIP backup locally; ZIP is not a portal upload format. The final HTML, not the whole working folder, must fit the per-file limit. Self-contained HTML can use inline JavaScript and embedded blob modules; network requests, nested frames, workers, eval and parent access are blocked. Browser storage and fullscreen may be unavailable: catch failures, supply touch controls and a WebGL fallback. For larger files use an External design link with independently managed hosting/privacy, or wait for larger-file transfer support; do not degrade the model just to fit. After a failed or lost save response, refresh and check whether it saved before retrying. Withdraw cannot recall copies already opened. Live upload, mobile performance and authenticated chatbot checks require separate verification."
+    },
     {
       "id": "line-discount-per-unit",
       "title": "Line Discount: dollars off each unit versus the whole line",

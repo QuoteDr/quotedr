@@ -1,5 +1,6 @@
 import { designInput, MAX_DESIGN_BYTES } from './portal-design-policy.mjs';
 import {prepareDesignHtml} from './portal-design-prepare.mjs';
+import {usageMessage} from './storage-budget-client.mjs';
 
 const el = (tag,text,className) => { const node=document.createElement(tag); if(text != null)node.textContent=text; if(className)node.className=className; return node; };
 const button = (text,fn,style='btn btn-outline-primary btn-sm') => { const b=el('button',text,style);b.type='button';b.onclick=fn;return b; };
@@ -24,7 +25,7 @@ export function isolatedDesignHtml(html) {
   // document may start resource requests. The first policy is active before the
   // uploaded bytes are parsed, only inside the opaque sandbox. Later policies
   // can tighten this policy but cannot relax it.
-  const policy="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; font-src data:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'";
+  const policy="default-src 'none'; script-src 'unsafe-inline' blob:; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; font-src data:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'";
   return '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="'+policy+'"><meta name="referrer" content="no-referrer"></head><body>'+html+'</body></html>';
 }
 function dialog(title,full=false) {
@@ -61,7 +62,7 @@ export async function showDesign(read, title, options={}) {
       const a=el('a','Open external design','btn btn-primary');a.href=designInput({kind:'link',title,url:result.url}).external_url;a.target='_blank';a.rel='noopener noreferrer';
       body.append(el('p','This design is hosted by another provider. Its own privacy and sign-in settings apply.'),a);addContinue();return true;
     }
-    const bytes=Uint8Array.from(atob(result.base64),c=>c.charCodeAt(0));
+    const bytes=result.file ? new Uint8Array(await result.file.arrayBuffer()) : Uint8Array.from(atob(result.base64),c=>c.charCodeAt(0));
     if(result.kind==='interactive'){
       const frame=el('iframe');frame.title=title;frame.setAttribute('sandbox','allow-scripts');frame.referrerPolicy='no-referrer';
       frame.srcdoc=isolatedDesignHtml(new TextDecoder().decode(bytes));body.append(frame);
@@ -167,7 +168,8 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
     for(const [v,t]of [['link','External design link'],['image','Image rendering'],['pdf','PDF drawing'],['interactive','Interactive HTML (automatic preparation)']]){const o=el('option',t);o.value=v;kind.append(o);}kind.value=previous?.kind||'link';
     const url=input('url','HTTPS design link','url');
     if(previous?.kind==='link')request({action:'read',id:previous.id}).then(r=>{if(!url.value)url.value=r.url||'';}).catch(e=>{error.textContent=e.message;});
-    const file=input('file','Choose file (maximum 8 MB)','file');
+    const file=input('file','Choose file (maximum 30 MB)','file');
+    f.append(el('p','Files and thumbnails use your shared account storage and monthly upload-byte allowance. Replacements count; previews, links and metadata edits do not upload bytes. Check storage on the Dashboard for your allowance. Existing designs remain available at the limit. Keep originals locally.'));
     const thumbnail=input('thumbnail','Card thumbnail screenshot (optional)','file');thumbnail.accept='.png,.jpg,.jpeg,.webp';
     const thumbnailHelp=el('small',previous?.has_thumbnail?'Choose a new screenshot to replace the current thumbnail. Leave blank to keep it.':'Photo renderings use their image automatically. For interactive models or PDFs, choose a screenshot clients will see on the card.');thumbnail.parentElement.append(thumbnailHelp);
     const thumbnailPreview=el('img');thumbnailPreview.className='qd-design-thumbnail-preview';thumbnailPreview.hidden=true;thumbnailPreview.alt='Selected thumbnail preview';f.append(thumbnailPreview);
@@ -182,14 +184,14 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
     function changed(){const link=kind.value==='link';url.parentElement.hidden=!link;file.parentElement.hidden=link;reviewed.parentElement.hidden=kind.value!=='interactive';preview.hidden=link;file.accept=kind.value==='interactive'?'.html':kind.value==='pdf'?'.pdf':'.png,.jpg,.jpeg,.webp';reviewed.checked=false;}
     function resetPreparation(){preparedFile=preparedPayload=previewedFile=null;reviewed.checked=false;reviewed.disabled=true;error.textContent='';}
     kind.onchange=()=>{changed();resetPreparation();};file.onchange=resetPreparation;changed();resetPreparation();
-    async function filePayload(){const selected=file.files[0],selectedKind=kind.value;if(!selected)throw new Error('Choose a file to preview.');if(selected.size>MAX_DESIGN_BYTES)throw new Error('Choose a file under 8 MB.');if(preparedFile===selected&&preparedPayload?.kind===selectedKind)return preparedPayload;let bytes=new Uint8Array(await selected.arrayBuffer());const mime=selectedKind==='interactive'?'text/html':selected.type;
-      if(selectedKind==='interactive'){const result=await prepareDesignHtml(new TextDecoder().decode(bytes));bytes=new TextEncoder().encode(result.html);}if(selected!==file.files[0]||selectedKind!==kind.value)throw new Error('The selected file changed. Please preview it again.');const payload={kind:selectedKind,mime,size:bytes.length,base64:binary64(bytes)};preparedFile=selected;preparedPayload=payload;return payload;}
+    async function filePayload(){const selected=file.files[0],selectedKind=kind.value;if(!selected)throw new Error('Choose a file to preview.');if(selected.size>MAX_DESIGN_BYTES)throw new Error('Choose a file no larger than 30 MB.');if(preparedFile===selected&&preparedPayload?.kind===selectedKind)return preparedPayload;let bytes=new Uint8Array(await selected.arrayBuffer());const mime=selectedKind==='interactive'?'text/html':selected.type;
+      if(selectedKind==='interactive'){const result=await prepareDesignHtml(new TextDecoder().decode(bytes));bytes=new TextEncoder().encode(result.html);}if(selected!==file.files[0]||selectedKind!==kind.value)throw new Error('The selected file changed. Please preview it again.');const payload={kind:selectedKind,mime,size:bytes.length,file:new Blob([bytes],{type:mime})};preparedFile=selected;preparedPayload=payload;return payload;}
     f.onsubmit=async event=>{event.preventDefault();save.disabled=true;error.textContent='Saving…';try{
       const keepFile=previous&&previous.kind===kind.value&&kind.value!=='link'&&!file.files[0];
       if(kind.value==='interactive'&&!keepFile&&(!reviewed.checked||previewedFile!==file.files[0]))throw new Error('Preview the interactive design and confirm its controls work first.');
       const chosenThumbnail=thumbnail.files[0]||(kind.value==='image'&&file.files[0]?file.files[0]:null);
       const data={action:'save',id:previous?.id,baseVersion:previous?.updated_at,title:fields.title.value,project:fields.project.value,version:fields.version.value,note:fields.note.value,kind:kind.value,url:url.value,...(kind.value==='link'?{}:keepFile?{keepFile:true,mime:previous.mime_type,size:previous.size_bytes}:await filePayload()),...(chosenThumbnail?await thumbnailPayload(chosenThumbnail):{})};designInput(data);
-      await request(data);d.close();await refresh();status.textContent='Design saved to the portal.';
+      const saved=await request(data);d.close();await refresh();status.textContent='Design saved to the portal.'+(saved.usage?' '+usageMessage(saved.usage):'');
     }catch(e){error.textContent=e.message;}finally{save.disabled=false;}};
   }
   function reviewDesigns(documentId){

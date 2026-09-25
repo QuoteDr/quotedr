@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 135,
-  "totalBytes": 27853468,
-  "treeSha256": "8b74378f4f3fa06b10c07be05a8b393745e113bee95ac70df1bf440b7530d619",
+  "fileCount": 136,
+  "totalBytes": 27876463,
+  "treeSha256": "43902e2bd0514441a9217220eff1c96f955124d0efb40d25cf841ffbeb874930",
   "files": [
     {
       "path": "404.html",
@@ -12,8 +12,8 @@
     },
     {
       "path": "_headers",
-      "bytes": 1742,
-      "sha256": "62dfd8cba7219ad16062c8151236f84580013dccbb17db7b2025b93da9f08422"
+      "bytes": 1748,
+      "sha256": "9c70546e5d447d0fa0e69c732c6b1e9bb4725949c808af4f215c43f9e03b108f"
     },
     {
       "path": "_redirects",
@@ -157,8 +157,8 @@
     },
     {
       "path": "client-portal.html",
-      "bytes": 229595,
-      "sha256": "43a2722e369766c34042d079942457c0f9f4ffe59861deb6aa6dbc99be01e5a0"
+      "bytes": 231290,
+      "sha256": "cd87fd6128a7d3629077797116237bba269d481e720c27338b41c64ffb4eb9cd"
     },
     {
       "path": "community-starter-templates.js",
@@ -172,8 +172,8 @@
     },
     {
       "path": "dashboard.html",
-      "bytes": 414956,
-      "sha256": "2a833d66a52a49ab15f550f308de90e32ca4f46a083dcca75115057ab8763942"
+      "bytes": 416069,
+      "sha256": "bb653a55cc50895c1d61fc397276930010da36cb42cee51da80af3f12fd96689"
     },
     {
       "path": "data/whats-new.json",
@@ -257,13 +257,13 @@
     },
     {
       "path": "interactive-quote-viewer.html",
-      "bytes": 372982,
-      "sha256": "ffd180cad4cc5595691aa0e1789ea5af647a53f952f3060e450d1466f465e6ba"
+      "bytes": 374218,
+      "sha256": "25ab31f6f8f21b186ba9c8de1c18b07b9bca66d8a695ef497150c8b122372bf9"
     },
     {
       "path": "invoice-viewer.html",
-      "bytes": 139296,
-      "sha256": "488759bdc1f72b4e7d692210a1a00bc7a37fa7cde44501149849ade2a49fb835"
+      "bytes": 140980,
+      "sha256": "e2a1770a12254e08bc0dbff4888ee8b06692ff7a0f8bf26e4b754b971f08ce22"
     },
     {
       "path": "labor-reminders.js",
@@ -327,13 +327,13 @@
     },
     {
       "path": "portal-design-policy.mjs",
-      "bytes": 1515,
-      "sha256": "77690a85d00c1549a86f6da2deb3d0cf4f4f14bd298c0cd4a6130358bdd40a4d"
+      "bytes": 1586,
+      "sha256": "e2873d4266fef0d2453c6b0e97f03570ae850e830620c61dbcad31084f5196b5"
     },
     {
       "path": "portal-design-prepare.mjs",
-      "bytes": 3952,
-      "sha256": "3da1619a8f3c88f2c908c1bbf006ba2ad281072526c92635ba284cb7968dee62"
+      "bytes": 4126,
+      "sha256": "2c0a9d72dbc5389c068ee9adb54ca5f464d3285b17681d1c0327ba98514b891d"
     },
     {
       "path": "portal-designs.css",
@@ -342,8 +342,8 @@
     },
     {
       "path": "portal-designs.js",
-      "bytes": 22533,
-      "sha256": "64f4eefd1505ea7e5af798a6e5955306bfdb9956a07f3d4519bdaf30dd0e042c"
+      "bytes": 23055,
+      "sha256": "1aede64a0c076d79bf5ec63d77d2981102380a1119053379dded12dae8fb7bb8"
     },
     {
       "path": "portal-theme-studio.html",
@@ -377,8 +377,8 @@
     },
     {
       "path": "qdr-handbook.json",
-      "bytes": 44756,
-      "sha256": "99b423a8675968ea969681a7928d42b823efa97a43dca0ef07b6aef59f477be7"
+      "bytes": 56299,
+      "sha256": "2884fee47d5ab1bec445e952ff21513c4757be3979714bee71eb142f82118a03"
     },
     {
       "path": "quickbooks-import-controller.js",
@@ -397,8 +397,8 @@
     },
     {
       "path": "quote-builder.html",
-      "bytes": 1541214,
-      "sha256": "b522c820bc391ea349f52cf28a4f5d5e2b9d01d9177a4afa1ba69664eeaf55d2"
+      "bytes": 1541977,
+      "sha256": "4bb1cc3aa24212c234d7297b9e773db91bdb03f5efcd7ca7569d67e2a7ec7860"
     },
     {
       "path": "quote-calculators.js",
@@ -457,8 +457,8 @@
     },
     {
       "path": "quote-items.js",
-      "bytes": 420519,
-      "sha256": "0dbd2cc2a3dadad4f3605d7e93ab3d1879612d0ebde7171b688b5d2ecebc8425"
+      "bytes": 420846,
+      "sha256": "fd770027369292b386d60e7a587a296477ec0f7b877ef5252c73ed2aefc957bc"
     },
     {
       "path": "quote-media.js",
@@ -556,9 +556,14 @@
       "sha256": "8433d90f2dea46ac830c527b67d63c2d11aca952f2b95931fefb9659d8432625"
     },
     {
+      "path": "storage-budget-client.mjs",
+      "bytes": 2409,
+      "sha256": "66def50fcf499945cc5a603b333398abdd0fadf242cf3e93003d4ec54da72c7b"
+    },
+    {
       "path": "supabase-v2.js",
-      "bytes": 194022,
-      "sha256": "9e0c3893a258677030b3ca6c3d35445f8d2c2836f7bab323521bd78f3aec8244"
+      "bytes": 195474,
+      "sha256": "52b614d8759800905261d1f4ac3c92bf5bca4639d7ee70e6e38239d6dc879b29"
     },
     {
       "path": "supplier-materials.js",

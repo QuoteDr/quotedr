@@ -287,6 +287,24 @@
     <div class="container py-4">
         <div id="birthdayRewardDashboard" aria-live="polite"></div>
         <div id="laborReminderCard"></div>
+        <div class="card mb-3"><div class="card-body">
+            <button type="button" class="btn btn-outline-primary" id="checkStorageBudget">Check storage</button>
+            <span id="storageBudgetStatus" class="ms-2" role="status">Shared account storage and monthly upload allowance.</span>
+        </div></div>
+        <script type="module">
+            import {usageMessage} from './storage-budget-client.mjs';
+            document.getElementById('checkStorageBudget').addEventListener('click',async function(){
+                const output=document.getElementById('storageBudgetStatus');
+                this.disabled=true;output.textContent='Checking storage…';
+                try {
+                    await window.qdrStorageReady;
+                    const result=await window._supabase.__qdrBudget.usage();
+                    if(result.error)throw result.error;
+                    output.textContent=usageMessage(result.usage);
+                } catch(error) { output.textContent=error.message||'Storage check unavailable. Please refresh and retry.'; }
+                finally {this.disabled=false;}
+            });
+        </script>
         <script src="labor-reminders.js?v=2026092001"></script>
 
         <!-- Stats Cards -->
@@ -521,7 +539,7 @@
     <script src="modal-help.js?v=1777741200"></script>
     <script src="change-orders.js?v=1778060200"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026091702"></script>
+    <script src="supabase-v2.js?v=2026092501"></script>
     <script src="quote-backups.js?v=2026091404"></script>
     <script src="quote-folder-backups.js?v=2026091501"></script>
     <script src="birthday-rewards.js?v=2026082401"></script>
@@ -2908,11 +2926,11 @@
                 qdAlert(error && error.message ? error.message : String(error), { title: 'Portal Destination Locked', type: 'warning' });
                 return;
             }
-            if (!await configureDashboardChangeOrderContinuePayment(quote)) return;
             if (quote.data && quote.data.portal_visible === true) {
                 await shareClientPortal(quoteId, clientName, clientEmail, { autoCopy: true });
                 return;
             }
+            if (!await configureDashboardChangeOrderContinuePayment(quote)) return;
             queueDashboardPortalAction({ type: 'share', quoteId: quoteId, clientName: clientName, clientEmail: clientEmail });
             await openPortalAssignment(quoteId);
         }
@@ -3770,10 +3788,9 @@
 
         async function shareClientPortal(quoteId, clientName, savedEmail, options) {
             options = options || {};
-            var expiryTarget = (allQuotes || []).find(function(row) { return row.id === quoteId; });
-            if (!expiryTarget) return;
-            expiryTarget = await loadDashboardFullQuote(expiryTarget);
-            if (!await confirmDashboardPortalZeroPricedItems(expiryTarget)) return;
+            // Opening an existing portal (including its activity) is not publication.
+            // Assignment and email actions retain their own send-readiness checks.
+            // The authenticated read below still requires portal_visible === true.
             // Dismiss any stale Bootstrap backdrop before opening
             document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
             document.body.classList.remove('modal-open');

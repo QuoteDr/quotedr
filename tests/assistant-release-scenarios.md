@@ -4,6 +4,12 @@ Run these conversational checks against the candidate backend before calling its
 
 | Question | Required behaviour |
 | --- | --- |
+| Every Preview Invoice creates another dashboard invoice. | Explain local-only Preview Invoice / Preview Invoice PDF after release; no number reservation, cloud save or status change. Distinguish Share Invoice in Client Portal as the explicit issuing workflow. |
+| Can I send that preview link? (follow-up) | No; it is a browser-local snapshot, not a client sharing link. Use the explicit portal sharing flow. |
+| Delete those duplicate invoices for me. | Do not infer cleanup permission from a preview bug report; payments/signatures must be reviewed before separate authorized cleanup. Never claim the preview fix removed existing duplicates. |
+| My signed quote says expired. Do I need to renew or sign it again? | Explain that accepted quotes hide the acceptance deadline and show the recorded Accepted On date; refresh after the matching release, report persistent display issues, never recommend re-signing or modifying the customer record as a display fix. |
+| What if the old signature date is missing? (follow-up) | Show Accepted or Signed without inventing a date. Do not use today's date as the historical acceptance date. |
+| My signed invoice is overdue; does signing remove the due date or mark it paid? | No. Signature date display is separate from payment due dates, balances, overdue payments and invalidated documents. |
 | I want to highlight a bunch of line items at once, can I do that? | Yes; checkboxes within a room, Edit > Highlight Selected, choose colour, Apply. |
 | Can I do all of them? (following highlighting) | Explain room Select All Items, not whole-quote selection. |
 | My payment failed | Ask a diagnostic question; do not give generic Stripe setup as the answer. |
@@ -122,3 +128,33 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Follow up "Can I replace just the second one?" Expect Replace under that thumbnail, not replacement of the entire collection.
 - Ask why Add Photos is disabled or why selecting four failed. Explain the three-photo limit, no partial import, individual Remove/Replace; do not suggest clearing browser storage.
 - Ask whether Cancel saves uploads or whether a thumbnail proves cloud backup. Both no; save the item, wait for Cloud saved and reopen to verify.
+# Rendering upload allowance (2026-09-21.3)
+
+- "Can I upload a 25 MB walkthrough without reducing quality?" Explain 30,000,000-byte limit, no model simplification, required local preview and confirmation; distinguish deployment status from local code.
+- Follow-up: "What if I replace it three times?" Each successful file version counts across the account's portals/team, UTC calendar month; previews/metadata edits do not count.
+- "My fourth upload failed; can I withdraw one?" No refund by withdrawal/deletion; existing designs remain viewable. Never promise unlimited bandwidth or that failed response means failed save.
+- "It works as a local HTML but not in the portal." Explain opaque sandbox, no external dependencies/network/workers/eval, optional storage/fullscreen, ZIP backup not upload. Never suggest allow-same-origin or disabling CSP.
+# Expired existing portal activity — 2026-09-24
+
+- Ask: "My quote expired. Can I still see whether the client opened it?" Expect Dashboard > existing green Client Portal > Activity; no renewal or resend required.
+- Follow up: "Can I email it again too?" Expect distinction: Email Portal Follow-up retains expiry/send checks; viewing does not waive them.
+- Failure: "Update Quote Expiry still appears when I open the portal." Expect refresh after deployment, then report the issue; never tell the user to alter expiry or remove the document merely to read activity.
+- Access failure: do not promise history without an authenticated successful load, or interpret missing events as proof of no visit.
+- These are answer-quality release scenarios, not proof of authenticated chatbot verification.
+# Shared storage budget release scenarios (2026-09-24; authenticated checks pending)
+
+## Invoice width regression (2026-09-25)
+
+- “My invoice is tiny and the discount runs off the edge” → after release, refresh: screen layout is nearly full-width and discount explanations wrap. No invoice edits or resend required.
+- “Does that change my PDF or the discount amount?” → amounts do not change; print uses paper width, not desktop width. Review print preview. Do not claim a live visual check without one.
+
+- “My account says warning-only; am I blocked at 2 GB?” → no shared-budget block; usage/warnings continue. Check the displayed thresholds, not assumed defaults.
+- Follow-up “So any size file and unlimited AI too?” → no; exemption concerns managed storage/monthly bytes only, not technical per-file or unrelated AI/security restrictions.
+- “Can I change my email to get that?” → no; server-managed identity-specific exception, not user-editable email matching.
+
+- “Where do I see my remaining storage?” → Dashboard > Check storage; distinguish retained from monthly uploaded/reserved bytes. Displayed account allowance wins over generic numbers.
+- Follow-up “Does deleting it give me that back?” → frees retained storage only; does not refund monthly transferred bytes. Never recommend deleting customer files without backup/review.
+- “I got a quota error; did QDR delete my models?” → no automatic deletion; existing designs remain available. Failed upload reservations can last three hours; verify a possibly successful save before retrying.
+- “Can I upload a 200 MB model now?” → not in this release: final render file cap remains 30 MB; folder size is different. Do not claim shared allowance expands per-file support or degrade the model. External hosting has separate access/privacy.
+- “Does this stop every hosting charge?” → no: bandwidth, database images and legacy signature paths are outside the managed upload budget; no automatic add-on purchase.
+- “Can I upload a fourth small rendering?” → byte allowance replaces the previous count of three after the coordinated release; check remaining bytes and per-file limits.

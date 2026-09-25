@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {stripTypeScriptTypes} from 'node:module';
+import {budgetedUpload,storageUsage,storageBudgetMessage,budgetedSignedUpload} from '../supabase/functions/_shared/storage-budget.ts';
+const owner='11111111-1111-4111-8111-111111111111';
+const calls=[];let forbidden=false,denied=false,existing=false,writes=0;
+const db={rpc:async(name,args)=>{calls.push([name,args]);return denied?{error:{message:'storage_monthly_limit'}}:{data:name==='qdr_storage_status'?{}:{existing}};},storage:{from:()=>({upload:async()=>{writes++;return{};},createSignedUploadUrl:async(path,options)=>({data:{token:'test',path,options}})})}};
+class AccountAccessError extends Error {constructor(){super('Permission denied');this.status=403;}}
+const authorize=async()=>{if(forbidden)throw new AccountAccessError();return {ownerUserId:owner,user:{id:owner}};};
+let source=await fs.readFile('supabase/functions/storage-budget/index.ts','utf8');
+source=source.replace(/^import .*;\r?\n/gm,'').replace('export async function','async function').replace('Deno.serve(handleStorageBudget);','');
+const handle=new Function('requireAccountPermissionWithDefault','serviceClient','AccountAccessError','budgetedUpload','storageUsage','storageBudgetMessage',stripTypeScriptTypes(source)+';return handleStorageBudget;')(authorize,()=>db,AccountAccessError,budgetedUpload,storageUsage,storageBudgetMessage);
+const request=body=>handle(new Request('https://local.test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}));
+forbidden=true;assert.equal((await request({action:'usage'})).status,403);assert.equal(calls.length,0);forbidden=false;
+assert.equal((await request({action:'remove',bucket:'room-photos',paths:['another-owner/file']})).status,403);
+assert.equal((await request({action:'upload',bucket:'unknown'})).status,400);
+const upload=async()=>{const body=new FormData();body.append('metadata',JSON.stringify({action:'upload',bucket:'room-photos',path:owner+'/photo'}));body.append('file',new Blob(['photo'],{type:'image/jpeg'}));return handle(new Request('https://local.test',{method:'POST',body}));};
+assert.equal((await upload()).status,200);assert.equal(writes,1);
+denied=true;assert.equal((await upload()).status,409);assert.equal(writes,1);denied=false;
+await budgetedSignedUpload(db,owner,'document-payment-evidence',owner+'/proof',8388608);
+assert.equal(calls.findLast(([n])=>n==='qdr_storage_reserve')[1].p_bytes,8388608);
+existing=true;const retry=await budgetedSignedUpload(db,owner,'document-payment-evidence',owner+'/proof',8388608);
+assert.equal(retry.data.alreadyUploaded,true,'Interrupted successful upload goes to finalize, not overwrite');
+assert.equal((await request({padding:'x'.repeat(17000)})).status,413);
+console.log('PASS storage gateway authorization, path scope, multipart, quota denial, signed maximum and retry recovery');

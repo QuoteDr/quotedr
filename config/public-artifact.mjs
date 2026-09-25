@@ -14,6 +14,7 @@ export const publicArtifactConfig = Object.freeze({
     'client-portal.html',
     'contact.html',
     'dashboard.html',
+    'storage-budget-client.mjs',
     'quote-profit-report.js',
     'quote-pdf-export.js',
     'quote-find.js',

@@ -56,7 +56,7 @@ test('the payment function authorizes, verifies, and signs evidence without chan
   assert(edge.includes('record.provider !== "manual"'));
   assert(edge.includes('record.portal_visible !== true'));
   assert(edge.includes('.filter((record: any) => record.portal_visible === true)'));
-  assert(edge.includes('createSignedUploadUrl(record.object_path, { upsert: true })'));
+  assert(edge.includes('budgetedSignedUpload(admin,row.user_id,PAYMENT_EVIDENCE_BUCKET,record.object_path,8*1024*1024)'));
   assert(edge.includes('createSignedUrl(record.object_path, PAYMENT_EVIDENCE_SIGNED_URL_SECONDS)'));
   assert(edge.includes('actualSize') && edge.includes('actualMime'));
   assert(edge.includes('paymentEvidenceContentMatches(actualBytes, record.mime_type)'));
@@ -94,7 +94,7 @@ test('payment-proof callers request the same current shared-client bundle', () =
   const viewer = read('interactive-quote-viewer.html');
   const dashboardVersion = dashboard.match(/supabase-v2\.js\?v=(\d+)/)?.[1];
   const viewerVersion = viewer.match(/supabase-v2\.js\?v=(\d+)/)?.[1];
-  assert.equal(dashboardVersion, '2026082401');
+  assert(Number(dashboardVersion) >= 2026092501, 'the release must invalidate the pre-budget shared client');
   assert.equal(viewerVersion, dashboardVersion);
   assert.notEqual(dashboardVersion, '2026081801', 'a stale client bundle leaves payment-proof helpers undefined');
 });

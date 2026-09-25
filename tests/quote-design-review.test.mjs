@@ -28,13 +28,16 @@ const viewSource=src.slice(src.indexOf('async function viewDocument('),src.index
 const actualView=new Function('normalizeId','assertTokenAccess','quoteDesignState','adminClient','publicDesignReview','json',stripTypeScriptTypes(viewSource)+';return viewDocument;')(v=>v||'',async()=>({target:row}),quoteDesignState,()=>db,publicDesignReview,data=>data);
 const lockedResponse=await actualView({documentId:row.id,token:'valid',designViewerId:viewer});
 assert(lockedResponse.designReview.locked);assert.equal(lockedResponse.document,undefined);assert(!JSON.stringify(lockedResponse).includes('5847'));
-const extracted=src.slice(src.indexOf('async function designReviewRequest('),src.indexOf('async function viewDocument('));
+const extracted="const MAX_DESIGN_BYTES=30000000; const corsHeaders={};\n"+src.slice(src.indexOf('async function designReviewRequest('),src.indexOf('async function viewDocument('));
 const factory=new Function('assertTokenAccess','normalizeId','adminClient','reviewViewer','quoteDesignState','userFromAuthHeader','sanitizeSessionId','portalId','json',stripTypeScriptTypes(extracted)+';return designReviewRequest;');
 const handler=factory(async()=>({target:row}),v=>v||'',()=>db,reviewViewer,quoteDesignState,async()=>owner?{id:'owner'}:null,v=>v||'',r=>r.data.portal_id,(data,status=200)=>({data,status}));
 const base={documentId:'quote',token:'valid',designViewerId:viewer,revision:state.revision,sessionId:'test-session'};
 assert.equal((await handler({}, {...base,operation:'continue'})).status,400);
 assert.equal((await handler({}, {...base,revision:'stale',operation:'open'})).status,409);
 assert.equal((await handler({}, {...base,operation:'open'})).status,200);
+const binaryOpen=await handler({}, {...base,operation:'open',binary:true});
+assert.equal(binaryOpen.headers.get('Content-Type'),'application/octet-stream');
+assert.equal(await binaryOpen.text(),'<html>model</html>');
 assert((await quoteDesignState(db,row,viewer)).locked,'Opening does not unlock');
 await handler({}, {...base,operation:'duration',durationSeconds:15});
 await handler({}, {...base,operation:'duration',durationSeconds:9999});

@@ -10,7 +10,7 @@ const viewer = read('interactive-quote-viewer.html');
 const clientDocument = read('supabase/functions/client-document/index.ts');
 const clientPolicy = read('supabase/functions/_shared/client-document-policy.mjs');
 const payment = read('supabase/functions/document-payment/index.ts');
-const migration = read('supabase/migrations/20260828120000_change_order_continue_payments.sql');
+const migration = read('supabase/migrations/20260828230920_change_order_continue_payments.sql');
 
 function changeOrderProjectSummary({ projectBeforeCents, adjustmentCents, taxCents, projectPaidCents, continueRequiredCents, currentChangePaidCents }) {
   const updatedProjectTotalCents = projectBeforeCents + adjustmentCents + taxCents;

@@ -4,6 +4,16 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Preview Invoice PDF creates duplicate invoices dashboard','invoice-preview-read-only'],
+ ['Does preview use an invoice number or save to cloud?','invoice-preview-read-only'],
+ ['Can I send the local unissued preview link to a client?','invoice-preview-read-only'],
+ ['Accepted signed quote expired date banner after acceptance','accepted-document-dates'],
+ ['Signed invoice date missing does signing mean paid?','accepted-document-dates'],
+ ['Do I renew an already accepted quote to remove expiry warning?','accepted-document-dates'],
+ ['Upload 30 MB interactive rendering walkthrough monthly allowance','portal-render-upload-limits'],
+ ['Does replacing my render count toward three uploads?','portal-render-upload-limits'],
+ ['Fourth design upload blocked does withdrawing refund allowance?','portal-render-upload-limits'],
+ ['Can my walkthrough use embedded blob libraries without reducing texture quality?','portal-render-upload-limits'],
  ['Discount fifty dollars off each door unit honour old pricing','line-discount-per-unit'],
  ['Does each unit discount change when I change quantity?','line-discount-per-unit'],
  ['Why is dollar discount not multiplied by six doors?','line-discount-per-unit'],
@@ -79,4 +89,16 @@ assert.equal(searchHandbook(book,'quantum banana telescope').length,0);
 assert(!validHandbook({...book,articles:[{id:'<script>'}]}));
 assert(!validHandbook({...book,articles:[book.articles[0],book.articles[0]]}));
 assert(searchHandbook(book,book.articles.map(a=>a.title).join(' ')).length<=4);
-console.log('Handbook retrieval: 12 questions, follow-up, unknown, validation and limit passed');
+for (const q of ['View expired quote portal activity', 'Do I have to renew a quote just to see its activity?', 'Update Quote Expiry blocks opening my existing Client Portal']) {
+ assert(searchHandbook(book,q).some(a=>a.id==='expired-quote-portal-activity'),q);
+}
+assert(searchHandbook(book,'Can I still email it?', 'expired quote portal activity').some(a=>a.id==='expired-quote-portal-activity'));
+console.log('Handbook retrieval: questions, follow-up, unknown, validation and limit passed');
+assert(searchHandbook(book,'Invoice viewer discounts overflowing narrow page').some(a=>a.id==='invoice-viewer-wide-layout'));
+for(const q of ['Check storage monthly upload bytes', 'Does deleting a file refund my monthly upload allowance?', 'Storage warning existing files still available']) {
+ assert(searchHandbook(book,q).some(a=>a.id==='shared-storage-budget'),q);
+}
+assert(searchHandbook(book,'Does it reset?','shared storage monthly allowance').some(a=>a.id==='shared-storage-budget'));
+for(const q of ['Warning only storage account unlimited uploads', 'Can I bypass my storage cap with my email?', 'Does warning only remove the render file size limit?']) {
+ assert(searchHandbook(book,q).some(a=>a.id==='storage-warning-only-exception'),q);
+}

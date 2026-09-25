@@ -1,6 +1,7 @@
 import { ACCOUNT_PERMISSION, AccountAccessError, requireAccountPermissionWithDefault, serviceClient } from '../_shared/account-authorization.ts';
 import { currentDesignPortal, verifyDesignSession } from '../_shared/portal-design-session.mjs';
 import { designInput, MAX_DESIGN_BYTES } from '../../../portal-design-policy.mjs';
+import { budgetedUpload, storageBudgetMessage, storageUsage } from '../_shared/storage-budget.ts';
 
 const headers = { 'Access-Control-Allow-Origin':'*', 'Access-Control-Allow-Headers':'authorization,apikey,content-type,x-client-info', 'Cache-Control':'private, no-store', 'X-Robots-Tag':'noindex, nofollow', 'Content-Type':'application/json' };
 const json = (data:unknown, status=200) => new Response(JSON.stringify(data), {status,headers});
@@ -21,9 +22,16 @@ export async function handleDesignRequest(req:Request) {
     // Bound both the declared and actual body; never download a caller-supplied URL.
     const maxRequestBytes=MAX_DESIGN_BYTES*1.4+MAX_THUMBNAIL_BYTES*1.4+8192;
     if (Number(req.headers.get('content-length')) > maxRequestBytes) return json({error:'File too large'},413);
-    const raw = await req.text();
-    if (raw.length > maxRequestBytes) return json({error:'File too large'},413);
-    const body = JSON.parse(raw);
+    // Enforce the actual streamed size as well as Content-Length, including chunked requests.
+    let received=0;
+    const bounded=req.body?.pipeThrough(new TransformStream({transform(chunk,controller){received+=chunk.byteLength;if(received>maxRequestBytes)throw new Error('File too large');controller.enqueue(chunk);}}));
+    const reader=new Response(bounded,{headers:{'Content-Type':req.headers.get('content-type')||'application/json'}});
+    let body, incomingFile:File|null=null;
+    if(req.headers.get('content-type')?.startsWith('multipart/form-data')){
+      const form=await reader.formData();const metadata=form.get('metadata'),file=form.get('file');
+      if(typeof metadata!=='string'||metadata.length>MAX_THUMBNAIL_BYTES*1.4+8192||!(file instanceof File)||file.size>MAX_DESIGN_BYTES)return json({error:'Invalid design upload'},400);
+      body=JSON.parse(metadata);incomingFile=file;
+    }else body=await reader.json();
     const db = serviceClient();
     const action = String(body.action || 'list');
     if (action === 'resolve') {
@@ -65,7 +73,7 @@ export async function handleDesignRequest(req:Request) {
       const quote=quoteResult.data;
       if(!quote || quote.data?.portal_id!==portalId)return json({error:'Choose a quote in this portal.'},400);
       const ids=Array.isArray(body.designIds)?body.designIds:(body.id?[body.id]:[]);
-      if(ids.length>20 || new Set(ids).size!==ids.length || ids.some(id=>typeof id!=='string'))return json({error:'Choose up to 20 distinct designs.'},400);
+      if(ids.length>20 || new Set(ids).size!==ids.length || ids.some((id:unknown)=>typeof id!=='string'))return json({error:'Choose up to 20 distinct designs.'},400);
       for(const id of ids){
         const design=await db.from('portal_designs').select('id,visible').eq('id',id).eq('library_id',library.id).maybeSingle();
         if(design.error)throw design.error;
@@ -121,6 +129,7 @@ export async function handleDesignRequest(req:Request) {
       const file = await db.storage.from('portal-designs').download(previous.storage_path);
       if (file.error) throw file.error;
       if (file.data.size > MAX_DESIGN_BYTES) throw new Error('Design exceeds size limit');
+      if(body.binary===true)return new Response(file.data,{headers:{...headers,'Content-Type':'application/octet-stream','X-Content-Type-Options':'nosniff','X-Design-Kind':previous.kind,'X-Design-Mime':previous.mime_type,'Access-Control-Expose-Headers':'X-Design-Kind,X-Design-Mime'}});
       const bytes = new Uint8Array(await file.data.arrayBuffer());
       let binary = '';
       for (let i=0;i<bytes.length;i+=16384) binary += String.fromCharCode(...bytes.subarray(i,i+16384));
@@ -160,17 +169,17 @@ export async function handleDesignRequest(req:Request) {
       if(thumbnailBytes.length!==body.thumbnailSize)return json({error:'Thumbnail size mismatch'},400);
     }
     if (values.kind !== 'link' && !keepFile) {
-      if (typeof body.base64 !== 'string' || body.base64.length > MAX_DESIGN_BYTES*1.4) return json({error:'Invalid file'},400);
-      const bytes = Uint8Array.from(atob(body.base64),c=>c.charCodeAt(0));
+      if (!incomingFile&&(typeof body.base64 !== 'string' || body.base64.length > MAX_DESIGN_BYTES*1.4)) return json({error:'Invalid file'},400);
+      const bytes = incomingFile ? new Uint8Array(await incomingFile.arrayBuffer()) : Uint8Array.from(atob(body.base64),c=>c.charCodeAt(0));
       if (bytes.length !== values.size_bytes) return json({error:'File size mismatch'},400);
       path = owner + '/' + library.id + '/' + id + '/' + crypto.randomUUID();
-      const uploaded = await db.storage.from('portal-designs').upload(path,bytes,{contentType:values.mime_type,upsert:false});
+      const uploaded = await budgetedUpload(db,owner,'portal-designs',path,bytes,{contentType:values.mime_type});
       if (uploaded.error) throw uploaded.error;
       uploadedNew = true;
     }
     if(thumbnailBytes){
       thumbnailPath=owner+'/'+library.id+'/'+id+'/thumbnail-'+crypto.randomUUID();
-      const uploaded=await db.storage.from('portal-designs').upload(thumbnailPath,thumbnailBytes,{contentType:body.thumbnailMime,upsert:false});
+      const uploaded=await budgetedUpload(db,owner,'portal-designs',thumbnailPath,thumbnailBytes,{contentType:body.thumbnailMime});
       if(uploaded.error){if(uploadedNew&&path)await db.storage.from('portal-designs').remove([path]);throw uploaded.error;}
       thumbnailMimeType=body.thumbnailMime;thumbnailSize=thumbnailBytes.length;uploadedThumbnail=true;
     }
@@ -181,11 +190,15 @@ export async function handleDesignRequest(req:Request) {
     if (saved.error || !saved.data?.length) {
       if (uploadedNew && path) await db.storage.from('portal-designs').remove([path]);
       if(uploadedThumbnail&&thumbnailPath)await db.storage.from('portal-designs').remove([thumbnailPath]);
+      if(saved.error?.message?.includes('render_upload_quota_exceeded'))return json({error:'Your account has used its three design file uploads this calendar month (UTC). Replacements count. Existing designs remain available; try again next month.'},429);
       return json({error:saved.error ? 'Design could not be saved. Your original is unchanged.' : 'This design changed in another window. Refresh before replacing.'},saved.error ? 500 : 409);
     }
     // Old private objects retained for recovery, never served by the read endpoint.
-    return json({ok:true,id});
+    return json({ok:true,id,usage:await storageUsage(db,owner)});
   } catch(error) {
+    const budgetMessage=storageBudgetMessage(error);
+    if(budgetMessage)return json({error:budgetMessage},409);
+    if(error instanceof Error&&error.message==='File too large')return json({error:'File too large'},413);
     if (error instanceof AccountAccessError) return json({error:error.message},error.status);
     console.error('portal-designs request failed', error instanceof Error ? error.message : 'Unknown error');
     return json({error:'The design request could not be completed. Please try again.'},500);

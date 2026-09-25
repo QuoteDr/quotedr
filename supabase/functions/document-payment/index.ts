@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { budgetedSignedUpload, storageUsage, storageBudgetMessage } from '../_shared/storage-budget.ts';
 import { quoteDesignState } from '../_shared/quote-design-review.mjs';
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
@@ -49,6 +50,7 @@ type QuoteRow = {
   public_share_token_hash?: string | null;
   parent_quote_id?: string | null;
   change_order_number?: number | null;
+  updated_at?: string | null;
 };
 
 class PaymentError extends Error {
@@ -254,7 +256,7 @@ async function changeOrderProjectPaymentContext(admin: any, row: QuoteRow) {
       .in("quote_id", projectIds)
       .in("status", ["paid", "confirmed"]);
     if (error) throw error;
-    projectPaidCents += (records || []).reduce((sum, record) => sum + Math.max(0, Math.round(Number(record.amount_cents || 0))), 0);
+    projectPaidCents += (records || []).reduce((sum: number, record: {amount_cents?: number | string | null}) => sum + Math.max(0, Math.round(Number(record.amount_cents || 0))), 0);
   }
   return {
     updatedProjectTotalCents,
@@ -571,7 +573,7 @@ async function updateQuotePaymentState(admin: any, row: QuoteRow, record: any, p
   else nextPayments.push(paymentEntry);
 
   const { settings } = await paymentSettings(admin, row.user_id);
-  const state = await documentPaymentState(admin, { ...row, data }, settings);
+  const state: Awaited<ReturnType<typeof documentPaymentState>> & {continueWorkSecured?: boolean; continueWorkDueCents?: number} = await documentPaymentState(admin, { ...row, data }, settings);
   const nextReceived = state.paidCents / 100;
   const changeOrderPayment = isChangeOrder(row);
   const nextData: Record<string, any> = {
@@ -1003,6 +1005,7 @@ function evidenceDocumentId(record: any) {
 }
 
 async function removeEvidenceObject(admin: any, record: any) {
+  await storageUsage(admin, record.user_id);
   const removed = await admin.storage.from(PAYMENT_EVIDENCE_BUCKET).remove([record.object_path]);
   if (removed.error && !String(removed.error.message || "").toLowerCase().includes("not found")) throw removed.error;
 }
@@ -1091,9 +1094,8 @@ async function prepareEvidenceUpload(
       record.mime_type !== mimeType || Number(record.byte_size) !== byteSize
     ) throw new PaymentError("This upload request conflicts with an earlier attempt.", 409, "payment_evidence_conflict");
   }
-  const { data: upload, error: uploadError } = await admin.storage
-    .from(PAYMENT_EVIDENCE_BUCKET)
-    .createSignedUploadUrl(record.object_path, { upsert: true });
+  const { data: upload, error: uploadError } = await budgetedSignedUpload(admin,row.user_id,PAYMENT_EVIDENCE_BUCKET,record.object_path,8*1024*1024);
+  if (upload?.alreadyUploaded) return {...await finalizeEvidenceUpload(admin,{evidenceId:record.id},row,actorRole),alreadyFinalized:true};
   if (uploadError || !upload?.token) throw uploadError || new Error("Signed upload token was not created");
   return {
     evidence: safePaymentEvidence(record),
@@ -1267,6 +1269,8 @@ Deno.serve(async (req) => {
     throw new PaymentError("Unknown payment action", 400, "unknown_action");
   } catch (error) {
     if (error instanceof PaymentError) return json({ error: error.message, code: error.code }, error.status);
+    const budgetMessage=storageBudgetMessage(error);
+    if(budgetMessage)return json({error:budgetMessage,code:'storage_budget'},409);
     if (error instanceof AccountAccessError) return json({ error: error.message, code: error.code }, error.status);
     const id = supportId();
     console.error("document-payment error", { supportId: id, action, documentId: activeDocumentId, message: (error as Error).message });

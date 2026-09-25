@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><title>Render isolation regression</title>
+<h1>Render isolation regression</h1><pre id="result">Running…</pre>
+<script type="module">
+import {isolatedDesignHtml} from '/portal-designs.js';
+const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts');
+window.addEventListener('message',e=>{if(e.source===frame.contentWindow&&e.data?.test==='render-isolation')document.querySelector('#result').textContent=JSON.stringify(e.data.results,null,2);});
+frame.srcdoc=isolatedDesignHtml(`<script type="module">
+const results={};
+try{parent.document.body;results.parentBlocked=false;}catch{results.parentBlocked=true;}
+try{localStorage.getItem('test');results.storageBlocked=false;}catch{results.storageBlocked=true;}
+try{eval('1');results.evalBlocked=false;}catch{results.evalBlocked=true;}
+try{await fetch('http://127.0.0.1:8879/network-must-not-load');results.networkBlocked=false;}catch{results.networkBlocked=true;}
+const url=URL.createObjectURL(new Blob(['export const ready=true'],{type:'text/javascript'}));
+try{results.blobModuleWorks=(await import(url)).ready===true;}catch{results.blobModuleWorks=false;}
+URL.revokeObjectURL(url);
+parent.postMessage({test:'render-isolation',results},'*');
+<\/script>`);document.body.append(frame);
+</script>

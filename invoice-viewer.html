@@ -594,7 +594,19 @@
             .invoice-typed-signature-preview { min-height: 108px; }
             .invoice-typed-signature-preview.has-signature { font-size: 1.9rem; }
         }
+        @media screen {
+            .container.invoice-page {
+                width: 96%;
+                max-width: none;
+            }
+        }
+        .invoice-line-discount {
+            white-space: normal;
+            overflow-wrap: anywhere;
+            min-width: 0;
+        }
         @media print {
+            .container.invoice-page { width: 100%; max-width: none; }
             .d-print-none, .no-print { display: none !important; }
             body { background: white !important; }
             .invoice-business-logo { height: 120px; max-width: 260px; }
@@ -616,7 +628,7 @@ if (location.search.includes('debug')) {
     <script src="analytics.js?v=1778059000"></script>
 </head>
 <body>
-    <div class="container py-4" style="max-width: 860px;">
+    <div class="container invoice-page py-4">
 
         <!-- Invoice actions -->
         <div class="mb-3 d-print-none invoice-action-bar">
@@ -1071,9 +1083,9 @@ if (location.search.includes('debug')) {
             if (!discounts.hasDiscount(item)) return '';
             var original = invoiceMarkedAmount(room, item, discounts.originalTotal(item));
             var amount = invoiceMarkedAmount(room, item, discounts.discountAmount(item));
-            return '<div class="small text-muted"><span>Was </span><s>' + formatMoney(original, currency) + '</s></div>' +
+            return '<div class="invoice-line-discount"><div class="small text-muted"><span>Was </span><s>' + formatMoney(original, currency) + '</s></div>' +
                 '<div class="small text-success">' + escapeHtml(discounts.discountLabel(item)) + (discounts.appliesToUpgrades && !discounts.appliesToUpgrades(item) ? ' (base item only)' : '') + ' -' + formatMoney(amount, currency) + '</div>' +
-                '<div class="small text-muted">Now ' + formatMoney(invoiceLineTotal(item, room), currency) + '</div>';
+                '<div class="small text-muted">Now ' + formatMoney(invoiceLineTotal(item, room), currency) + '</div></div>';
         }
 
         function invoiceRoomIconClass(room) {
@@ -1772,8 +1784,25 @@ if (location.search.includes('debug')) {
             });
         }
 
+        function renderInvoiceRecordDate() {
+            var el = document.getElementById('invoiceDateDisplay');
+            if (!el) return;
+            if (invoiceHasSignature()) {
+                var raw = invoiceData.signed_at || invoiceData.invoice_acknowledged_at || invoiceData.approved_at || invoiceData.accepted_at || window._invoiceRow?.accepted_at;
+                var date = formatInvoiceSignatureTime(raw);
+                el.textContent = date ? 'Signed on ' + date : 'Signed';
+            } else {
+                el.textContent = new Date().toLocaleDateString('en-CA', {year:'numeric', month:'long', day:'numeric'});
+            }
+        }
+
         function renderInvoiceSignatureState() {
+            renderInvoiceRecordDate();
             var section = document.getElementById('invoiceSignatureSection');
+            if (invoiceData.previewOnly === true) {
+                if (section) section.style.display = 'none';
+                return;
+            }
             var unsigned = document.getElementById('invoiceSignatureUnsigned');
             var signed = document.getElementById('invoiceSignedRecord');
             if (!section || !unsigned || !signed) return;
@@ -1897,6 +1926,7 @@ if (location.search.includes('debug')) {
         }
 
         async function confirmInvoiceSignature() {
+            if (invoiceData.previewOnly === true) return;
             var input = document.getElementById('invoiceSignerName');
             var name = String(input && input.value || '').trim();
             var expectedName = invoiceSignatureClientName();
@@ -2085,8 +2115,7 @@ if (location.search.includes('debug')) {
             const settings = getInvoiceSettings();
             renderInvoiceInvalidNotice();
             // Header info
-            const date = new Date().toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric' });
-            document.getElementById('invoiceDateDisplay').textContent = date;
+            renderInvoiceRecordDate();
             document.getElementById('invoiceTitleDisplay').textContent = settings.title || 'Invoice';
             if (invoiceData.quoteNumber) {
                 document.getElementById('invoiceNumberDisplay').textContent = '#' + invoiceData.quoteNumber;
@@ -2393,6 +2422,12 @@ if (location.search.includes('debug')) {
         }
 
         function renderInvoicePaymentOptions(settings, total, invoiceId) {
+            if (invoiceData.previewOnly === true) {
+                var previewPaymentSection = document.getElementById('clientPaymentSection');
+                if (previewPaymentSection) previewPaymentSection.style.display = 'none';
+                _invoiceIdForPayment = '';
+                return;
+            }
             if (invoiceIsInvalid()) {
                 var invalidSection = document.getElementById('clientPaymentSection');
                 var invalidButtons = document.getElementById('clientPaymentButtons');
@@ -2487,6 +2522,7 @@ if (location.search.includes('debug')) {
         }
 
         async function handleClientInvoicePayment() {
+            if (invoiceData.previewOnly === true) return;
             if (invoiceIsInvalid()) {
                 alert('This invoice is no longer valid and cannot accept payment.');
                 return;
@@ -2526,6 +2562,7 @@ if (location.search.includes('debug')) {
         }
 
         async function reportManualInvoicePayment(method) {
+            if (invoiceData.previewOnly === true) return;
             if (invoiceIsInvalid() || typeof callDocumentPaymentFunction !== 'function') return;
             var label = method === 'etransfer' ? 'e-transfer' : method;
             var confirmed = typeof qdConfirm === 'function'
@@ -2571,6 +2608,7 @@ if (location.search.includes('debug')) {
         var _QB_ANON = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
 
         async function checkQBConnected() {
+            if (invoiceData.previewOnly === true) return;
             try {
                 const { data } = await _supabase.auth.getSession();
                 const token = data?.session?.access_token;
@@ -2588,6 +2626,7 @@ if (location.search.includes('debug')) {
         }
 
         async function pushInvoiceToQB() {
+            if (invoiceData.previewOnly === true) return;
             if (typeof requireProFeature === 'function') {
                 var allowed = await requireProFeature('quickbooks', 'QuickBooks sync');
                 if (!allowed) return;

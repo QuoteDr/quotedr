@@ -17,6 +17,18 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 window._supabase = _supabase;
 window._supabaseClient = _supabase;
+// Install before callers upload; the temporary wrapper waits for the module.
+const qdrStorageOriginalFrom = _supabase.storage.from.bind(_supabase.storage);
+const qdrStorageReady = import('./storage-budget-client.mjs').then(m => m.installStorageBudget(_supabase, () => qdActiveAccountId()));
+_supabase.storage.from = function(bucket) {
+    const api = qdrStorageOriginalFrom(bucket);
+    if (['item-full-res-photos','room-photos','portal-job-assets'].includes(bucket)) {
+        api.upload = async (...args) => { await qdrStorageReady; return _supabase.storage.from(bucket).upload(...args); };
+        api.remove = async (...args) => { await qdrStorageReady; return _supabase.storage.from(bucket).remove(...args); };
+    }
+    return api;
+};
+window.qdrStorageReady = qdrStorageReady;
 
 // Client portal links have their own additive hostname contract. Keep the
 // legacy QuoteDr origins valid permanently. Do not deploy a changed primary
@@ -758,12 +770,14 @@ async function callClientDocumentFunction(body, requireUser) {
     const headers = requireUser ? await getSupabaseFunctionAuthHeaders() : body?.action==='design_review' ? await getSupabaseOptionalUserFunctionHeaders() : getSupabasePublicFunctionHeaders();
     var requestBody = Object.assign({}, body || {});
     requestBody.designViewerId=qdDesignViewerId();
+    if(requestBody.action==='design_review')requestBody.binary=true;
     if (requireUser) requestBody.accountId = qdActiveAccountId();
     const response = await fetch(CLIENT_DOCUMENT_FUNCTION_URL, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(requestBody)
     });
+    if(response.ok&&response.headers.get('Content-Type')?.startsWith('application/octet-stream'))return {file:await response.blob(),kind:response.headers.get('X-Design-Kind'),mime:response.headers.get('X-Design-Mime')};
     const data = await response.json().catch(function() { return {}; });
     if (!response.ok || data.error) throw new Error(data.error || 'Secure client document request failed');
     return data;
@@ -866,6 +880,7 @@ async function uploadPaymentEvidence(options) {
         idempotencyKey: crypto.randomUUID()
     });
     var prepared = await callDocumentPaymentFunction(Object.assign({}, basePayload, { action: prepareAction }), ownerUpload);
+    if (prepared.alreadyFinalized && prepared.evidence) return prepared;
     if (!prepared.upload || !prepared.evidence) throw new Error('Payment proof upload could not be prepared.');
     var uploaded = await _supabase.storage
         .from(prepared.upload.bucket)
@@ -2884,6 +2899,10 @@ async function uploadAiVoiceAudioEvidence(transcriptId, capture, idempotencyKey)
     });
     if (prepared.alreadyFinalized) {
         return { recording: prepared.recording, idempotencyKey: uploadKey, alreadyFinalized: true };
+    }
+    if (prepared.alreadyUploaded && prepared.recording) {
+        const recovered = await qdAiVoiceAudioFunction({action:'finalize_upload',recordingId:prepared.recording.id});
+        return {recording:recovered.recording,idempotencyKey:uploadKey,alreadyFinalized:recovered.alreadyFinalized===true};
     }
     if (!prepared.upload || prepared.upload.bucket !== QD_AI_VOICE_AUDIO_BUCKET) {
         throw new Error('QuoteDr did not return a valid private audio upload destination.');

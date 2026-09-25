@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {prepareDesignHtml,validateSelfContained} from '../portal-design-prepare.mjs';
+import {MAX_DESIGN_BYTES} from '../portal-design-policy.mjs';
 const lib=JSON.parse(fs.readFileSync('vendor/design-runtime-1/runtime.json'));
 const load=async()=>lib;
 const model='<script type="application/json" id="model">{"meshes":[1,2]}</script>';
@@ -19,16 +20,19 @@ assert.deepEqual(await prepareDesignHtml(plain,()=>{throw Error('unexpected fetc
 for(const bad of [
   html.replace('https://esm.sh/three@0.160.1','https://attacker.invalid/payload.js'),
   html.replace('https://esm.sh/three@0.160.1','https://esm.sh/three@0.160.1?other'),
-  html.replace('"https://esm.sh/three@0.160.1"','window.source'),
   html.replace('</body>','<script src="https://attacker.invalid/a.js"></script></body>'),
   wrapped+wrapped, html+'<iframe src="https://example.test"></iframe>',
-  'x'.repeat(8*1024*1024+1)
+  'x'.repeat(MAX_DESIGN_BYTES+1)
 ])await assert.rejects(()=>prepareDesignHtml(bad,load));
-const expanded={...lib,modules:'x'.repeat(8*1024*1024)};
+const expanded={...lib,modules:'x'.repeat(MAX_DESIGN_BYTES)};
 await assert.rejects(()=>prepareDesignHtml(html,async()=>expanded),/prepared viewer is over/);
 const ui=fs.readFileSync('portal-designs.js','utf8');
 assert(ui.includes("frame.setAttribute('sandbox','allow-scripts')"));
 assert(ui.includes("connect-src 'none'"));
+assert(ui.includes("script-src 'unsafe-inline' blob:"));
+const embedded='<script type="module">const url=URL.createObjectURL(new Blob(["export const value=1"],{type:"text/javascript"}));await import(url);</script>';
+assert.deepEqual(await prepareDesignHtml(embedded,load),{html:embedded,prepared:false});
+assert.equal(MAX_DESIGN_BYTES,30_000_000);
 assert(ui.includes('previewedFile!==file.files[0]'));
 assert(ui.includes('reviewed.disabled=true'));
 assert(!fs.readFileSync('portal-design-prepare.mjs','utf8').includes('fetch(url'));

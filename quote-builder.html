@@ -16401,7 +16401,7 @@ Example:
                     console.warn('Could not include approved change orders in invoice:', e);
                 }
             }
-            if (typeof reviewDocumentCardPaymentRules === 'function') {
+            if (!options.previewOnly && typeof reviewDocumentCardPaymentRules === 'function') {
                 var cardPaymentReview = await reviewDocumentCardPaymentRules('invoice', invoiceData);
                 if (!cardPaymentReview) return null;
                 if (cardPaymentReview.bufferApplied) {
@@ -16422,6 +16422,18 @@ Example:
                 if (cardPaymentReview.cardPayment) invoiceData.card_payment = cardPaymentReview.cardPayment;
             }
             invoiceData.paymentSettings = clientSafePaymentSettings(invoiceData.paymentSettings);
+            if (options.previewOnly) {
+                // A local snapshot is not an issued invoice: no number reservation,
+                // cloud save, source status change, payment review or share state.
+                invoiceData.previewOnly = true;
+                invoiceData.sourceQuoteNumber = invoiceData.quoteNumber;
+                invoiceData.quoteNumber = 'Preview — not issued';
+                var previewBaseUrl = getInvoiceBaseUrl();
+                var localPreviewUrl = previewBaseUrl + '?invoice=' + encodeURIComponent(invoiceId) + '&preview=1&admin_preview=1';
+                localStorage.setItem(invoiceId, JSON.stringify(invoiceData));
+                localStorage.setItem('ald_last_preview_invoice', invoiceId);
+                return { invoiceId: invoiceId, invoiceData: invoiceData, invoiceUrl: localPreviewUrl, invoiceBaseUrl: previewBaseUrl };
+            }
             try {
                 if (typeof qdEnsureInvoiceDocumentNumber !== 'function') {
                     throw new Error('Invoice numbering is unavailable. Reload QuoteDr and try again.');
@@ -16455,6 +16467,9 @@ Example:
         }
 
         function saveInvoiceForViewer(invoiceState, savingNote, openBtn) {
+            if (invoiceState?.invoiceData?.previewOnly === true) {
+                return Promise.resolve(invoiceState);
+            }
             if (!invoiceState || typeof saveInvoiceForSharing !== 'function') {
                 if (savingNote) savingNote.style.display = 'none';
                 return Promise.resolve(invoiceState);
@@ -16511,7 +16526,7 @@ Example:
                 ? openBtn.href
                 : (window._currentInvoiceUrl || '');
             if (!invoiceUrl || invoiceUrl === '#') {
-                var invoiceState = await prepareInvoiceForViewer({ markInvoiced: false });
+                var invoiceState = await prepareInvoiceForViewer({ markInvoiced: false, previewOnly: true });
                 if (!invoiceState) return false;
                 invoiceUrl = invoiceState.invoiceUrl;
                 window._currentInvoiceUrl = invoiceUrl;
@@ -17012,16 +17027,10 @@ Example:
 
         async function previewInvoice() {
             try {
-                var invoiceState = await prepareInvoiceForViewer({ markInvoiced: false });
+                var invoiceState = await prepareInvoiceForViewer({ markInvoiced: false, previewOnly: true });
                 if (!invoiceState) return;
-                var savePromise = saveInvoiceForViewer(invoiceState);
                 var win = window.open(invoiceState.invoiceUrl, '_blank');
                 if (!win) window.location.href = invoiceState.invoiceUrl;
-                savePromise.then(function(updated) {
-                    if (updated && updated.invoiceUrl !== invoiceState.invoiceUrl && !win) {
-                        window.location.href = updated.invoiceUrl;
-                    }
-                });
             } catch(err) {
                 console.error('previewInvoice error:', err);
                 qdAlert('Something went wrong opening the invoice preview. Please try again.');

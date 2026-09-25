@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { designInput, MAX_DESIGN_BYTES } from '../portal-design-policy.mjs';
+import { budgetedUpload, storageBudgetMessage, storageUsage } from '../supabase/functions/_shared/storage-budget.ts';
 import { issueDesignSession, verifyDesignSession, currentDesignPortal } from '../supabase/functions/_shared/portal-design-session.mjs';
 
 const secret='test-only-secret';
@@ -17,7 +18,7 @@ assert.equal(designInput({kind:'link',title:'A',url:'https://example.com/view'})
 
 // Execute the actual Edge handler with a deterministic database/authorization adapter.
 // The session validator and current-portal resolver are the real implementations.
-let storageReads=0, authPermission='';
+let storageReads=0, authPermission='', quotaFailure=false;
 const tables={
   quotes:[],quote_design_links:[],
   user_data:[{user_id:owner,key:'client_portals',value:[{id:portal,name:'Design-only project',pin:'1847',updatedAt:new Date().toISOString()}]}],
@@ -34,7 +35,7 @@ class Query{
   update(value){this.mode='update';this.value=value;return this;}insert(value){this.mode='insert';this.value=value;return this;}
   upsert(value){this.mode='insert';this.value=value;return this;}
   in(k,values){this.inFilter=[k,values];return this;}delete(){this.mode='delete';return this;}
-  then(resolve){let rows=tables[this.table].filter(r=>this.filters.every(([k,v])=>k==='data->>portal_id'?r.data?.portal_id===v:r[k]===v));
+  then(resolve){if(quotaFailure&&this.table==='portal_designs'&&this.mode==='insert')return Promise.resolve({data:null,error:{message:'render_upload_quota_exceeded'}}).then(resolve);let rows=tables[this.table].filter(r=>this.filters.every(([k,v])=>k==='data->>portal_id'?r.data?.portal_id===v:r[k]===v));
     if(this.mode==='update')rows.forEach(r=>Object.assign(r,this.value));
     if(this.inFilter)rows=rows.filter(r=>this.inFilter[1].includes(r[this.inFilter[0]]));
     if(this.mode==='delete')tables[this.table]=tables[this.table].filter(r=>!rows.includes(r));
@@ -45,11 +46,12 @@ class Query{
 }
 const stored=new Map([['private-model',new Blob(['<html>model</html>'])]]);
 const db={from:t=>new Query(t),storage:{from:()=>({download:async path=>{storageReads++;return{data:stored.get(path),error:null};},upload:async(p,b)=>{stored.set(p,new Blob([b]));return{};},remove:async paths=>{paths.forEach(p=>stored.delete(p));return{};}})}};
+db.rpc=async name=>quotaFailure&&name==='qdr_storage_reserve'?{error:{message:'storage_monthly_limit'}}:{data:{existing:false}};
 class AccountAccessError extends Error{constructor(message,status=403){super(message);this.status=status;}}
 const authorize=async(req,account,permission)=>{authPermission=permission;if(req.headers.get('authorization')!=='Bearer owner-test')throw new AccountAccessError('Forbidden');return{ownerUserId:owner};};
 let source=await fs.readFile('supabase/functions/portal-designs/index.ts','utf8');
 source=source.replace(/^import .*;\r?\n/gm,'').replace('export async function handleDesignRequest','async function handleDesignRequest').replace('Deno.serve(handleDesignRequest);','');
-const handler=new Function('ACCOUNT_PERMISSION','AccountAccessError','requireAccountPermissionWithDefault','serviceClient','currentDesignPortal','verifyDesignSession','designInput','MAX_DESIGN_BYTES','Deno',stripTypeScriptTypes(source)+'\nreturn handleDesignRequest;')({QUOTES_SEND:'quotes.send',QUOTES_READ:'quotes.read'},AccountAccessError,authorize,()=>db,currentDesignPortal,verifyDesignSession,designInput,MAX_DESIGN_BYTES,{env:{get:()=>secret}});
+const handler=new Function('ACCOUNT_PERMISSION','AccountAccessError','requireAccountPermissionWithDefault','serviceClient','currentDesignPortal','verifyDesignSession','designInput','MAX_DESIGN_BYTES','Deno','budgetedUpload','storageBudgetMessage','storageUsage',stripTypeScriptTypes(source)+'\nreturn handleDesignRequest;')({QUOTES_SEND:'quotes.send',QUOTES_READ:'quotes.read'},AccountAccessError,authorize,()=>db,currentDesignPortal,verifyDesignSession,designInput,MAX_DESIGN_BYTES,{env:{get:()=>secret}},budgetedUpload,storageBudgetMessage,storageUsage);
 async function call(body,ownerAuth=false){return handler(new Request('https://local.test',{method:'POST',headers:{'content-type':'application/json',authorization:ownerAuth?'Bearer owner-test':'Bearer anon'},body:JSON.stringify({contractorId:owner,portalId:portal,...body})}));}
 let response=await call({action:'list'});assert.equal(response.status,401);
 response=await call({action:'read',id:'one'});assert.equal(response.status,401);assert.equal(storageReads,0,'No bytes read before a valid PIN grant');
@@ -68,6 +70,15 @@ const count=stored.size;
 response=await call({...save,id:'one',baseVersion:'stale'},true);assert.equal(response.status,409);assert.equal(stored.size,count,'Conflict cleans up the new upload, not the old model');
 response=await call(save,true);assert.equal(response.status,200);const savedId=(await response.json()).id;
 const saved=tables.portal_designs.find(r=>r.id===savedId);assert(stored.has(saved.storage_path));
+quotaFailure=true;const beforeQuota=stored.size;
+response=await call(save,true);assert.equal(response.status,409);assert.equal(stored.size,beforeQuota,'Quota rejection writes no new files');quotaFailure=false;
+// Exercise exact 30 MB multipart transfer through the real handler, then binary read.
+const large=new Uint8Array(MAX_DESIGN_BYTES);large[0]=60;large[large.length-1]=62;
+const multipart=new FormData();multipart.append('metadata',JSON.stringify({...save,contractorId:owner,portalId:portal,base64:undefined,thumbnailBase64:undefined,size:large.length}));multipart.append('file',new Blob([large],{type:'text/html'}),'fixture.html');
+response=await handler(new Request('https://local.test',{method:'POST',headers:{authorization:'Bearer owner-test'},body:multipart}));assert.equal(response.status,200);
+const largeId=(await response.json()).id;
+response=await call({action:'read',id:largeId,session:token,binary:true});assert.equal(response.status,200);assert.equal(response.headers.get('Content-Type'),'application/octet-stream');assert.deepEqual(new Uint8Array(await response.arrayBuffer()),large);
+assert.equal((await call({...save,size:MAX_DESIGN_BYTES+1},true)).status,400);
 response=await call({action:'read',session:token,id:savedId});assert.equal(atob((await response.json()).base64),'hello');
 response=await call({action:'thumbnail',id:savedId});assert.equal(response.status,401);
 response=await call({action:'thumbnail',session:token,id:savedId});assert.equal(atob((await response.json()).base64),'card');

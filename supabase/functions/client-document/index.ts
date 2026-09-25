@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { MAX_DESIGN_BYTES } from '../../../portal-design-policy.mjs';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import {
   ACCOUNT_PERMISSION,
@@ -960,6 +961,7 @@ async function designReviewRequest(req:Request,body:Record<string,unknown>) {
   if(!viewer)return json({error:'Refresh the page to start a design review.'},400);
   const state=await quoteDesignState(db,target,viewer,body.designId);
   if(!state || state.revision!==body.revision)return json({error:'This design changed. Refresh the quote to review the latest version.'},409);
+  const reviewedDesign = state.design;
   const operation=String(body.operation||''), user=await userFromAuthHeader(req);
   const owner=user?.id===target.user_id;
   const sessionId=sanitizeSessionId(body.sessionId);
@@ -967,7 +969,7 @@ async function designReviewRequest(req:Request,body:Record<string,unknown>) {
   async function log(eventType:string,duration:number|null=null){
     if(owner)return;
     const inserted=await db.from('portal_document_events').insert({user_id:target.user_id,portal_id:portalId(target)||null,document_id:target.id,
-      event_type:eventType,session_id:sessionId,duration_seconds:duration,metadata:{design_id:state.design.id,design_title:state.design.title,design_version:state.design.version}});
+      event_type:eventType,session_id:sessionId,duration_seconds:duration,metadata:{design_id:reviewedDesign.id,design_title:reviewedDesign.title,design_version:reviewedDesign.version}});
     if(inserted.error)throw inserted.error;
   }
   const receipt={document_id:target.id,viewer_id:viewer,revision:state.revision};
@@ -983,7 +985,8 @@ async function designReviewRequest(req:Request,body:Record<string,unknown>) {
     if(state.design.kind==='link')return json({url:state.design.external_url});
     const file=await db.storage.from('portal-designs').download(state.design.storage_path);
     if(file.error)throw file.error;
-    if(file.data.size>8*1024*1024)throw new Error('Design exceeds size limit');
+    if(file.data.size>MAX_DESIGN_BYTES)throw new Error('Design exceeds size limit');
+    if(body.binary===true)return new Response(file.data,{headers:{...corsHeaders,'Cache-Control':'private, no-store','Content-Type':'application/octet-stream','X-Content-Type-Options':'nosniff','X-Design-Kind':state.design.kind,'X-Design-Mime':state.design.mime_type,'Access-Control-Expose-Headers':'X-Design-Kind,X-Design-Mime'}});
     const bytes=new Uint8Array(await file.data.arrayBuffer());let binary='';
     for(let i=0;i<bytes.length;i+=16384)binary+=String.fromCharCode(...bytes.subarray(i,i+16384));
     return json({base64:btoa(binary),mime:state.design.mime_type,kind:state.design.kind});

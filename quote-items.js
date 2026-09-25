@@ -389,6 +389,11 @@
             context = context || {};
             if (!file || !String(file.type || '').toLowerCase().startsWith('image/')) return null;
             var quota = canAddManageFullResPhotoBytes(file.size || 0, existingMeta);
+            if (!quota.allowed && window.qdrStorageReady) {
+                await window.qdrStorageReady;
+                var budgetStatus = await window._supabase.__qdrBudget.usage();
+                if (!budgetStatus.error && budgetStatus.usage && budgetStatus.usage.warningOnly === true) quota.allowed = true;
+            }
             if (!quota.allowed) {
                 throw new Error('Full-resolution photo storage is full. This account includes ' + formatManagePhotoBytes(MANAGE_FULL_RES_PHOTO_ACCOUNT_LIMIT_BYTES) + ' for saved item photos.');
             }

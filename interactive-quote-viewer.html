@@ -1602,7 +1602,7 @@ if (location.search.includes('debug')) {
                             <div class="proposal-detail-value" id="quoteNumberDisplay"></div>
                         </div>
                         <div class="proposal-detail">
-                            <div class="proposal-detail-label">Prepared On</div>
+                            <div class="proposal-detail-label" id="quoteDateLabel">Prepared On</div>
                             <div class="proposal-detail-value" id="quoteDateDisplay"></div>
                         </div>
                     </div>
@@ -1974,7 +1974,7 @@ if (location.search.includes('debug')) {
     <script src="typed-signature.js?v=2026080301"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="card-payment-rules.js?v=2026080301"></script>
-    <script src="supabase-v2.js?v=2026090802"></script>
+    <script src="supabase-v2.js?v=2026092501"></script>
     <script src="save-coordinator.js?v=2026081801"></script>
     <script src="change-orders.js?v=1778152100"></script>
 
@@ -4886,8 +4886,7 @@ if (location.search.includes('debug')) {
             if (quoteData.projectAddress) {
                 document.getElementById('projectAddressDisplay').textContent = quoteData.projectAddress;
             }
-            const quoteDateEl = document.getElementById('quoteDateDisplay');
-            if (quoteDateEl) quoteDateEl.textContent = new Date().toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric' });
+            renderQuoteRecordDate();
             const quoteNumEl = document.getElementById('quoteNumberDisplay');
             if (quoteNumEl && quoteData.quoteNumber) {
                 var qNum = quoteData.quoteNumber;
@@ -5737,7 +5736,28 @@ if (location.search.includes('debug')) {
 
         function quoteIsAccepted() {
             return ['accepted', 'approved', 'invoiced', 'paid'].includes(String(quoteData.status || quoteData.data?.status || '').toLowerCase())
-                || !!(quoteData.signature_url || quoteData.signed_at || quoteData.approved_at);
+                || !!(quoteData.signature_url || quoteData.signed_at || quoteData.approved_at || quoteData.accepted_at || quoteRowAcceptedAt());
+        }
+
+        function quoteRowAcceptedAt() {
+            var row = window._quoteRow;
+            return row && quoteData.id && row.id === quoteData.id ? row.accepted_at : '';
+        }
+
+        function quoteAcceptanceDate() {
+            var raw = quoteData.signed_at || quoteData.approved_at || quoteData.accepted_at || quoteRowAcceptedAt();
+            if (!raw) return '';
+            var date = new Date(raw);
+            return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-CA', {year:'numeric', month:'long', day:'numeric'});
+        }
+
+        function renderQuoteRecordDate() {
+            var label = document.getElementById('quoteDateLabel');
+            var value = document.getElementById('quoteDateDisplay');
+            var accepted = quoteIsAccepted();
+            var date = accepted ? quoteAcceptanceDate() : new Date().toLocaleDateString('en-CA', {year:'numeric', month:'long', day:'numeric'});
+            if (label) label.textContent = accepted ? (date ? 'Accepted On' : 'Status') : 'Prepared On';
+            if (value) value.textContent = accepted ? (date || 'Accepted') : date;
         }
 
         function quoteDepositIsPaid() {
@@ -5769,6 +5789,8 @@ if (location.search.includes('debug')) {
         }
 
         function applyQuoteCompletionState() {
+            renderQuoteRecordDate();
+            showExpiryNotice();
             if (!quoteIsAccepted()) return;
 
             var signedBy = quoteData.signed_by || quoteData.approved_by || quoteData.accepted_by || 'Client';
@@ -6008,6 +6030,10 @@ if (location.search.includes('debug')) {
         function showExpiryNotice() {
             var el = document.getElementById('quoteExpiry');
             if (!el) return;
+            if (quoteIsAccepted()) {
+                el.innerHTML = '';
+                return;
+            }
             var expiryStyle = resolveViewerDocumentStyle();
             if (expiryStyle.expiryMode === 'automatic' && !expiryStyle.expiryStartedAt) {
                 el.textContent = 'Validity: ' + (Number(expiryStyle.expiryDurationDays) || 30) + ' days from first client sharing.';
@@ -6208,6 +6234,8 @@ if (location.search.includes('debug')) {
                 var stickyActions = document.getElementById('stickyClientActions');
                 if (stickyActions) stickyActions.style.display = 'none';
                 closeSignatureModal();
+
+                applyQuoteCompletionState();
 
                 if (typeof reconcileQuotePaymentState === 'function') await reconcileQuotePaymentState(quoteId);
                 if (typeof renderDepositPaymentSection === 'function') renderDepositPaymentSection();

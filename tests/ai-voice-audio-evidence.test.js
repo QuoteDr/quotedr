@@ -50,7 +50,7 @@ function sourceBetween(source, startMarker, endMarker) {
     support_hold_state: 'closed',
     post_case_delete_at: '2026-08-07T23:59:59Z',
   }, now), true, 'post-case audio must become due after the defined 30-day deadline');
-  const safe = policy.safeVoiceAudioRecording({ ...baseRecord, expires_at: '2026-08-22T00:00:00Z' });
+  const safe = policy.safeVoiceAudioRecording({ ...baseRecord, expires_at: new Date(Date.now() + 86400000).toISOString() });
   assert.strictEqual(safe.playbackAvailable, true);
   assert.strictEqual(Object.hasOwn(safe, 'objectPath'), false, 'browser metadata must not expose the private object path');
   assert.strictEqual(Object.hasOwn(safe, 'userId'), false, 'browser metadata must not expose internal owner IDs');
@@ -78,7 +78,8 @@ function sourceBetween(source, startMarker, endMarker) {
 
   const edge = read('supabase/functions/voice-audio/index.ts');
   assert(!/console\.(?:log|warn|error)/.test(edge), 'audio paths, account details, and support reasons must not be logged');
-  assert(edge.includes("createSignedUploadUrl(record.object_path, { upsert: true })"), 'retry uploads must be idempotent at their unique path');
+  assert(edge.includes('budgetedSignedUpload('), 'signed uploads must reserve shared capacity');
+  assert(edge.includes('alreadyUploaded'), 'retries must recover existing immutable uploads');
   assert(edge.includes('createSignedUrl(record.object_path, VOICE_AUDIO_SIGNED_URL_SECONDS)'));
   assert(edge.includes("action === 'cleanup_expired'"));
   assert(edge.includes(".eq('upload_status', 'deletion_pending')"), 'automatic deletion must be retryable after interrupted Storage removal');

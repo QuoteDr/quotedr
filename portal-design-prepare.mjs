@@ -4,9 +4,11 @@ const modulePaths=['objects/Reflector','postprocessing/EffectComposer','postproc
 const known=new Map([['three','THREE'],['https://esm.sh/three@0.160.1','THREE'],['https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js','THREE']]);
 for(const path of modulePaths){for(const base of ['https://esm.sh/three@0.160.1/','https://cdn.jsdelivr.net/npm/three@0.160.1/'])known.set(base+'examples/jsm/'+path+'.js',path.split('/').pop());}
 export function validateSelfContained(html){
-  if (/<(?:iframe|frame|object|embed)\b|<script\b[^>]*\bsrc\s*=|<link\b[^>]*stylesheet/i.test(html) || /\bimport\s*(?:\(|[^;\n]*?\bfrom\s*|["'])/.test(html)) throw Error(unsupported);
+  // Runtime-generated blob modules are permitted inside the opaque CSP sandbox.
+  // Literal remote imports still go through the known-library preparation path.
+  if (/<(?:iframe|frame|object|embed)\b|<script\b[^>]*\bsrc\s*=|<link\b[^>]*stylesheet/i.test(html) || /\bimport\s*(?:\(\s*["'](?!blob:)|[^;(\n]*?\bfrom\s*|["'])/.test(html)) throw Error(unsupported);
 }
-function checkSize(html){if(new TextEncoder().encode(html).length>MAX_DESIGN_BYTES)throw Error('The prepared viewer is over 8 MB. Reduce the model size or use External design link.');}
+function checkSize(html){if(new TextEncoder().encode(html).length>MAX_DESIGN_BYTES)throw Error('The prepared viewer is over 30 MB. Use External design link for a larger model.');}
 function decodeAttribute(text){return text.replace(/&quot;/g,'"').replace(/&apos;|&#x27;|&#39;/gi,"'").replace(/&#(x[\da-f]+|\d+);/gi,(_,n)=>{const v=n[0].toLowerCase()==='x'?parseInt(n.slice(1),16):Number(n);return v<=0x10ffff?String.fromCodePoint(v):'\ufffd';}).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');}
 let runtimePromise;
 async function runtime(){

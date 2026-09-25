@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { budgetedUpload } from '../_shared/storage-budget.ts';
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -34,7 +35,7 @@ function dataUrlBytes(dataUrl: string) {
 }
 
 async function sha256Hex(bytes: Uint8Array) {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(bytes));
   return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -76,14 +77,11 @@ serve(async (req) => {
           const { bytes, mimeType } = dataUrlBytes(dataUrl);
           const hash = await sha256Hex(bytes);
           const path = `${userId}/thumbnails/${hash}.${extensionForMime(mimeType)}`;
-          const { error } = await publicBucket.upload(path, bytes, {
+          await budgetedUpload(admin,userId,PHOTO_BUCKET,path,bytes, {
             contentType: mimeType,
             cacheControl: "31536000",
             upsert: false,
           });
-          if (error && Number((error as { statusCode?: number }).statusCode || 0) !== 409 && !/already exists|duplicate/i.test(error.message || "")) {
-            throw error;
-          }
           const publicUrl = publicBucket.getPublicUrl(path).data.publicUrl;
           if (!publicUrl) throw new Error("Photo storage did not return a public URL");
           return publicUrl;

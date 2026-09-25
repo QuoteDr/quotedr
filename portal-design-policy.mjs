@@ -1,4 +1,5 @@
-export const MAX_DESIGN_BYTES = 8 * 1024 * 1024;
+// Decimal MB, matching the upload UI and monthly allowance documentation.
+export const MAX_DESIGN_BYTES = 30_000_000;
 export const DESIGN_MIME = Object.freeze({ image:['image/png','image/jpeg','image/webp'], pdf:['application/pdf'], interactive:['text/html'] });
 export function designInput(input) {
   const kind = String(input.kind || '');
@@ -12,7 +13,7 @@ export function designInput(input) {
     out.external_url = url.href;
   } else {
     if (!DESIGN_MIME[kind].includes(input.mime)) throw new Error('Unsupported file type. Use PNG, JPEG, WebP, PDF, or self-contained HTML.');
-    if (!Number.isInteger(input.size) || input.size <= 0 || input.size > MAX_DESIGN_BYTES) throw new Error('Design files must be between 1 byte and 8 MB.');
+    if (!Number.isInteger(input.size) || input.size <= 0 || input.size > MAX_DESIGN_BYTES) throw new Error('Design files must be between 1 byte and 30 MB.');
     out.mime_type = input.mime;
     out.size_bytes = input.size;
   }
