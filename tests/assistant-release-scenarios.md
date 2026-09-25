@@ -186,6 +186,15 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - “Saving conflicts”: refresh and reopen before reapplying, preserve newer work; no customer-record changes during tests.
 # Empty portal link regression — 2026-09-25.8
 
+## Design loading regression — 2026-09-25.9
+
+- Large viewer: "Can I make the model nearly full browser size?" Open design automatically expands interactive previews, retaining border and Close. Follow-up: "Does that unblock the model fullscreen button?" Fullscreen permission is granted, but the model must implement the click handler and the browser must support it. Sandbox stays isolated. Escape exits on desktop. "Does Reset All work now?" Native confirm remains blocked; model author needs an in-model dialog. "Still small after update" Refresh, distinguish model-internal layout; never recommend deleting/re-uploading for size alone.
+
+- "The design loading bar is moving. Is it almost done?" Explain indeterminate activity, not percentage or guaranteed network progress.
+- Follow-up: "Can I skip it?" Explicit viewing-problem fallback asks confirmation while loading; cancelling keeps waiting. Never claim automatic skipping or approval.
+- "The bar disappeared but the model is still starting" Embedded page load does not prove model initialisation; allow more time, or close and reopen to retry. Do not advise deleting the original.
+- "My image failed to open" Error/fallback, not a successful completion claim. Reduced motion uses a steady indicator.
+
 - "I created a portal but have no quote yet. How do I get the customer link?" Explain Manage Portals > PIN > Copy Link, current PIN, and no dummy quote required.
 - Follow-up: "Will they need another link when I add the invoice?" Same full portal entry remains usable; publish the document, refresh, unlock. Do not confuse with the separate design-only link.
 - "Copy says blocked" Advise manual copy from Client link, not portal deletion/recreation.

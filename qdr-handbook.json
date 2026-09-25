@@ -1,7 +1,23 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-25.8",
+  "version": "2026-09-25.10",
   "articles": [
+    {
+      "id": "design-viewer-window-size",
+      "title": "Large interactive model viewer window",
+      "verifiedAt": "2026-09-25",
+      "release": "2026-09-25.10",
+      "sources": ["portal-designs.js", "portal-designs.css"],
+      "body": "Choose Open design for an interactive model in Designs & Renderings. The viewer automatically uses almost the entire browser viewport, leaving a narrow rounded border and visible backdrop. Resize the browser and the model frame resizes with it. Close and presentation controls remain outside the model; on very short windows the dialog can scroll. Close does not confirm a presentation step or save model adjustments. QDR also permits the isolated model to request true fullscreen when its fullscreen button is clicked. The uploaded model must implement requestFullscreen with rejection handling; browser/device support and embedding policies still apply. Exit fullscreen with Escape on desktop or the browser/device exit control to return to QDR controls. This does not grant parent-page access, storage, native confirmation popups or network access. Reset All that uses window.confirm still needs an in-model confirmation dialog from the model author. If fullscreen is unavailable use the enlarged bordered viewer. If it still looks small, refresh the portal after the matching web release; empty space inside the model itself may be controlled by the uploaded viewer. Keep originals locally; do not delete a design just to resize the window. No uploaded files or model quality are changed."
+    },
+    {
+      "id": "design-loading-progress",
+      "title": "Design loading bar and slow model previews",
+      "verifiedAt": "2026-09-25",
+      "release": "2026-09-25.9",
+      "sources": ["portal-designs.js", "portal-designs.css"],
+      "body": "Open design in Designs & Renderings shows an animated loading bar while retrieving and opening the file. It is an activity indicator, not a download percentage or a guarantee that the connection is working. Keep the window open on slower devices. Interactive models may continue initialising after their embedded page appears; QDR cannot measure completion inside the isolated model. Images wait for decoding; PDFs wait for their first-page preview attempt. Normal presentation Continue appears after opening, not during download. I can’t view this — continue anyway remains available for viewing problems; using it while loading asks you to confirm skipping. Cancel that confirmation to keep waiting. A failed load displays its error and retains the explicit fallback; nothing automatically skips the presentation order. Closing stops viewing without confirming that step, so reopen it to retry. No quote acceptance or saved model edits result from loading. Reduced-motion settings show a steady indicator. Publishing uses animated Saving dots until success or error; wait for Design saved to the portal before assuming publication succeeded. Keep original files locally. These instructions describe the matching web release; local checks do not prove a customer device can render the model."
+    },
     {
       "id": "empty-portal-client-link",
       "title": "Empty portal links before adding quotes or designs",

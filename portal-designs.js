@@ -57,34 +57,43 @@ async function renderDrawingPdf(bytes,body,d){
   }catch(error){box.textContent='Inline PDF preview is unavailable. Use Download drawing to view the file.';}
 }
 export async function showDesign(read, title, options={}) {
-  const d=dialog(title,true);const body=el('div','Loading design…');d.append(body);
+  const d=dialog(title,true);const body=el('div');
+  const loading=el('div',null,'qd-design-loading');
+  const loadingText=el('p','Loading design… Please keep this window open. Large models may take longer on slower devices.');loadingText.setAttribute('role','status');
+  const progress=el('div',null,'qd-design-progress');progress.setAttribute('role','progressbar');progress.setAttribute('aria-label','Loading design');
+  loading.append(loadingText,progress);d.append(loading,body);let busy=true;
+  const ready=()=>{busy=false;loading.remove();};
   d.addEventListener('close',()=>options.onClose?.(),{once:true});
   const addContinue=(link)=>{if(options.onContinue){const next=button(options.continueLabel||'Continue to quote',()=>{d.close();options.onContinue();},'btn btn-primary');
     if(link&&options.requireExternalOpen){next.disabled=true;link.addEventListener('click',()=>{next.disabled=false;});body.append(el('p','Open the external link first, then return here to confirm you have watched or reviewed it. QDR cannot verify playback.'));}
     d.append(next);
   }};
-  if(options.onProblem)d.append(button('I can’t view this — continue anyway',()=>{d.close();options.onProblem();},'btn btn-outline-secondary'));
+  if(options.onProblem)d.append(button('I can’t view this — continue anyway',()=>{if(busy&&!window.confirm('This design is still loading. Skip it and continue without viewing it?'))return;d.close();options.onProblem();},'btn btn-outline-secondary'));
   try {
     const result=await read(); if(!d.isConnected)return;
     body.replaceChildren();
     if(result.url){
       const a=el('a','Open external design','btn btn-primary');a.href=designInput({kind:'link',title,url:result.url}).external_url;a.target='_blank';a.rel='noopener noreferrer';
-      body.append(el('p','This design is hosted by another provider. Its own privacy and sign-in settings apply.'),a);addContinue(a);return true;
+      body.append(el('p','This design is hosted by another provider. Its own privacy and sign-in settings apply.'),a);ready();addContinue(a);return true;
     }
     const bytes=result.file ? new Uint8Array(await result.file.arrayBuffer()) : Uint8Array.from(atob(result.base64),c=>c.charCodeAt(0));
     if(result.kind==='interactive'){
+      d.classList.add('qd-design-model');body.className='qd-design-model-body';
       const frame=el('iframe');frame.title=title;frame.setAttribute('sandbox','allow-scripts');frame.referrerPolicy='no-referrer';
+      frame.setAttribute('allow','fullscreen *');frame.setAttribute('allowfullscreen','');
+      loadingText.textContent='Opening interactive model… The model may need a little longer to initialise after it appears.';
+      frame.addEventListener('load',()=>{if(!d.isConnected)return;ready();addContinue();},{once:true});
       frame.srcdoc=isolatedDesignHtml(new TextDecoder().decode(bytes));body.append(frame);
       body.append(el('p','Interactive preview only. Adjustments are not saved or approved. Send your preferred changes to your contractor.','qd-design-meta'));
     }else{
       if(!['image/png','image/jpeg','image/webp','application/pdf'].includes(result.mime))throw new Error('Unsupported preview type');
       const url=URL.createObjectURL(new Blob([bytes],{type:result.mime}));d.addEventListener('close',()=>URL.revokeObjectURL(url),{once:true});
-      if(result.kind==='image'){const img=el('img');img.src=url;img.alt=title;body.append(img);}
+      if(result.kind==='image'){const img=el('img');img.src=url;img.alt=title;body.append(img);await img.decode();}
       else {await renderDrawingPdf(bytes,body,d);}
       const download=el('a','Download drawing','btn btn-outline-primary');download.href=url;download.download=title+(result.mime==='application/pdf'?'.pdf':result.mime==='image/jpeg'?'.jpg':result.mime==='image/webp'?'.webp':'.png');body.append(download);
     }
-    addContinue();return true;
-  }catch(error){body.textContent=error.message;body.className='qd-design-error';return false;}
+    if(result.kind!=='interactive'&&d.isConnected){ready();addContinue();}return true;
+  }catch(error){ready();body.textContent=error.message;body.className='qd-design-error';return false;}
 }
 
 export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQuotes=()=>[],onQuotesChanged=()=>{},onOpenDesign,onAttachmentsChanged=()=>{}}) {
@@ -249,13 +258,13 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
     kind.onchange=()=>{changed();resetPreparation();};file.onchange=resetPreparation;changed();resetPreparation();
     async function filePayload(){const selected=file.files[0],selectedKind=kind.value;if(!selected)throw new Error('Choose a file to preview.');if(selected.size>MAX_DESIGN_BYTES)throw new Error('Choose a file no larger than 30 MB.');if(preparedFile===selected&&preparedPayload?.kind===selectedKind)return preparedPayload;let bytes=new Uint8Array(await selected.arrayBuffer());const mime=selectedKind==='interactive'?'text/html':selected.type;
       if(selectedKind==='interactive'){const result=await prepareDesignHtml(new TextDecoder().decode(bytes));bytes=new TextEncoder().encode(result.html);}if(selected!==file.files[0]||selectedKind!==kind.value)throw new Error('The selected file changed. Please preview it again.');const payload={kind:selectedKind,mime,size:bytes.length,file:new Blob([bytes],{type:mime})};preparedFile=selected;preparedPayload=payload;return payload;}
-    f.onsubmit=async event=>{event.preventDefault();save.disabled=true;error.textContent='Saving…';try{
+    f.onsubmit=async event=>{event.preventDefault();if(save.disabled)return;save.disabled=true;error.textContent='Saving…';error.classList.add('is-saving');try{
       const keepFile=previous&&previous.kind===kind.value&&kind.value!=='link'&&!file.files[0];
       if(kind.value==='interactive'&&!keepFile&&(!reviewed.checked||previewedFile!==file.files[0]))throw new Error('Preview the interactive design and confirm its controls work first.');
       const chosenThumbnail=thumbnail.files[0]||(kind.value==='image'&&file.files[0]?file.files[0]:null);
       const data={action:'save',id:previous?.id,baseVersion:previous?.updated_at,title:fields.title.value,project:fields.project.value,version:fields.version.value,note:fields.note.value,kind:kind.value,url:url.value,...(kind.value==='link'?{}:keepFile?{keepFile:true,mime:previous.mime_type,size:previous.size_bytes}:await filePayload()),...(chosenThumbnail?await thumbnailPayload(chosenThumbnail):{})};designInput(data);
       const saved=await request(data);d.close();await refresh();status.textContent='Design saved to the portal.'+(saved.usage?' '+usageMessage(saved.usage):'');
-    }catch(e){error.textContent=e.message;}finally{save.disabled=false;}};
+    }catch(e){error.textContent=e.message;}finally{error.classList.remove('is-saving');save.disabled=false;}};
   }
   function reviewDesigns(documentId){
     if(!isOwner)return [];

@@ -4,6 +4,11 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Interactive model viewer window bigger fullscreen blocked','design-viewer-window-size'],
+ ['Resize model window without fullscreen permission','design-viewer-window-size'],
+ ['Design loading bar slow model preview','design-loading-progress'],
+ ['Does the design loading bar show a download percentage?','design-loading-progress'],
+ ['Design still loading can I skip or keep waiting?','design-loading-progress'],
  ['Portal show amount still owing instead of invoice total theme','portal-document-amount-display'],
  ['Where do I choose balance remaining on client portal cards?','portal-document-amount-display'],
  ['Deposit already recorded why is portal Balance Due full price?','portal-document-amount-display'],

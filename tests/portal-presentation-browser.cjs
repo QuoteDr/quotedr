@@ -28,6 +28,18 @@ const server=http.createServer((req,res)=>{const path=req.url.slice(1).split('?'
   await page.getByRole('dialog').getByRole('heading',{name:'Interactive model'}).waitFor();
   await page.frameLocator('dialog iframe').getByText('Fixture model loaded').waitFor();
   assert.equal(await page.locator('dialog iframe').getAttribute('sandbox'),'allow-scripts');
+  assert.equal(await page.locator('dialog iframe').getAttribute('allow'),'fullscreen *');
+  assert(await page.frames()[1].evaluate(()=>document.fullscreenEnabled),'Sandboxed model receives fullscreen permission');
+  for(const size of [{width:2560,height:1440},{width:1280,height:900},{width:390,height:844}]){
+   await page.setViewportSize(size);
+   const dialogBox=await page.locator('dialog').boundingBox();const frameBox=await page.locator('dialog iframe').boundingBox();
+   assert(dialogBox.width>size.width*.94&&dialogBox.width<size.width,'Near-full width with backdrop');
+   assert(dialogBox.height>size.height*.94&&dialogBox.height<size.height,'Near-full height with backdrop');
+   assert(frameBox.height>size.height*.5,'Model receives most of viewport');
+   const closeBox=await page.getByRole('button',{name:'Close',exact:true}).boundingBox();
+   const finishBox=await page.getByRole('button',{name:'Finish presentation',exact:true}).boundingBox();
+   assert(closeBox.y>=0&&finishBox.y+finishBox.height<size.height,'Close and presentation actions visible');
+  }
   await page.getByRole('button',{name:'Finish presentation',exact:true}).click();assert.equal(await page.getByRole('dialog').count(),0);
   await page.setViewportSize({width:390,height:844});await page.reload();
   await page.locator('article').filter({has:page.getByRole('heading',{name:'Interactive model'})}).getByRole('button',{name:'Open design',exact:true}).click();

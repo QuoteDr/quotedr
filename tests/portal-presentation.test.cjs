@@ -2,7 +2,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 class Element {
-  constructor(tag){this.tag=tag;this.children=[];this.style={};this.listeners={};this.value='';this.textContent='';this.disabled=false;}
+  constructor(tag){this.tag=tag;this.children=[];this.style={};this.listeners={};this.value='';this.textContent='';this.disabled=false;this.classList={add:()=>{},remove:()=>{}};}
   append(...nodes){for(const n of nodes){n.parent=this;this.children.push(n);if(this.tag==='select'&&this.children.length===1)this.value=n.value;}}
   prepend(n){n.parent=this;this.children.unshift(n);}
   replaceChildren(...nodes){this.children.forEach(n=>n.parent=null);this.children=[];this.append(...nodes);}
@@ -28,6 +28,17 @@ const byText=(text,root=body)=>all(root).find(n=>n.textContent===text);
 const modal=()=>body.children.find(n=>n.tag==='dialog');
 const tick=()=>new Promise(r=>setImmediate(r));
 (async()=>{
+ let finishRead;
+ const pending=context.showDesign(()=>new Promise(resolve=>{finishRead=resolve;}),'Slow model',{onContinue:()=>{},onProblem:()=>{throw new Error('Should not skip');}});
+ assert(all(modal()).some(n=>n.role==='progressbar'),'Loading activity bar visible');
+ assert(!byText('Continue to quote',modal()),'No normal continue during retrieval');
+ context.window.confirm=()=>false;
+ await byText('I can’t view this — continue anyway').click();assert(modal(),'Cancel skip keeps loading');
+ finishRead({kind:'interactive',base64:btoa('<p>Model</p>')});await pending;
+ assert(!byText('Continue to quote',modal()),'Wait for embedded page load');
+ const frame=all(modal()).find(n=>n.tag==='iframe');frame.listeners.load[0]();
+ assert(!all(modal()).some(n=>n.role==='progressbar'),'Loading indicator removed after opening');
+ assert(byText('Continue to quote',modal()));await byText('Close',modal()).click();context.window.confirm=()=>true;
  let config=presentation,reads=[],writes=[],failRead=false;
  const request=async payload=>{if(payload.action==='list')return{designs:rows,presentations:[config],presentationRevision:'rev1'};
    if(payload.action==='read'){reads.push(payload.id);if(failRead)throw new Error('File unavailable');return payload.id==='model'?{kind:'interactive',base64:btoa('<p>Model</p>')}:{url:'https://example.com/video'};}

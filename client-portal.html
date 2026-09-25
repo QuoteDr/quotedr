@@ -2876,8 +2876,8 @@
       await loadQuotes();
 
       if (portalId) {
-        const css = document.createElement('link');css.rel='stylesheet';css.href='portal-designs.css?v=2026090802';document.head.append(css);
-        const designs = await import('./portal-designs.js?v=2026092504');
+        const css = document.createElement('link');css.rel='stylesheet';css.href='portal-designs.css?v=2026092505';document.head.append(css);
+        const designs = await import('./portal-designs.js?v=2026092505');
         portalDesignController = designs.mountDesignLibrary(document.getElementById('portalDesignLibrary'), {
           request:portalDesignRequest, isOwner:portalIsAdminView,
           getQuotes:()=>portalQuotesCache,onQuotesChanged:()=>loadQuotes(),
