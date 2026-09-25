@@ -1170,10 +1170,9 @@ if (location.search.includes('debug')) {
         function renderCollapsibleDescription(text, prefixHtml) {
             if (!text) return '';
             var clean = escapeHtml(text);
-            var isLong = clean.length > 170;
-            return '<div class="item-desc-wrap' + (isLong ? ' is-collapsed' : '') + '">' +
+            return '<div class="item-desc-wrap">' +
                 '<div class="item-desc item-desc-collapsible">' + (prefixHtml || '') + clean + '</div>' +
-                (isLong ? '<button type="button" class="item-desc-toggle d-print-none" onclick="toggleItemDescription(this)">Show more</button>' : '') +
+                '<button type="button" class="item-desc-toggle d-print-none" hidden aria-expanded="false" onclick="toggleItemDescription(this)">Show more</button>' +
                 '</div>';
         }
 
@@ -1181,8 +1180,34 @@ if (location.search.includes('debug')) {
             var wrap = btn.closest('.item-desc-wrap');
             if (!wrap) return;
             var collapsed = wrap.classList.toggle('is-collapsed');
+            wrap.dataset.expanded = String(!collapsed);
+            btn.setAttribute('aria-expanded', String(!collapsed));
             btn.textContent = collapsed ? 'Show more' : 'Show less';
         }
+
+        function refreshInvoiceDescriptions() {
+            document.querySelectorAll('.item-desc-wrap').forEach(function(wrap) {
+                var description = wrap.querySelector('.item-desc-collapsible');
+                var button = wrap.querySelector('.item-desc-toggle');
+                if (!description || !button || !description.getBoundingClientRect().width) return;
+                // Measure the natural text height, without clipping or its fade overlay.
+                wrap.classList.remove('is-collapsed');
+                var limit = parseFloat(getComputedStyle(description).lineHeight) * 3;
+                var overflows = description.scrollHeight > limit + 1;
+                var expanded = wrap.dataset.expanded === 'true';
+                button.hidden = !overflows;
+                wrap.classList.toggle('is-collapsed', overflows && !expanded);
+                button.textContent = expanded ? 'Show less' : 'Show more';
+                button.setAttribute('aria-expanded', String(expanded));
+            });
+        }
+        var invoiceDescriptionFrame = 0;
+        function scheduleInvoiceDescriptions() {
+            cancelAnimationFrame(invoiceDescriptionFrame);
+            invoiceDescriptionFrame = requestAnimationFrame(refreshInvoiceDescriptions);
+        }
+        window.addEventListener('resize', scheduleInvoiceDescriptions);
+        if (document.fonts) document.fonts.ready.then(scheduleInvoiceDescriptions);
 
         var portalActivityStarted = false;
         var portalActivitySessionId = '';
@@ -2233,6 +2258,7 @@ if (location.search.includes('debug')) {
             });
 
             document.getElementById('invoiceContainer').innerHTML = html;
+            scheduleInvoiceDescriptions();
             updateInvoiceRoomLocator();
 
             // Totals

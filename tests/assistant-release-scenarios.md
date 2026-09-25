@@ -158,3 +158,8 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - “Can I upload a 200 MB model now?” → not in this release: final render file cap remains 30 MB; folder size is different. Do not claim shared allowance expands per-file support or degrade the model. External hosting has separate access/privacy.
 - “Does this stop every hosting charge?” → no: bandwidth, database images and legacy signature paths are outside the managed upload budget; no automatic add-on purchase.
 - “Can I upload a fourth small rendering?” → byte allowance replaces the previous count of three after the coordinated release; check remaining bytes and per-file limits.
+# Invoice description overflow — September 25 hotfix
+
+- Ask: "Invoice Show more blurs the last line but there is nothing hidden." Explain the overflow-only behaviour and refresh after release; do not suggest editing or resending the invoice.
+- Follow-up: "What if I rotate my phone?" Explain three-line measurement at the new width and preserving an explicitly expanded description.
+- Failure: "Do I need to issue another invoice to fix this?" No; display-only, no new invoice, numbering, payment or record mutation. Print includes full text. Cite the invoice viewer handbook article. Run authenticated answers separately from retrieval tests.

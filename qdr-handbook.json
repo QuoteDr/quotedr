@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-25.3",
+  "version": "2026-09-25.4",
   "articles": [
     {
       "id": "invoice-preview-read-only",
@@ -22,9 +22,9 @@
       "id": "invoice-viewer-wide-layout",
       "title": "Invoice viewer: wider screen layout and wrapping discounts",
       "verifiedAt": "2026-09-25",
-      "release": "2026-09-25.1",
+      "release": "2026-09-25.4",
       "sources": ["invoice-viewer.html"],
-      "body": "Open the invoice viewer through your existing invoice link or preview. The invoice automatically uses nearly the full available screen width; no setting or save is required. Discount explanations wrap within the Total column instead of extending over the page edge. Pricing and discount calculations are unchanged. Print / Save as PDF uses the printable page width rather than the desktop screen width; review the browser print preview before saving. On a phone the available width is still limited, so long discount explanations can take several lines. If the old narrow layout remains after release, refresh the viewer and check browser zoom. This display-only change does not edit, resend, accept or pay an invoice; retain normal invoice backups and do not modify customer records to test it."
+      "body": "Open the invoice viewer through your existing invoice link or preview. The invoice automatically uses nearly the full available screen width; no setting or save is required. Discount explanations wrap within the Total column instead of extending over the page edge. Show more and the description fade appear only when the rendered description exceeds three lines. Click Show more to expand it or Show less to collapse it. Descriptions that already fit remain fully visible without a button or blurred last line. Resizing the window or rotating a phone recalculates whether the text fits, preserving your explicit expanded choice. Pricing and discount calculations are unchanged. Print / Save as PDF shows full descriptions and uses the printable page width rather than the desktop screen width; review the browser print preview before saving. On a phone the available width is still limited, so long discount explanations can take several lines. If an unnecessary Show more button, fade or old narrow layout remains after release, refresh the viewer and check browser zoom. This display-only change does not edit, resend, accept or pay an invoice; retain normal invoice backups and do not modify customer records to test it."
     },
     {
       "id": "storage-warning-only-exception",

@@ -4,6 +4,9 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Invoice Show more blurs last line but no extra text','invoice-viewer-wide-layout'],
+ ['Invoice description expand collapse when rotating phone','invoice-viewer-wide-layout'],
+ ['Invoice Show less do I need to save or resend?','invoice-viewer-wide-layout'],
  ['Preview Invoice PDF creates duplicate invoices dashboard','invoice-preview-read-only'],
  ['Does preview use an invoice number or save to cloud?','invoice-preview-read-only'],
  ['Can I send the local unissued preview link to a client?','invoice-preview-read-only'],
