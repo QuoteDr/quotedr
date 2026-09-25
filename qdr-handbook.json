@@ -1,7 +1,23 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-25.10",
+  "version": "2026-09-25.12",
   "articles": [
+    {
+      "id": "quote-free-portal-branding",
+      "title": "Quote-free and design-only portals use saved company branding and theme",
+      "verifiedAt": "2026-09-25",
+      "release": "2026-09-25.12",
+      "sources": ["client-portal.html", "supabase/functions/portal-designs/index.ts", "supabase/functions/_shared/portal-branding.mjs", "supabase/functions/_shared/portal-design-session.mjs"],
+      "body": "A portal does not need a quote to display saved company branding. Open the client link and enter the current portal PIN. After unlocking, empty portals and Copy client design link views load the company name, logo and account portal theme through the protected portal endpoint. A saved per-portal theme override still applies. Configure that override using Dashboard > Manage Portals > Theme; using the default keeps the account theme. Missing branding before unlocking does not mean your settings were erased. If Your Contractor, a missing logo or the default blue layout remains after unlocking, refresh and unlock again; confirm the company branding and portal theme were saved. The web app and portal-designs Edge Function must both contain this fix. Do not add a placeholder quote, delete the portal, re-upload models or reset saved themes to work around this issue. Viewing does not save or alter branding, designs or customer documents. An expired session or changed PIN requires unlocking again. Local regression checks are not confirmation of a live customer browser test."
+    },
+    {
+      "id": "design-project-room-picker",
+      "title": "Choose an existing design room or create a new room",
+      "verifiedAt": "2026-09-25",
+      "release": "2026-09-25.11",
+      "sources": ["portal-designs.js", "client-portal.html"],
+      "body": "In the admin portal choose Designs & Renderings > Add design or Replace / edit. Project / room is a dropdown of existing design groups in this portal, including withdrawn designs, plus Project designs. It does not import every room from quote documents. No quote is required. Choose an existing room, or Create new room… and enter New room name (up to 160 characters). Blank or whitespace-only names are not accepted; a name matching an existing room ignoring case reuses that group. Editing preserves the current group; new designs start with the current project filter when selected. Complete the other design fields and click Add to portal or Publish replacement, then wait for Design saved to the portal. A new group is saved with the design, not merely by typing its name. Closing without publishing creates no room. This groups designs only; it does not create or rename quote rooms. If publishing fails keep the original files and retry after resolving the displayed error; check Refresh before repeating an uncertain upload. Moving a design to a different group can change which project presentation it belongs to; review Presentation order afterwards."
+    },
     {
       "id": "design-viewer-window-size",
       "title": "Large interactive model viewer window",
@@ -28,7 +44,7 @@
     },
     {
       "id": "standalone-design-presentation-order",
-      "title": "Standalone design presentation order: watch the tutorial video before the model",
+      "title": "Standalone design presentation order: tutorial before model and progress after reloading",
       "verifiedAt": "2026-09-25",
       "release": "2026-09-25.7",
       "sources": ["portal-designs.js", "client-portal.html", "supabase/functions/portal-designs/index.ts", "supabase/migrations/20260925173406_portal_design_presentation.sql"],

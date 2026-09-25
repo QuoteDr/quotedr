@@ -29,10 +29,10 @@ export async function currentDesignPortal(db, owner, portal) {
   ]);
   if (quotes.error || registry.error) throw new Error('Portal access is temporarily unavailable');
   const records = (quotes.data || []).filter(q=>q.data?.portal_visible === true || q.data?.portal_anchor_only === true).map(q=>({
-    name:q.data.portal_name || 'Client Portal', pin:String(q.data.portal_pin || ''), updated:q.updated_at
+    name:q.data.portal_name || 'Client Portal', pin:String(q.data.portal_pin || ''), updated:q.updated_at, theme:q.data.portal_theme || {}
   }));
   const saved = Array.isArray(registry.data?.value) ? registry.data.value.find(p=>p.id === portal) : null;
-  if (saved) records.push({ name:saved.name, pin:String(saved.pin || ''), updated:saved.updatedAt || saved.createdAt });
+  if (saved) records.push({ name:saved.name, pin:String(saved.pin || ''), updated:saved.updatedAt || saved.createdAt, theme:saved.theme || {} });
   records.sort((a,b)=>new Date(b.updated || 0)-new Date(a.updated || 0));
   return records[0] || null;
 }

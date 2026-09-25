@@ -2,6 +2,7 @@ import { ACCOUNT_PERMISSION, AccountAccessError, requireAccountPermissionWithDef
 import { currentDesignPortal, verifyDesignSession, digest } from '../_shared/portal-design-session.mjs';
 import { designInput, MAX_DESIGN_BYTES } from '../../../portal-design-policy.mjs';
 import { budgetedUpload, storageBudgetMessage, storageUsage } from '../_shared/storage-budget.ts';
+import { loadPortalBranding, publicPortalTheme } from '../_shared/portal-branding.mjs';
 
 const headers = { 'Access-Control-Allow-Origin':'*', 'Access-Control-Allow-Headers':'authorization,apikey,content-type,x-client-info', 'Cache-Control':'private, no-store', 'X-Robots-Tag':'noindex, nofollow', 'Content-Type':'application/json' };
 const json = (data:unknown, status=200) => new Response(JSON.stringify(data), {status,headers});
@@ -57,6 +58,8 @@ export async function handleDesignRequest(req:Request) {
     const portal = await currentDesignPortal(db,owner,portalId);
     if (!portal) return json({error:'Portal not found'},404);
     if (!ownerMode && !await verifyDesignSession(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),body.session,owner,portalId,portal.pin)) return json({error:'Unlock the portal again to view designs.',code:'pin_required'},401);
+
+    if (action === 'branding') return json({branding:await loadPortalBranding(db,owner),theme:publicPortalTheme(portal.theme)});
 
     // A full portal entry URL exists before any documents. Only a current, signed
     // PIN session may exchange it for the existing document-viewer capability.

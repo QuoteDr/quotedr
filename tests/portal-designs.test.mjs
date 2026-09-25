@@ -4,6 +4,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { designInput, MAX_DESIGN_BYTES } from '../portal-design-policy.mjs';
 import { budgetedUpload, storageBudgetMessage, storageUsage } from '../supabase/functions/_shared/storage-budget.ts';
 import { issueDesignSession, verifyDesignSession, currentDesignPortal, digest } from '../supabase/functions/_shared/portal-design-session.mjs';
+import { loadPortalBranding, publicPortalTheme } from '../supabase/functions/_shared/portal-branding.mjs';
 
 const secret='test-only-secret';
 const owner='11111111-1111-4111-8111-111111111111', portal='project-a';
@@ -51,9 +52,20 @@ class AccountAccessError extends Error{constructor(message,status=403){super(mes
 const authorize=async(req,account,permission)=>{authPermission=permission;if(req.headers.get('authorization')!=='Bearer owner-test')throw new AccountAccessError('Forbidden');return{ownerUserId:owner};};
 let source=await fs.readFile('supabase/functions/portal-designs/index.ts','utf8');
 source=source.replace(/^import .*;\r?\n/gm,'').replace('export async function handleDesignRequest','async function handleDesignRequest').replace('Deno.serve(handleDesignRequest);','');
-const handler=new Function('ACCOUNT_PERMISSION','AccountAccessError','requireAccountPermissionWithDefault','serviceClient','currentDesignPortal','verifyDesignSession','designInput','MAX_DESIGN_BYTES','Deno','budgetedUpload','storageBudgetMessage','storageUsage','digest',stripTypeScriptTypes(source)+'\nreturn handleDesignRequest;')({QUOTES_SEND:'quotes.send',QUOTES_READ:'quotes.read'},AccountAccessError,authorize,()=>db,currentDesignPortal,verifyDesignSession,designInput,MAX_DESIGN_BYTES,{env:{get:()=>secret}},budgetedUpload,storageBudgetMessage,storageUsage,digest);
+const handler=new Function('ACCOUNT_PERMISSION','AccountAccessError','requireAccountPermissionWithDefault','serviceClient','currentDesignPortal','verifyDesignSession','designInput','MAX_DESIGN_BYTES','Deno','budgetedUpload','storageBudgetMessage','storageUsage','digest','loadPortalBranding','publicPortalTheme',stripTypeScriptTypes(source)+'\nreturn handleDesignRequest;')({QUOTES_SEND:'quotes.send',QUOTES_READ:'quotes.read'},AccountAccessError,authorize,()=>db,currentDesignPortal,verifyDesignSession,designInput,MAX_DESIGN_BYTES,{env:{get:()=>secret}},budgetedUpload,storageBudgetMessage,storageUsage,digest,loadPortalBranding,publicPortalTheme);
 async function call(body,ownerAuth=false){return handler(new Request('https://local.test',{method:'POST',headers:{'content-type':'application/json',authorization:ownerAuth?'Bearer owner-test':'Bearer anon'},body:JSON.stringify({contractorId:owner,portalId:portal,...body})}));}
 // Empty full-portal entry requires a current PIN grant, and creates no fake quote.
+tables.user_data.push({user_id:owner,key:'business_profile',value:{business_name:'Example Builder',privateSecret:'hidden'}},{user_id:owner,key:'portal_theme',value:{layoutStyle:'client-hub',privateSecret:'hidden'}});
+tables.user_data[0].value[0].theme={headerColor:'#abcdef',privateSecret:'hidden'};
+assert.equal((await call({action:'branding'})).status,401);
+assert.equal((await call({action:'branding',session:token+'bad'})).status,401);
+assert.equal((await call({action:'branding',session:token,portalId:'other'})).status,404);
+const branded=await (await call({action:'branding',session:token})).json();
+assert.equal(branded.branding.businessProfile.business_name,'Example Builder');
+assert.equal(branded.branding.portalTheme.layoutStyle,'client-hub');
+assert.deepEqual(branded.theme,{headerColor:'#abcdef'});
+assert(!JSON.stringify(branded).includes('privateSecret'));
+assert.equal(tables.quotes.length,0,'Branding does not create a placeholder quote');
 assert.equal((await call({action:'portal_access'})).status,401);
 assert.equal((await call({action:'portal_access',session:token,portalId:'other'})).status,404);
 assert.equal((await call({action:'portal_access',session:token+'bad'})).status,401);

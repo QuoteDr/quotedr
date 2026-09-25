@@ -7,7 +7,7 @@ const fixture=`<!doctype html><meta charset="utf-8"><link rel="stylesheet" href=
 import {mountDesignLibrary} from '/portal-designs.js';
 const rows=[{id:'model',project:'Basement',title:'Interactive model',kind:'interactive',visible:true,updated_at:'2026-09-25'},{id:'video',project:'Basement',title:'Tutorial video',kind:'link',visible:true,updated_at:'2026-09-25'}];
 const request=async p=>p.action==='list'?{designs:rows,presentations:[{project:'Basement',ids:['video','model'],requireReview:true}],presentationRevision:'test'}:p.id==='video'?{url:'https://fixture.invalid/video'}:{kind:'interactive',base64:btoa('<p>Fixture model loaded</p>')};
-await mountDesignLibrary(document.querySelector('main'),{request,isOwner:false}).refresh();
+await mountDesignLibrary(document.querySelector('main'),{request,isOwner:location.hash==='#owner'}).refresh();
 </script>`;
 const allowed=new Set(['portal-designs.js','portal-designs.css','portal-design-policy.mjs','portal-design-prepare.mjs','storage-budget-client.mjs']);
 const server=http.createServer((req,res)=>{const path=req.url.slice(1).split('?')[0];if(!path){res.setHeader('Content-Type','text/html');res.end(fixture);}else if(path==='video'){res.end('Fixture video provider');}else if(allowed.has(path)){res.setHeader('Content-Type',path.endsWith('css')?'text/css':'text/javascript');res.end(fs.readFileSync(path));}else{res.writeHead(404);res.end();}});
@@ -46,6 +46,16 @@ const server=http.createServer((req,res)=>{const path=req.url.slice(1).split('?'
   await page.getByRole('dialog').getByRole('heading',{name:'Tutorial video'}).waitFor();
   await page.getByRole('button',{name:'I can’t view this — continue anyway'}).click();
   await page.getByRole('dialog').getByRole('heading',{name:'Interactive model'}).waitFor();
-  assert.deepEqual(errors,[]);console.log('PASS browser desktop/mobile: tutorial first, disabled confirmation until opened, model sandbox, finish, reload reset and fallback; no page errors');
+  await page.goto('http://127.0.0.1:'+server.address().port+'/#owner');await page.reload();
+  await page.getByRole('button',{name:'Add design',exact:true}).click();
+  const room=page.getByLabel('Project / room',{exact:true});
+  await room.selectOption('Basement');assert.equal(await page.getByLabel('New room name').isVisible(),false);
+  await room.selectOption({label:'Create new room…'});assert(await page.getByLabel('New room name').isVisible());
+  await page.getByLabel('New room name').fill('Kitchen');
+  await room.selectOption('Basement');assert.equal(await page.getByLabel('New room name').isVisible(),false);
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  await page.locator('article').filter({has:page.getByRole('heading',{name:'Interactive model'})}).getByRole('button',{name:'Replace / edit',exact:true}).click();
+  assert.equal(await page.getByLabel('Project / room',{exact:true}).inputValue(),'Basement');
+  assert.deepEqual(errors,[]);console.log('PASS browser desktop/mobile: presentation, sandbox, viewer sizing, room dropdown, new room field and edit selection; no page errors');
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>server.close());

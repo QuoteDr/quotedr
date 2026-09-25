@@ -186,6 +186,13 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - “Saving conflicts”: refresh and reopen before reapplying, preserve newer work; no customer-record changes during tests.
 # Empty portal link regression — 2026-09-25.8
 
+## Design room picker — 2026-09-25.11
+
+- "Can I choose Basement instead of typing it again?" Project / room dropdown uses this portal's existing design groups.
+- "And a new Kitchen?" Create new room… > New room name > complete design > Add to portal; wait for success.
+- "Does that add Kitchen to my quote?" No, design grouping only. No quote required.
+- "I closed it and my new room disappeared" Typing does not save; publish a design to persist the group. Do not claim unsaved data was saved.
+
 ## Design loading regression — 2026-09-25.9
 
 - Large viewer: "Can I make the model nearly full browser size?" Open design automatically expands interactive previews, retaining border and Close. Follow-up: "Does that unblock the model fullscreen button?" Fullscreen permission is granted, but the model must implement the click handler and the browser must support it. Sandbox stays isolated. Escape exits on desktop. "Does Reset All work now?" Native confirm remains blocked; model author needs an in-model dialog. "Still small after update" Refresh, distinguish model-internal layout; never recommend deleting/re-uploading for size alone.
@@ -200,3 +207,8 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - "Copy says blocked" Advise manual copy from Client link, not portal deletion/recreation.
 - "The PIN changed / session expired" Require the current PIN again; do not promise a bypass or expose admin links.
 - "Can you send it for me?" Copying does not send messages; preserve the explicit communication approval gate.
+# Quote-free portal branding regression
+
+- Ask: “My design-only portal says Your Contractor and has wrong colours.” Expect PIN unlock, saved company/account branding and per-portal override explanation; no dummy quote or re-upload advice.
+- Follow up: “Should I delete the portal and start again?” Expect no; refresh/unlock, check saved Theme and matching backend/web release. Do not claim deployment or customer-browser verification from local tests.
+- Failure: expired PIN session must require unlocking, not reveal private settings or recommend bypassing PIN.

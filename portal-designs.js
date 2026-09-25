@@ -233,7 +233,15 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
     const fields={};
     function input(name,label,type='text',value='') {const wrap=el('label',label);const n=el(type==='textarea'?'textarea':'input');if(type!=='textarea')n.type=type;n.value=value;wrap.append(n);f.append(wrap);fields[name]=n;return n;}
     input('title','Design title','text',previous?.title||'').required=true;
-    input('project','Project / room','text',previous?.project||'Project designs');
+    const roomLabel=el('label','Project / room'),roomSelect=el('select');roomSelect.setAttribute('aria-label','Project / room');roomLabel.append(roomSelect);f.append(roomLabel);
+    const roomNames=[...new Set(['Project designs',...rows.map(row=>row.project),previous?.project].filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    for(const name of roomNames){const option=el('option',name);option.value=name;roomSelect.append(option);}
+    const newRoomOption=el('option','Create new room…');newRoomOption.value='';roomSelect.append(newRoomOption);
+    roomSelect.value=previous?.project||filter.value||'Project designs';
+    const newRoom=input('newRoom','New room name');newRoom.maxLength=160;
+    const updateRoomField=()=>{newRoom.parentElement.hidden=roomSelect.value!=='';newRoom.required=roomSelect.value==='';};
+    roomSelect.onchange=updateRoomField;updateRoomField();
+    function selectedRoom(){const name=(roomSelect.value||newRoom.value).trim();if(!name)throw new Error('Enter a new room name.');return roomNames.find(room=>room.toLowerCase()===name.toLowerCase())||name;}
     input('version','Version','text',previous?String(Number(previous.version)+1 || previous.version):'1');
     input('note','Note for the client','textarea',previous?.note||'');
     const label=el('label','Design type');const kind=el('select');label.append(kind);f.append(label);
@@ -259,10 +267,11 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
     async function filePayload(){const selected=file.files[0],selectedKind=kind.value;if(!selected)throw new Error('Choose a file to preview.');if(selected.size>MAX_DESIGN_BYTES)throw new Error('Choose a file no larger than 30 MB.');if(preparedFile===selected&&preparedPayload?.kind===selectedKind)return preparedPayload;let bytes=new Uint8Array(await selected.arrayBuffer());const mime=selectedKind==='interactive'?'text/html':selected.type;
       if(selectedKind==='interactive'){const result=await prepareDesignHtml(new TextDecoder().decode(bytes));bytes=new TextEncoder().encode(result.html);}if(selected!==file.files[0]||selectedKind!==kind.value)throw new Error('The selected file changed. Please preview it again.');const payload={kind:selectedKind,mime,size:bytes.length,file:new Blob([bytes],{type:mime})};preparedFile=selected;preparedPayload=payload;return payload;}
     f.onsubmit=async event=>{event.preventDefault();if(save.disabled)return;save.disabled=true;error.textContent='Saving…';error.classList.add('is-saving');try{
+      const project=selectedRoom();
       const keepFile=previous&&previous.kind===kind.value&&kind.value!=='link'&&!file.files[0];
       if(kind.value==='interactive'&&!keepFile&&(!reviewed.checked||previewedFile!==file.files[0]))throw new Error('Preview the interactive design and confirm its controls work first.');
       const chosenThumbnail=thumbnail.files[0]||(kind.value==='image'&&file.files[0]?file.files[0]:null);
-      const data={action:'save',id:previous?.id,baseVersion:previous?.updated_at,title:fields.title.value,project:fields.project.value,version:fields.version.value,note:fields.note.value,kind:kind.value,url:url.value,...(kind.value==='link'?{}:keepFile?{keepFile:true,mime:previous.mime_type,size:previous.size_bytes}:await filePayload()),...(chosenThumbnail?await thumbnailPayload(chosenThumbnail):{})};designInput(data);
+      const data={action:'save',id:previous?.id,baseVersion:previous?.updated_at,title:fields.title.value,project,version:fields.version.value,note:fields.note.value,kind:kind.value,url:url.value,...(kind.value==='link'?{}:keepFile?{keepFile:true,mime:previous.mime_type,size:previous.size_bytes}:await filePayload()),...(chosenThumbnail?await thumbnailPayload(chosenThumbnail):{})};designInput(data);
       const saved=await request(data);d.close();await refresh();status.textContent='Design saved to the portal.'+(saved.usage?' '+usageMessage(saved.usage):'');
     }catch(e){error.textContent=e.message;}finally{error.classList.remove('is-saving');save.disabled=false;}};
   }

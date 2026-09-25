@@ -4,6 +4,12 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Empty portal missing logo shows Your Contractor branding','quote-free-portal-branding'],
+ ['Design-only portal wrong colours no quote theme','quote-free-portal-branding'],
+ ['Should I add a placeholder quote to restore portal branding?','quote-free-portal-branding'],
+ ['Design project room dropdown create new room','design-project-room-picker'],
+ ['New room name blank while adding a design','design-project-room-picker'],
+ ['Does creating a design room also create a quote room?','design-project-room-picker'],
  ['Interactive model viewer window bigger fullscreen blocked','design-viewer-window-size'],
  ['Resize model window without fullscreen permission','design-viewer-window-size'],
  ['Design loading bar slow model preview','design-loading-progress'],

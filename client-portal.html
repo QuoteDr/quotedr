@@ -2877,7 +2877,7 @@
 
       if (portalId) {
         const css = document.createElement('link');css.rel='stylesheet';css.href='portal-designs.css?v=2026092505';document.head.append(css);
-        const designs = await import('./portal-designs.js?v=2026092505');
+        const designs = await import('./portal-designs.js?v=2026092506');
         portalDesignController = designs.mountDesignLibrary(document.getElementById('portalDesignLibrary'), {
           request:portalDesignRequest, isOwner:portalIsAdminView,
           getQuotes:()=>portalQuotesCache,onQuotesChanged:()=>loadQuotes(),
@@ -3014,6 +3014,13 @@
     async function getContractorName() {
       try {
         let branding = null;
+        let designPortalTheme = {};
+        if ((portalEntry || portalDesignShare) && !portalIsAdminView) {
+          if (!sessionStorage.getItem(portalDesignSessionKey())) return;
+          const result = await portalDesignRequest({action:'branding'});
+          branding = result.branding || {};
+          designPortalTheme = result.theme || {};
+        }
         if (portalToken && portalAnchorId) {
           const secureResult = portalBootstrapResult || await secureClientDocumentRequest({
             action: 'portal',
@@ -3057,7 +3064,7 @@
         renderBusinessHeader(headerProfile);
 
         portalDefaultTheme = normalizePortalTheme(branding.portalTheme || {});
-        applyPortalTheme(portalDefaultTheme);
+        applyPortalTheme(mergePortalTheme(portalDefaultTheme, designPortalTheme));
 
       } catch (error) {
         console.error('Error fetching contractor branding:', error);
@@ -5752,6 +5759,7 @@
         if (result.valid) {
           sessionStorage.setItem(unlockKey, 'true');
           if (result.session) sessionStorage.setItem(portalDesignSessionKey(),result.session);
+          if (portalEntry || portalDesignShare) await getContractorName();
           if (portalEntry) await loadQuotes();
           hidePinGate();
           if (portalDesignController) await portalDesignController.refresh();
