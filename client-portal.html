@@ -2659,12 +2659,13 @@
 
     const portalShortToken = portalShortTokenFromLocation();
     const portalDesignShare = urlParams.get('design') || '';
+    const portalEntry = urlParams.get('portal_entry') === '1';
     let portalDesignController = null;
     const clientEmail = urlParams.get('email');
     const clientName = urlParams.get('client'); // backward compat
     let contractorId = urlParams.get('contractor');
     const portalQuoteId = urlParams.get('quote') || urlParams.get('id');
-    const portalToken = urlParams.get('token') || portalShortToken || '';
+    let portalToken = urlParams.get('token') || portalShortToken || '';
     let portalAnchorId = urlParams.get('portal_anchor') || portalQuoteId || '';
     let portalId = urlParams.get('portal');
     let portalBootstrapResult = null;
@@ -2933,7 +2934,7 @@
       const response=await fetch(supabaseUrl+'/functions/v1/portal-designs',{method:'POST',headers,body:content});
       if(response.ok&&response.headers.get('Content-Type')?.startsWith('application/octet-stream'))return {file:await response.blob(),kind:response.headers.get('X-Design-Kind'),mime:response.headers.get('X-Design-Mime')};
       const result=await response.json();
-      if(!response.ok||result.error)throw new Error(result.error||'Design library unavailable. Please try again.');
+      if(!response.ok||result.error){const error=new Error(result.error||'Design library unavailable. Please try again.');error.code=result.code;throw error;}
       return result;
     }
 
@@ -3557,6 +3558,31 @@
     // Load quotes for this client from this contractor
     async function loadQuotes() {
       try {
+        if (portalEntry && !portalIsAdminView && !portalToken) {
+          const session = sessionStorage.getItem(portalDesignSessionKey());
+          if (!session) return; // No customer document information before verified PIN access.
+          let access;
+          try { access = await portalDesignRequest({action:'portal_access'}); }
+          catch(error) {
+            if(error.code==='pin_required') {
+              sessionStorage.removeItem(portalDesignSessionKey());
+              document.getElementById('pinGate').style.display='flex';
+              document.getElementById('portalContent').style.display='none';
+              document.getElementById('pinError').textContent='Please enter the current portal PIN.';
+              return;
+            }
+            throw error;
+          }
+          portalResolvedClientName = access.name || portalResolvedClientName;
+          clientNameEl.textContent = titleCase(portalResolvedClientName || 'Client');
+          if (!access.token) {
+            portalQuotesCache=[];
+            noQuotesEl.classList.remove('d-none');
+            return;
+          }
+          portalToken=access.token;
+          portalAnchorId=access.anchorId;
+        }
         if (portalDesignShare) {
           portalQuotesCache=[];
           noQuotesEl.classList.add('d-none');
@@ -5726,6 +5752,7 @@
         if (result.valid) {
           sessionStorage.setItem(unlockKey, 'true');
           if (result.session) sessionStorage.setItem(portalDesignSessionKey(),result.session);
+          if (portalEntry) await loadQuotes();
           hidePinGate();
           if (portalDesignController) await portalDesignController.refresh();
         } else if (res.status === 429) {
@@ -5766,7 +5793,7 @@
       if ((!_email && !_name && !_lp.get('quote') && !_portal && !portalShortToken) || !_cid) return;
 
       const unlockKey = `portal_unlocked_${_email || _name || _portal}_${_cid}_${_portal}`;
-      if (sessionStorage.getItem(unlockKey) && (!portalDesignShare || sessionStorage.getItem(portalDesignSessionKey()))) {
+      if (sessionStorage.getItem(unlockKey) && (!(portalDesignShare || portalEntry) || sessionStorage.getItem(portalDesignSessionKey()))) {
         hidePinGate();
       }
     }

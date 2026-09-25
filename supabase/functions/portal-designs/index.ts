@@ -1,5 +1,5 @@
 import { ACCOUNT_PERMISSION, AccountAccessError, requireAccountPermissionWithDefault, serviceClient } from '../_shared/account-authorization.ts';
-import { currentDesignPortal, verifyDesignSession } from '../_shared/portal-design-session.mjs';
+import { currentDesignPortal, verifyDesignSession, digest } from '../_shared/portal-design-session.mjs';
 import { designInput, MAX_DESIGN_BYTES } from '../../../portal-design-policy.mjs';
 import { budgetedUpload, storageBudgetMessage, storageUsage } from '../_shared/storage-budget.ts';
 
@@ -57,6 +57,32 @@ export async function handleDesignRequest(req:Request) {
     const portal = await currentDesignPortal(db,owner,portalId);
     if (!portal) return json({error:'Portal not found'},404);
     if (!ownerMode && !await verifyDesignSession(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),body.session,owner,portalId,portal.pin)) return json({error:'Unlock the portal again to view designs.',code:'pin_required'},401);
+
+    // A full portal entry URL exists before any documents. Only a current, signed
+    // PIN session may exchange it for the existing document-viewer capability.
+    if (action === 'portal_access') {
+      if(ownerMode)return json({error:'Use the admin portal preview.'},400);
+      const result=await db.from('quotes').select('id,data,updated_at,public_share_token_hash').eq('user_id',owner).eq('data->>portal_id',portalId).order('created_at',{ascending:true});
+      if(result.error)throw result.error;
+      const rows=(result.data||[]).filter(row=>row.data?.portal_visible===true||row.data?.portal_anchor_only===true);
+      for(const row of rows){
+        const token=String(row.data?.portal_share_token||'');
+        if(token&&row.public_share_token_hash===await digest(token))return json({name:portal.name,token,anchorId:row.id});
+      }
+      const anchor=rows.find(row=>row.data?.portal_visible===true&&!row.public_share_token_hash);
+      if(!anchor){
+        if(rows.some(row=>row.data?.portal_visible===true))return json({error:'The document link needs repair. Ask your contractor to refresh and prepare its portal link.'},409);
+        return json({name:portal.name,token:null});
+      }
+      const token=randomToken(),createdAt=new Date().toISOString();
+      if(!anchor.updated_at)return json({error:'Refresh the portal before preparing document access.'},409);
+      let update=db.from('quotes').update({data:{...anchor.data,portal_pin:portal.pin,portal_share_token:token,portal_share_anchor_id:anchor.id,portal_share_created_at:createdAt},public_share_token_hash:await digest(token),public_share_token_created_at:createdAt,public_share_token_last4:token.slice(-4),updated_at:createdAt}).eq('id',anchor.id).eq('user_id',owner);
+      if(anchor.updated_at)update=update.eq('updated_at',anchor.updated_at);
+      const saved=await update.select('id').maybeSingle();
+      if(saved.error)throw saved.error;
+      if(!saved.data)return json({error:'The portal changed while opening. Refresh and enter your PIN again.'},409);
+      return json({name:portal.name,token,anchorId:anchor.id});
+    }
 
     let result = await db.from('portal_design_libraries').select('*').eq('user_id',owner).eq('portal_id',portalId).maybeSingle();
     if (result.error) throw result.error;

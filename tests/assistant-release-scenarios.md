@@ -184,3 +184,10 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - “It asks again after refresh”: progress is page-visit-only; changed content/order resets review. No server completion receipt is claimed.
 - “Did previewing accept the quote or send anything?”: Preview saved presentation does neither. Attached quote review is separate.
 - “Saving conflicts”: refresh and reopen before reapplying, preserve newer work; no customer-record changes during tests.
+# Empty portal link regression — 2026-09-25.8
+
+- "I created a portal but have no quote yet. How do I get the customer link?" Explain Manage Portals > PIN > Copy Link, current PIN, and no dummy quote required.
+- Follow-up: "Will they need another link when I add the invoice?" Same full portal entry remains usable; publish the document, refresh, unlock. Do not confuse with the separate design-only link.
+- "Copy says blocked" Advise manual copy from Client link, not portal deletion/recreation.
+- "The PIN changed / session expired" Require the current PIN again; do not promise a bypass or expose admin links.
+- "Can you send it for me?" Copying does not send messages; preserve the explicit communication approval gate.

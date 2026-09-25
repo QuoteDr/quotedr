@@ -2652,11 +2652,10 @@
         function renderPortalPinEditor(portal, portalClientUrl) {
             var pin = String(portal.pin || '').trim();
             var pinText = pin || 'Not set';
-            var linkReady = !!(portal.secureToken && portal.secureAnchorId);
-            var hasDocuments = portalDocumentCount(portal) > 0;
-            var clientLinkValue = linkReady ? portalClientUrl : (hasDocuments ? 'Preparing clean link...' : 'Add a document to create a client link');
-            var linkButtonIcon = linkReady ? 'fa-copy' : (hasDocuments ? 'fa-spinner fa-spin' : 'fa-ban');
-            var linkButtonText = linkReady ? 'Copy Link' : (hasDocuments ? 'Preparing' : 'Unavailable');
+            var linkReady = !!portalClientUrl;
+            var clientLinkValue = portalClientUrl || 'Portal link unavailable. Refresh and try again.';
+            var linkButtonIcon = 'fa-copy';
+            var linkButtonText = 'Copy Link';
             return '<div class="border rounded p-3 mt-2 bg-light">' +
                 '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">' +
                 '<div><strong><i class="fas fa-key me-1"></i>Portal PIN</strong><div class="small text-muted">Clients use this PIN to unlock this portal.</div></div>' +
@@ -2952,19 +2951,11 @@
         async function togglePortalPinEditor(portalId) {
             window._portalPinEditorId = window._portalPinEditorId === portalId ? '' : portalId;
             renderPortalAssignmentList();
-            if (window._portalPinEditorId !== portalId) return;
+            if (window._portalPinEditorId !== portalId || !String(portalId).startsWith('legacy-')) return;
             var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
-            if (portal && portalDocumentCount(portal) === 0) return;
-            if (!portal || (portal.secureToken && portal.secureAnchorId)) return;
-            try {
-                await ensurePortalStableShare(portal);
-                renderPortalAssignmentList();
-            } catch (error) {
-                console.error('Could not prepare clean portal link:', error);
-                qdAlert(error.message || 'Could not prepare the clean portal link.');
-                window._portalPinEditorId = '';
-                renderPortalAssignmentList();
-            }
+            if (!portal) return;
+            try { await ensurePortalStableShare(portal); renderPortalAssignmentList(); }
+            catch (error) { qdAlert(error.message || 'Could not prepare the portal link.'); }
         }
 
         async function copyPortalPinBundle(portalId) {
@@ -2972,16 +2963,17 @@
             if (!portal) return;
             var btn = typeof event !== 'undefined' && event.target ? event.target.closest('button') : null;
             try {
-                var stableShare = await ensurePortalStableShare(portal);
-                portal.secureToken = stableShare.token;
-                portal.secureAnchorId = stableShare.anchorId;
+                // Copying an existing portal link must not create or modify a quote.
+                if (!portal.id) throw new Error('Refresh the portal list and try again.');
+                if (String(portal.id).startsWith('legacy-')) await ensurePortalStableShare(portal);
             } catch (error) {
                 qdAlert(error.message || 'Could not prepare the clean portal link.');
                 return;
             }
             var contractor = (portal.quotes && portal.quotes[0] && portal.quotes[0].user_id) || (window.currentUser && window.currentUser.id) || '';
             var url = portalUrlForDashboard(Object.assign({}, portal, { contractorId: contractor }), window._portalAssignQuoteId || '');
-            await navigator.clipboard.writeText(url).catch(function(){});
+            try { await navigator.clipboard.writeText(url); }
+            catch (_) { qdAlert('Clipboard access was blocked. Select and copy the Client link field manually.'); return; }
             if (btn) {
                 var orig = btn.innerHTML;
                 btn.innerHTML = '<i class="fas fa-check me-1"></i>Link Copied';
@@ -3699,6 +3691,9 @@
             var isLocalPortalPreview = ['localhost', '127.0.0.1'].includes(window.location.hostname);
             if (secureToken && !(options && options.admin) && !isLocalPortalPreview) {
                 return shortPortalUrlForDashboard(secureToken);
+            }
+            if (!(options && options.admin) && !secureToken && portal.id && !String(portal.id).startsWith('legacy-')) {
+                return getClientPortalBaseUrl() + '?portal_entry=1&contractor=' + encodeURIComponent(portal.contractorId || '') + '&portal=' + encodeURIComponent(portal.id);
             }
             var params = [];
             if (portal.clientEmail) params.push('email=' + encodeURIComponent(portal.clientEmail));

@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { designInput, MAX_DESIGN_BYTES } from '../portal-design-policy.mjs';
 import { budgetedUpload, storageBudgetMessage, storageUsage } from '../supabase/functions/_shared/storage-budget.ts';
-import { issueDesignSession, verifyDesignSession, currentDesignPortal } from '../supabase/functions/_shared/portal-design-session.mjs';
+import { issueDesignSession, verifyDesignSession, currentDesignPortal, digest } from '../supabase/functions/_shared/portal-design-session.mjs';
 
 const secret='test-only-secret';
 const owner='11111111-1111-4111-8111-111111111111', portal='project-a';
@@ -51,8 +51,24 @@ class AccountAccessError extends Error{constructor(message,status=403){super(mes
 const authorize=async(req,account,permission)=>{authPermission=permission;if(req.headers.get('authorization')!=='Bearer owner-test')throw new AccountAccessError('Forbidden');return{ownerUserId:owner};};
 let source=await fs.readFile('supabase/functions/portal-designs/index.ts','utf8');
 source=source.replace(/^import .*;\r?\n/gm,'').replace('export async function handleDesignRequest','async function handleDesignRequest').replace('Deno.serve(handleDesignRequest);','');
-const handler=new Function('ACCOUNT_PERMISSION','AccountAccessError','requireAccountPermissionWithDefault','serviceClient','currentDesignPortal','verifyDesignSession','designInput','MAX_DESIGN_BYTES','Deno','budgetedUpload','storageBudgetMessage','storageUsage',stripTypeScriptTypes(source)+'\nreturn handleDesignRequest;')({QUOTES_SEND:'quotes.send',QUOTES_READ:'quotes.read'},AccountAccessError,authorize,()=>db,currentDesignPortal,verifyDesignSession,designInput,MAX_DESIGN_BYTES,{env:{get:()=>secret}},budgetedUpload,storageBudgetMessage,storageUsage);
+const handler=new Function('ACCOUNT_PERMISSION','AccountAccessError','requireAccountPermissionWithDefault','serviceClient','currentDesignPortal','verifyDesignSession','designInput','MAX_DESIGN_BYTES','Deno','budgetedUpload','storageBudgetMessage','storageUsage','digest',stripTypeScriptTypes(source)+'\nreturn handleDesignRequest;')({QUOTES_SEND:'quotes.send',QUOTES_READ:'quotes.read'},AccountAccessError,authorize,()=>db,currentDesignPortal,verifyDesignSession,designInput,MAX_DESIGN_BYTES,{env:{get:()=>secret}},budgetedUpload,storageBudgetMessage,storageUsage,digest);
 async function call(body,ownerAuth=false){return handler(new Request('https://local.test',{method:'POST',headers:{'content-type':'application/json',authorization:ownerAuth?'Bearer owner-test':'Bearer anon'},body:JSON.stringify({contractorId:owner,portalId:portal,...body})}));}
+// Empty full-portal entry requires a current PIN grant, and creates no fake quote.
+assert.equal((await call({action:'portal_access'})).status,401);
+assert.equal((await call({action:'portal_access',session:token,portalId:'other'})).status,404);
+assert.equal((await call({action:'portal_access',session:token+'bad'})).status,401);
+assert.deepEqual(await (await call({action:'portal_access',session:token})).json(),{name:'Design-only project',token:null});
+assert.equal(tables.quotes.length,0);
+const entryQuote={id:'entry-quote',user_id:owner,updated_at:'2026-09-25T00:00:00Z',data:{portal_id:portal,portal_name:'Design-only project',portal_visible:true,portal_pin:'1847',rooms:[{name:'Keep me'}]}};
+tables.quotes.push(entryQuote,{id:'private-draft',user_id:owner,data:{portal_id:portal,portal_visible:false}});
+const entry=await (await call({action:'portal_access',session:token})).json();
+assert.equal(entry.anchorId,'entry-quote');assert.equal(entry.token.length,48);
+assert.equal(entryQuote.public_share_token_hash,await digest(entry.token));
+assert.deepEqual(entryQuote.data.rooms,[{name:'Keep me'}]);
+assert.deepEqual(await (await call({action:'portal_access',session:token})).json(),entry,'Repeated visits reuse the token');
+entryQuote.data.portal_visible=false;entryQuote.data.portal_anchor_only=true;
+assert.deepEqual(await (await call({action:'portal_access',session:token})).json(),entry,'Preserved anchor keeps the same link after removal');
+tables.quotes=[];
 let response=await call({action:'list'});assert.equal(response.status,401);
 response=await call({action:'read',id:'one'});assert.equal(response.status,401);assert.equal(storageReads,0,'No bytes read before a valid PIN grant');
 response=await call({action:'resolve',shareToken:'a'.repeat(48)});assert.deepEqual(await response.json(),{contractorId:owner,portalId:portal,name:'Design-only project'});
@@ -132,7 +148,6 @@ db.rpc=async(name,args)=>{assert.equal(name,'portal_design_pin_attempt');lastSco
 let pinHandler;
 let pinSource=await fs.readFile('supabase/functions/verify-portal-pin/index.ts','utf8');
 pinSource=pinSource.replace(/^import .*;\r?\n/gm,'');
-const {digest}=await import('../supabase/functions/_shared/portal-design-session.mjs');
 new Function('createClient','currentDesignPortal','digest','issueDesignSession','Deno',stripTypeScriptTypes(pinSource))(()=>db,currentDesignPortal,digest,issueDesignSession,{serve:f=>{pinHandler=f;},env:{get:()=>secret}});
 const pinCall=body=>pinHandler(new Request('https://local.test',{method:'POST',body:JSON.stringify({contractorId:owner,portalId:portal,pin:'1847',...body})}));
 let pinResult=await(await pinCall({})).json();assert(pinResult.valid);assert(await verifyDesignSession(secret,pinResult.session,owner,portal,'1847'));

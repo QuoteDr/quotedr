@@ -108,6 +108,10 @@ for(const q of ['Standalone presentation order video before model', 'Require vie
 }
 assert(searchHandbook(book,'Does it remember after reloading?', 'standalone design presentation order').some(a=>a.id==='standalone-design-presentation-order'));
 console.log('Handbook retrieval: questions, follow-up, unknown, validation and limit passed');
+for(const q of ['Empty portal client link zero documents', 'Get a client link before adding a quote', 'Client link unavailable no documents']) {
+ assert(searchHandbook(book,q).some(a=>a.id==='empty-portal-client-link'),q);
+}
+assert(searchHandbook(book,'Will this work later?', 'empty portal client link').some(a=>a.id==='empty-portal-client-link'));
 assert(searchHandbook(book,'Invoice viewer discounts overflowing narrow page').some(a=>a.id==='invoice-viewer-wide-layout'));
 for(const q of ['Check storage monthly upload bytes', 'Does deleting a file refund my monthly upload allowance?', 'Storage warning existing files still available']) {
  assert(searchHandbook(book,q).some(a=>a.id==='shared-storage-budget'),q);

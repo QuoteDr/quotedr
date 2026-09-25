@@ -1,7 +1,15 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-25.7",
+  "version": "2026-09-25.8",
   "articles": [
+    {
+      "id": "empty-portal-client-link",
+      "title": "Empty portal links before adding quotes or designs",
+      "verifiedAt": "2026-09-25",
+      "release": "2026-09-25.8",
+      "sources": ["dashboard.html", "client-portal.html", "supabase/functions/portal-designs/index.ts"],
+"body": "After creating a portal, open Dashboard > Manage Portals > PIN > Copy Link. A link is available even with zero documents and no designs. No placeholder quote or invoice is created. Share the link and the portal PIN, never the admin preview link. This full portal entry link stays usable when published documents are added later; recipients refresh and unlock with the current PIN. Existing secure short links still work. Copy client design link in Designs & Renderings remains a separate design-only link. Recipients need a current verified PIN session before the new entry route loads document access; expired sessions or a changed PIN require unlocking again. An empty portal shows no documents yet, not a requirement to create a quote. Copy Link does not send a message or publish documents. Clipboard blocked: select and copy the link field manually. If opening says the portal changed, refresh and enter the PIN again; if the document link needs repair, ask the contractor to refresh and prepare the document portal link. Do not delete or recreate the portal to recover a link. The web app and portal-designs Edge Function must be released together. Source and local regression verification is not proof of a live customer walkthrough."
+    },
     {
       "id": "standalone-design-presentation-order",
       "title": "Standalone design presentation order: watch the tutorial video before the model",
