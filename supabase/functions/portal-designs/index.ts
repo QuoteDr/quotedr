@@ -8,6 +8,7 @@ const json = (data:unknown, status=200) => new Response(JSON.stringify(data), {s
 const randomToken = () => Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>b.toString(16).padStart(2,'0')).join('');
 const publicFields = 'id,project,title,note,version,kind,mime_type,size_bytes,thumbnail_path,visible,created_at,updated_at';
 const MAX_THUMBNAIL_BYTES = 1536 * 1024;
+type DesignPresentation = {project:string; ids:string[]; requireReview:boolean};
 const thumbnailMime = new Set(['image/png','image/jpeg','image/webp']);
 const encode = async (blob:Blob) => {
   const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';
@@ -47,7 +48,7 @@ export async function handleDesignRequest(req:Request) {
     const owner = String(body.contractorId || '');
     const portalId = String(body.portalId || '');
     if (!/^[a-f0-9-]{36}$/i.test(owner) || !portalId || portalId.length > 180) return json({error:'Invalid portal'},400);
-    const write = ['save','visibility','share','rotate_share','attach_quote'].includes(action);
+    const write = ['save','visibility','share','rotate_share','attach_quote','save_presentation'].includes(action);
     const ownerMode = body.ownerMode === true;
     if (ownerMode) {
       const auth = await requireAccountPermissionWithDefault(req, body.accountId, write ? ACCOUNT_PERMISSION.QUOTES_SEND : ACCOUNT_PERMISSION.QUOTES_READ);
@@ -67,6 +68,21 @@ export async function handleDesignRequest(req:Request) {
     }
     const library = result.data;
     if (!library) return action === 'list' ? json({designs:[]}) : json({error:'Design not found'},404);
+    if(action === 'save_presentation') {
+      const project=body.project, ids=body.designIds;
+      if(typeof project!=='string'||!project||project.length>160||!Array.isArray(ids)||ids.length>200||new Set(ids).size!==ids.length||ids.some(id=>typeof id!=='string'))return json({error:'Choose a project and up to 200 distinct designs.'},400);
+      if(!body.baseVersion||body.baseVersion!==library.presentation_revision)return json({error:'Presentation order changed. Refresh and try again.'},409);
+      const found=await db.from('portal_designs').select('id,project,visible').eq('library_id',library.id).eq('project',project).eq('visible',true);
+      if(found.error)throw found.error;
+      const visible=found.data||[];
+      if(!visible.length||ids.length!==visible.length||ids.some(id=>!visible.some(row=>row.id===id)))return json({error:'The project designs changed. Refresh before saving the order.'},409);
+      const presentations=(library.presentations as DesignPresentation[]||[]).filter(item=>item.project!==project);
+      presentations.push({project,ids,requireReview:body.requireReview===true});
+      const changed=await db.from('portal_design_libraries').update({presentations,presentation_revision:crypto.randomUUID()}).eq('id',library.id).eq('presentation_revision',body.baseVersion).select('id');
+      if(changed.error)throw changed.error;
+      if(!changed.data?.length)return json({error:'Presentation order changed. Refresh and try again.'},409);
+      return json({ok:true});
+    }
     if(action === 'attach_quote') {
       const quoteResult=await db.from('quotes').select('id,user_id,data,status,type').eq('id',body.documentId).eq('user_id',owner).maybeSingle();
       if(quoteResult.error)throw quoteResult.error;
@@ -115,7 +131,9 @@ export async function handleDesignRequest(req:Request) {
         if(quotes.data?.length){const links=await db.from('quote_design_links').select('*').in('document_id',quotes.data.map(q=>q.id));if(links.error)throw links.error;attachments=links.data||[];}
       }
       const designs=(rows.data||[]).map(({thumbnail_path,...row})=>({...row,has_thumbnail:Boolean(thumbnail_path)||row.kind==='image'}));
-      return json({designs,attachments});
+      // Do not expose withdrawn design IDs or empty, historical projects to clients.
+      const presentations=(library.presentations as DesignPresentation[]||[]).map(item=>({...item,ids:(item.ids||[]).filter(id=>designs.some(row=>row.id===id&&row.project===item.project))})).filter(item=>designs.some(row=>row.project===item.project));
+      return json({designs,attachments,presentations,presentationRevision:library.presentation_revision});
     }
     let previous = null;
     if (body.id) {

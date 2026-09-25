@@ -238,6 +238,14 @@
             <option value="client-os">Client OS</option>
           </select>
         </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="portalAmountDisplay">Document amounts</label>
+          <select id="portalAmountDisplay" class="form-select" onchange="updatePortalPreview()">
+            <option value="balance">Amount still owing</option>
+            <option value="total">Document total</option>
+          </select>
+          <div class="text-muted small">Deducts recorded payments on invoices and accepted quotes. Unaccepted quotes show their total. The Balance Due summary always shows remaining balances.</div>
+        </div>
         <div class="row g-2">
           <div class="col-6">
             <label class="form-label fw-semibold">Header</label>
@@ -475,6 +483,7 @@
         bgStyle: portalThemeChoice(document.getElementById('portalBgStyle').value, ['solid', 'soft-fade', 'branded-fade', 'paper'], 'soft-fade'),
         bgStrength: parseInt(document.getElementById('portalBgStrength').value, 10) || 0,
         layoutStyle: portalLayoutStyleValue(document.getElementById('portalLayoutStyle').value),
+        amountDisplay: document.getElementById('portalAmountDisplay').value === 'total' ? 'total' : 'balance',
         portalLogo: document.getElementById('portalLogoData').value || '',
         logoSize: portalThemeChoice(document.getElementById('portalLogoSize').value, ['small', 'medium', 'large'], 'medium'),
         logoScale: Math.max(70, Math.min(180, parseInt(document.getElementById('portalLogoScale').value, 10) || 100)),
@@ -510,6 +519,7 @@
       document.getElementById('portalBgStyle').value = portalThemeChoice(v.bgStyle, ['solid', 'soft-fade', 'branded-fade', 'paper'], 'soft-fade');
       document.getElementById('portalBgStrength').value = v.bgStrength !== undefined ? v.bgStrength : 45;
       document.getElementById('portalLayoutStyle').value = portalLayoutStyleValue(v.layoutStyle);
+      document.getElementById('portalAmountDisplay').value = v.amountDisplay === 'total' ? 'total' : 'balance';
       document.getElementById('portalLogoSize').value = portalThemeChoice(v.logoSize, ['small', 'medium', 'large'], 'medium');
       document.getElementById('portalLogoScale').value = Math.max(70, Math.min(180, parseInt(v.logoScale, 10) || (portalLayoutStyleValue(v.layoutStyle) === 'client-os' ? 130 : 100)));
       document.getElementById('portalHeaderDensity').value = portalThemeChoice(v.headerDensity, ['compact', 'standard', 'spacious'], 'standard');

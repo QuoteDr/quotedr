@@ -1,0 +1,35 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const source=fs.readFileSync('client-portal.html','utf8');
+const code=source.slice(source.indexOf('    function portalDocumentAmounts('),source.indexOf('    function createQuoteCard('));
+const make=mode=>new Function('portalAmountDisplay','quoteStatus','isInvoiceDocument','documentIsInvalid',code+';return {amounts:portalDocumentAmounts,display:portalDocumentAmountDisplay};')(mode,q=>String(q.status||'').toLowerCase(),q=>q.data?.documentType==='invoice'||['invoiced','paid'].includes(q.status),q=>q.status==='voided'||q.data?.document_validity==='superseded');
+const balance=make('balance'),total=make('total');
+const row={total:4743.91,status:'invoiced',data:{paymentsReceived:{amount:2000},payments:[{amount_cents:200000}]}};
+const before=JSON.stringify(row);
+assert.deepEqual(balance.display(row),{cents:274391,label:'Amount still owing'});
+assert.deepEqual(total.display(row),{cents:474391,label:'Total'});
+assert.equal(JSON.stringify(row),before);
+assert.equal(balance.amounts({...row,data:{paymentReceived:{value:2000}}}).balanceCents,274391);
+assert.equal(balance.amounts({...row,data:{payments:[{amount_cents:200000,status:'confirmed'},{amount_cents:100000,status:'reported'},{amount_cents:100000,status:'failed'}]}}).balanceCents,274391);
+assert.equal(balance.amounts({...row,data:{paymentsReceived:{amount:0},payments:[{amount_cents:200000}]}}).balanceCents,474391);
+assert.equal(balance.amounts({...row,data:{paymentsReceived:{amount:5000}}}).balanceCents,0);
+assert.equal(balance.amounts({...row,status:'paid',data:{}}).balanceCents,0);
+assert.equal(balance.amounts({...row,data:{paymentStatus:'paid'}}).balanceCents,0);
+assert.equal(balance.display({...row,status:'accepted'}).cents,274391);
+assert.deepEqual(balance.display({...row,status:'sent',data:{}}),{cents:474391,label:'Quote total'});
+assert.deepEqual(balance.display({...row,status:'voided'}),{cents:474391,label:'Reference total'});
+assert.equal(balance.display({...row,total:null}).cents,null);
+assert.equal(balance.amounts({...row,total:0,data:{}}).balanceCents,0);
+assert.equal(balance.amounts({...row,total:0.3,data:{paymentsReceived:{amount:0.1}}}).balanceCents,20);
+assert.match(source,/const amounts = portalDocumentAmounts\(quote\);\s*const remaining/);
+assert.match(source,/amountDisplay: \['balance', 'total'\]/);
+for(const file of ['settings.html','portal-theme-studio.html']){
+ const html=fs.readFileSync(file,'utf8');
+ assert.match(html,/id="portalAmountDisplay"/);
+ assert.match(html,/amountDisplay: document.getElementById\('portalAmountDisplay'\)/);
+ assert.match(html,/getElementById\('portalAmountDisplay'\).value = v.amountDisplay/);
+}
+const dash=fs.readFileSync('dashboard.html','utf8');
+assert.match(dash,/portal-theme-amount-display-/);assert.match(dash,/set\('amount-display', theme.amountDisplay/);
+const server=fs.readFileSync('supabase/functions/client-document/index.ts','utf8');
+assert.match(server,/"buttonStyle", "cardStyle", "amountDisplay"/);
+console.log('PASS portal balance/total preference, deposit deduction, no double count, pending exclusion, paid/zero/unknown/invalid/unaccepted, cents rounding and theme persistence');

@@ -455,7 +455,7 @@ const PUBLIC_PORTAL_THEME_STRING_FIELDS = [
   "headerColor", "bgColor", "bgColor2", "textColor", "headerTextColor",
   "headerDetailColor", "cardTextColor", "mutedTextColor", "buttonTextColor",
   "bgStyle", "layoutStyle", "portalLogo", "logoSize", "headerDensity",
-  "buttonStyle", "cardStyle",
+  "buttonStyle", "cardStyle", "amountDisplay",
 ];
 
 function sanitizePublicPortalTheme(value: unknown) {

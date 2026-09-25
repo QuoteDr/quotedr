@@ -4,6 +4,13 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Portal show amount still owing instead of invoice total theme','portal-document-amount-display'],
+ ['Where do I choose balance remaining on client portal cards?','portal-document-amount-display'],
+ ['Deposit already recorded why is portal Balance Due full price?','portal-document-amount-display'],
+ ['Does switching portal total to owing mark invoice paid?','portal-document-amount-display'],
+ ['Recommended portals should be first not alphabetical with others','recommended-portal-assignment'],
+ ['Why do two suggested client portals have the same name?','recommended-portal-assignment'],
+ ['Does a recommended portal automatically share my invoice?','recommended-portal-assignment'],
  ['Invoice Show more blurs last line but no extra text','invoice-viewer-wide-layout'],
  ['Invoice description expand collapse when rotating phone','invoice-viewer-wide-layout'],
  ['Invoice Show less do I need to save or resend?','invoice-viewer-wide-layout'],
@@ -96,6 +103,10 @@ for (const q of ['View expired quote portal activity', 'Do I have to renew a quo
  assert(searchHandbook(book,q).some(a=>a.id==='expired-quote-portal-activity'),q);
 }
 assert(searchHandbook(book,'Can I still email it?', 'expired quote portal activity').some(a=>a.id==='expired-quote-portal-activity'));
+for(const q of ['Standalone presentation order video before model', 'Require viewing in this order without a quote', 'I cannot view the tutorial how do I continue?', 'Does QDR verify external video playback?']) {
+ assert(searchHandbook(book,q).some(a=>a.id==='standalone-design-presentation-order'),q);
+}
+assert(searchHandbook(book,'Does it remember after reloading?', 'standalone design presentation order').some(a=>a.id==='standalone-design-presentation-order'));
 console.log('Handbook retrieval: questions, follow-up, unknown, validation and limit passed');
 assert(searchHandbook(book,'Invoice viewer discounts overflowing narrow page').some(a=>a.id==='invoice-viewer-wide-layout'));
 for(const q of ['Check storage monthly upload bytes', 'Does deleting a file refund my monthly upload allowance?', 'Storage warning existing files still available']) {

@@ -1507,6 +1507,9 @@ Sarah Jones, 905-555-5678"></textarea>
 											<option value="client-os">Client OS</option>
 										</select>
 										<div class="text-muted small">Choose the default layout. Individual portals can override this in Manage Portals.</div>
+										<label class="form-label fw-semibold mt-3" for="portalAmountDisplay">Document amounts</label>
+										<select id="portalAmountDisplay" class="form-select" onchange="updatePortalPreview()"><option value="balance">Amount still owing</option><option value="total">Document total</option></select>
+										<div class="text-muted small">Deducts recorded payments on invoices and accepted quotes. Unaccepted quotes show their total. Balance Due always shows remaining balances.</div>
 									</div>
 									<div class="mb-3">
 										<label class="form-label fw-semibold">Header Color</label>
@@ -6179,6 +6182,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				bgStyle: portalThemeChoice(document.getElementById('portalBgStyle').value, ['solid', 'soft-fade', 'branded-fade', 'paper'], 'soft-fade'),
 				bgStrength: parseInt(document.getElementById('portalBgStrength').value, 10) || 0,
 				layoutStyle: portalLayoutStyleValue(document.getElementById('portalLayoutStyle').value),
+				amountDisplay: document.getElementById('portalAmountDisplay').value === 'total' ? 'total' : 'balance',
 				portalLogo: document.getElementById('portalLogoData').value || '',
 				logoSize: portalThemeChoice(document.getElementById('portalLogoSize')?.value, ['small', 'medium', 'large'], 'medium'),
 				logoScale: Math.max(70, Math.min(180, parseInt(document.getElementById('portalLogoScale')?.value, 10) || 100)),
@@ -6197,6 +6201,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (v.bgStyle) document.getElementById('portalBgStyle').value = portalThemeChoice(v.bgStyle, ['solid', 'soft-fade', 'branded-fade', 'paper'], 'soft-fade');
 			if (v.bgStrength !== undefined) document.getElementById('portalBgStrength').value = v.bgStrength;
 			if (v.layoutStyle) document.getElementById('portalLayoutStyle').value = portalLayoutStyleValue(v.layoutStyle);
+			document.getElementById('portalAmountDisplay').value = v.amountDisplay === 'total' ? 'total' : 'balance';
 			if (document.getElementById('portalLogoSize')) document.getElementById('portalLogoSize').value = portalThemeChoice(v.logoSize, ['small', 'medium', 'large'], 'medium');
 			if (document.getElementById('portalLogoScale')) document.getElementById('portalLogoScale').value = Math.max(70, Math.min(180, parseInt(v.logoScale, 10) || (portalLayoutStyleValue(v.layoutStyle) === 'client-os' ? 130 : 100)));
 			if (document.getElementById('portalHeaderDensity')) document.getElementById('portalHeaderDensity').value = portalThemeChoice(v.headerDensity, ['compact', 'standard', 'spacious'], 'standard');

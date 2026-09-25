@@ -1,7 +1,31 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-25.4",
+  "version": "2026-09-25.7",
   "articles": [
+    {
+      "id": "standalone-design-presentation-order",
+      "title": "Standalone design presentation order: watch the tutorial video before the model",
+      "verifiedAt": "2026-09-25",
+      "release": "2026-09-25.7",
+      "sources": ["portal-designs.js", "client-portal.html", "supabase/functions/portal-designs/index.ts", "supabase/migrations/20260925173406_portal_design_presentation.sql"],
+      "body": "Before a quote exists, open the admin portal > Designs & Renderings > Presentation order. Select Project / room, use Move up or Move down to place the tutorial video first and the interactive model second, optionally tick Require viewing in this order, then click Save presentation. Wait for confirmation. Reopen Presentation order and choose Preview saved presentation to test the client flow without recording client completion or quote approval. You need published designs in the same project and account permission to share quotes. Without the requirement, cards follow the saved order but clients may open any design. With the requirement, clicking a later design first opens its earliest unreviewed predecessor. Open external design launches the video/link in another tab; return to QDR and choose I’ve watched / reviewed this — continue. The next design opens automatically. QDR cannot prove external playback or completion. I can’t view this — continue anyway is an explicit viewing-problem fallback, including file-read failures. This is a guided presentation, not a security lock, signature or receipt. Progress lasts only this page visit; reloading restarts the sequence, and changed designs/order require review again. Withdrawn designs are skipped; new designs in a configured project appear last. Projects have independent sequences. Quote attachment order and design-before-pricing gates remain separate; standalone review does not satisfy quote approval. A conflict means refresh, reopen Presentation order and reapply changes, not overwrite newer edits. Closing or switching projects warns about unsaved changes. Saving the order does not alter uploaded files, prices or send client messages. Keep original models locally. The matching migration, portal-designs Edge Function and web release must be deployed together before using this feature."
+    },
+    {
+      "id": "portal-document-amount-display",
+      "title": "Portal theme: amount still owing or document total",
+      "verifiedAt": "2026-09-25",
+      "release": "2026-09-25.6",
+      "sources": ["client-portal.html", "portal-theme-studio.html", "settings.html", "dashboard.html", "supabase/functions/client-document/index.ts"],
+      "body": "In Settings > Portal Theme or Theme Studio > Theme Details, choose Document amounts: Amount still owing or Document total. Amount still owing is the default when no choice was saved. In Theme Studio click Save Current as Default, or Save Custom Theme and select Set this custom theme as the default portal theme when saving if it should be your default. To override just one portal, open Dashboard > Manage Portals > Theme, enable Custom theme, choose Document amounts and save the theme. Portals using a custom theme keep their override until changed or returned to Use Default Theme. The live Theme Studio preview updates without changing real customer documents. Amount still owing deducts recorded payments on invoices and accepted quotes; an unaccepted quote remains labelled Quote total, not a payable bill. Document total shows the full document value. Balance Due in the summary always uses remaining balances regardless of the card display choice. The saved payments-received aggregate includes mirrored payment entries and is not added to them again; legacy entry-only records exclude explicitly pending/reported/failed payments. Paid documents show zero owing; overpayments do not display a negative balance. Invalid documents show a reference total and are excluded from Balance Due. This setting does not edit prices, mark payments received, issue an invoice or send messages. You need account access to save themes; wait for the saved confirmation before leaving. If a deposit is missing, inspect the invoice's recorded payments rather than re-entering a payment simply to change the portal display. Refresh after the matching web and client-document release. Unknown or design-locked pricing remains unavailable until access requirements are met. Keep normal document backups; theme settings are not a payment ledger or proof of payment."
+    },
+    {
+      "id": "recommended-portal-assignment",
+      "title": "Recommended portals first when sharing a quote or invoice",
+      "verifiedAt": "2026-09-25",
+      "release": "2026-09-25.5",
+      "sources": ["quote-builder.html"],
+      "body": "When the builder opens the portal-assignment chooser for a quote or invoice, existing matching portals appear at the top under Recommended portals. Remaining portals appear separately under Other portals. Each group is alphabetical by portal name; a portal is not repeated in both groups. With no recommendations, the normal alphabetical list remains. Recommendations use the existing client-matching rules and do not automatically select, merge or add anything. Review the client name, email and document count, then click Add here for the intended portal. Multiple distinct portals may have the same client name and can both be recommended; they are not automatically combined or deleted. If there are no portals, use the chooser's create-portal controls. You need an authenticated account and permission to share the document, and normal save/send checks still apply. Confirm the source quote is saved before sharing; if assignment fails, check its actual portal status before retrying. Do not delete a similar-looking portal as a display fix. If recommendations remain mixed into the alphabetical list after the matching release, refresh QDR."
+    },
     {
       "id": "invoice-preview-read-only",
       "title": "Preview Invoice without creating dashboard duplicates",

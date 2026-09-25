@@ -16741,6 +16741,23 @@ Example:
             return window._invoicePortalRegistry;
         }
 
+        function renderRecommendedPortalGroups(portals, documentData, renderCard) {
+            var recommended = [];
+            var others = [];
+            portals.forEach(function(portal) {
+                (invoiceMatchesPortal(portal, documentData) ? recommended : others).push(portal);
+            });
+            function alphabetical(a, b) {
+                return String(a.name || 'Client Portal').localeCompare(String(b.name || 'Client Portal'), undefined, { sensitivity: 'base', numeric: true });
+            }
+            recommended.sort(alphabetical);
+            others.sort(alphabetical);
+            if (!recommended.length) return others.map(renderCard).join('');
+            return '<section aria-label="Recommended portals"><h3 class="h6 mb-2">Recommended portals</h3>' +
+                recommended.map(renderCard).join('') + '</section>' +
+                (others.length ? '<section aria-label="Other portals" class="mt-3 pt-3 border-top"><h3 class="h6 mb-2">Other portals</h3>' + others.map(renderCard).join('') + '</section>' : '');
+        }
+
         function renderInvoicePortalAssignmentList() {
             var wrap = document.getElementById('invoicePortalAssignList');
             if (!wrap) return;
@@ -16750,7 +16767,7 @@ Example:
                 wrap.innerHTML = '<div class="text-muted small border rounded p-3">No portals exist yet. Create one on the right, then this invoice will be added there.</div>';
                 return;
             }
-            wrap.innerHTML = portals.map(function(portal) {
+            wrap.innerHTML = renderRecommendedPortalGroups(portals, invoiceData, function(portal) {
                 var recommended = invoiceMatchesPortal(portal, invoiceData);
                 var selected = invoiceData.portal_visible && invoiceData.portal_id && portal.id === invoiceData.portal_id;
                 var docCount = (portal.rows || []).filter(function(row) { return !(row.data && row.data.portal_placeholder); }).length;
@@ -16762,7 +16779,7 @@ Example:
                     '<div class="text-muted small">' + _escapeHtml(portal.clientName || 'Client') + (portal.clientEmail ? ' - ' + _escapeHtml(portal.clientEmail) : '') + ' - ' + docCount + ' document' + (docCount === 1 ? '' : 's') + '</div></div>' +
                     '<button type="button" class="btn btn-primary btn-sm" onclick="assignCurrentInvoiceToPortal(' + JSON.stringify(portal.id).replace(/"/g, '&quot;') + ')"><i class="fas fa-folder-plus me-1"></i>Add here</button>' +
                     '</div></div>';
-            }).join('');
+            });
         }
 
         async function openInvoicePortalAssignment(options) {
@@ -18771,7 +18788,7 @@ Example:
                 wrap.innerHTML = '<div class="text-muted small border rounded p-3">No portals exist yet. Create one on the right, then this quote will be added there.</div>';
                 return;
             }
-            wrap.innerHTML = portals.map(function(portal) {
+            wrap.innerHTML = renderRecommendedPortalGroups(portals, quoteData, function(portal) {
                 var recommended = invoiceMatchesPortal(portal, quoteData);
                 var selected = quoteData.portal_visible && quoteData.portal_id && portal.id === quoteData.portal_id;
                 var docCount = (portal.rows || []).filter(function(row) { return !(row.data && row.data.portal_placeholder); }).length;
@@ -18783,7 +18800,7 @@ Example:
                     '<div class="text-muted small">' + _escapeHtml(portal.clientName || 'Client') + (portal.clientEmail ? ' - ' + _escapeHtml(portal.clientEmail) : '') + ' - ' + docCount + ' document' + (docCount === 1 ? '' : 's') + '</div></div>' +
                     '<button type="button" class="btn btn-primary btn-sm" onclick="assignCurrentQuoteToPortal(' + JSON.stringify(portal.id).replace(/"/g, '&quot;') + ')"><i class="fas fa-folder-plus me-1"></i>Add here</button>' +
                     '</div></div>';
-            }).join('');
+            });
         }
 
         async function openQuotePortalAssignment(options) {

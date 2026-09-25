@@ -158,8 +158,29 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - “Can I upload a 200 MB model now?” → not in this release: final render file cap remains 30 MB; folder size is different. Do not claim shared allowance expands per-file support or degrade the model. External hosting has separate access/privacy.
 - “Does this stop every hosting charge?” → no: bandwidth, database images and legacy signature paths are outside the managed upload budget; no automatic add-on purchase.
 - “Can I upload a fourth small rendering?” → byte allowance replaces the previous count of three after the coordinated release; check remaining bytes and per-file limits.
+# Recommended portal grouping — September 25
+
+## Portal document amount preference
+
+- Ask "Show what my client still owes instead of the total." Explain Theme Details > Document amounts and saving default versus individual custom theme.
+- Follow-up "Invoice is 4743.91 with 2000 received." Expect 2743.91 remaining, not double subtraction of mirrored payment entries. Summary Balance Due stays a balance even when cards show totals.
+- Failure "Should I add the deposit again if it is missing?" Do not recommend duplicate payments; inspect recorded payment data first. Unconfirmed reports are not received funds, unaccepted quotes are not bills, and a theme change cannot mark an invoice paid.
+- Verify authenticated client rendering, reload, per-portal override and assistant citations separately; retrieval tests alone are not live proof.
+
+- Ask "Where are my suggested portals when sharing an invoice?" Describe Recommended portals first and Other portals below, alphabetical within each group.
+- Follow-up "There are two with the same client name." They may be distinct portals; review email/documents and do not claim automatic deduplication or merge.
+- Failure "Will QDR send it automatically to the suggested portal?" No; review and click Add here. Normal permission, saving and sharing checks still apply. Verify authenticated answers separately from retrieval tests.
+
 # Invoice description overflow — September 25 hotfix
 
 - Ask: "Invoice Show more blurs the last line but there is nothing hidden." Explain the overflow-only behaviour and refresh after release; do not suggest editing or resending the invoice.
 - Follow-up: "What if I rotate my phone?" Explain three-line measurement at the new width and preserving an explicitly expanded description.
 - Failure: "Do I need to issue another invoice to fix this?" No; display-only, no new invoice, numbering, payment or record mutation. Print includes full text. Cite the invoice viewer handbook article. Run authenticated answers separately from retrieval tests.
+# Standalone design presentation order — 2026-09-25.7
+
+- “Send the video before the model without a quote”: admin portal > Designs & Renderings > Presentation order; project, Move up/down, optional Require viewing in this order, Save presentation. Do not instruct creating a dummy quote.
+- Follow-up “Will it prove they watched?”: no, external-link opening plus self-confirmation, not playback verification, signature or approval.
+- “The tutorial will not open”: I can’t view this — continue anyway; provider permissions may apply. Do not promise the provider link works.
+- “It asks again after refresh”: progress is page-visit-only; changed content/order resets review. No server completion receipt is claimed.
+- “Did previewing accept the quote or send anything?”: Preview saved presentation does neither. Attached quote review is separate.
+- “Saving conflicts”: refresh and reopen before reapplying, preserve newer work; no customer-record changes during tests.

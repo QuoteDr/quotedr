@@ -106,6 +106,23 @@ assert.equal((await call({...attach,designIds:[savedId],baseVersion:tables.quote
 assert.equal((await call({...attach,designIds:[],baseVersion:tables.quote_design_links[0].updated_at},true)).status,200);
 assert.equal(tables.quote_design_links.length,0);
 tables.quotes=[];
+// Standalone order is independent of quote attachments and owner-only.
+const library=tables.portal_design_libraries[0];library.presentation_revision='revision-1';library.presentations=[];
+tables.portal_designs.find(r=>r.id===savedId).project='Basement';
+const otherDesign=tables.portal_designs.find(r=>r.id===largeId);otherDesign.project='Basement';
+const presentation={action:'save_presentation',ownerMode:true,project:'Basement',designIds:[largeId,savedId],requireReview:true,baseVersion:'revision-1'};
+assert.equal((await call({...presentation,ownerMode:false,session:token})).status,403);
+assert.equal((await call({...presentation,designIds:['other']},true)).status,409);
+assert.equal((await call({...presentation,designIds:[savedId,savedId]},true)).status,400);
+assert.equal((await call({...presentation,designIds:[savedId]},true)).status,409);
+assert.equal((await call(presentation,true)).status,200);
+assert.equal(authPermission,'quotes.send');
+assert.deepEqual(library.presentations,[{project:'Basement',ids:[largeId,savedId],requireReview:true}]);
+assert.equal((await call(presentation,true)).status,409,'Stale order cannot overwrite a newer order');
+assert.deepEqual((await(await call({action:'list',session:token})).json()).presentations,library.presentations);
+otherDesign.visible=false;
+assert.deepEqual((await(await call({action:'list',session:token})).json()).presentations[0].ids,[savedId]);
+assert.equal(tables.quote_design_links.length,0,'Standalone order does not attach designs to quotes');
 tables.user_data[0].value[0].pin='2345';assert.equal((await call({action:'list',session:token})).status,401,'PIN reset invalidates old grants');
 tables.user_data[0].value=[];assert.equal((await call({action:'list',session:token})).status,404,'Deleted portal revokes access');
 // Execute the PIN endpoint too, including legacy-oracle throttling.

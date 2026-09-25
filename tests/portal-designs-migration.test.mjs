@@ -7,9 +7,15 @@ await db.exec(`create role anon; create role authenticated; create role service_
 create schema auth; create table auth.users(id uuid primary key);
 create schema storage; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint);`);
 await db.exec(await fs.readFile('supabase/migrations/20260907021911_portal_design_library.sql','utf8'));
+await db.exec(await fs.readFile('supabase/migrations/20260925173406_portal_design_presentation.sql','utf8'));
 await db.exec(await fs.readFile('supabase/migrations/20260922025938_portal_render_upload_allowance.sql','utf8'));
 await db.exec(`insert into auth.users values ('11111111-1111-4111-8111-111111111111');
 insert into public.portal_design_libraries(id,user_id,portal_id,share_token) values('22222222-2222-4222-8222-222222222222','11111111-1111-4111-8111-111111111111','fixture','fixture');`);
+const library=(await db.query('select presentations,presentation_revision from public.portal_design_libraries')).rows[0];
+assert.deepEqual(library.presentations,[]);assert(library.presentation_revision);
+await assert.rejects(db.query("update public.portal_design_libraries set presentations='{}'::jsonb"),/check constraint/);
+assert.equal((await db.query('update public.portal_design_libraries set presentations=$1,presentation_revision=gen_random_uuid() where presentation_revision=$2 returning id',[JSON.stringify([{project:'Basement',ids:[],requireReview:true}]),library.presentation_revision])).rows.length,1);
+assert.equal((await db.query('update public.portal_design_libraries set presentations=$1 where presentation_revision=$2 returning id',['[]',library.presentation_revision])).rows.length,0,'Stale revision cannot save');
 const add=(id,path)=>db.query(`insert into public.portal_designs(id,library_id,title,kind,storage_path,size_bytes) values($1,'22222222-2222-4222-8222-222222222222','Render','interactive',$2,30000000)`,[id,path]);
 await add('33333333-3333-4333-8333-333333333333','first');
 await db.exec(`update public.portal_designs set title='Renamed',visible=false where storage_path='first'`);
@@ -33,6 +39,7 @@ await db.exec(`update public.portal_design_pin_attempts set window_start=now()-i
 assert.equal((await db.query(`select public.portal_design_pin_attempt('fixture') allowed`)).rows[0].allowed,true);
 await db.exec('reset role; set role anon');
 await assert.rejects(db.query('select * from public.portal_designs'),/permission denied/);
+await assert.rejects(db.query('select presentations from public.portal_design_libraries'),/permission denied/);
 await assert.rejects(db.query('select * from public.portal_render_upload_months'),/permission denied/);
 await assert.rejects(db.query("select public.portal_design_pin_attempt('bypass')"),/permission denied/);
 await db.exec('reset role');

@@ -3032,7 +3032,8 @@
             var headerDensity = dashboardPortalThemeChoice(theme.headerDensity, ['compact', 'standard', 'spacious'], 'standard');
             var buttonStyle = dashboardPortalThemeChoice(theme.buttonStyle, ['filled', 'outline', 'soft'], 'filled');
             var cardStyle = dashboardPortalThemeChoice(theme.cardStyle, ['flat', 'shadow', 'premium'], 'shadow');
-            var customChecked = (theme.useDefault !== true && (theme.headerColor || theme.bgColor || theme.bgColor2 || theme.textColor || theme.bgStyle || theme.bgStrength !== undefined || theme.layoutStyle || theme.logoSize || theme.logoScale !== undefined || theme.headerDensity || theme.buttonStyle || theme.cardStyle)) ? 'checked' : '';
+            var amountDisplay = theme.amountDisplay === 'total' ? 'total' : 'balance';
+            var customChecked = (theme.useDefault !== true && (theme.amountDisplay || theme.headerColor || theme.bgColor || theme.bgColor2 || theme.textColor || theme.bgStyle || theme.bgStrength !== undefined || theme.layoutStyle || theme.logoSize || theme.logoScale !== undefined || theme.headerDensity || theme.buttonStyle || theme.cardStyle)) ? 'checked' : '';
             var presetOptions = (window._dashboardPortalThemePresets || []).map(function(preset) {
                 return '<option value="' + escapeHtml(preset.id) + '">' + escapeHtml(preset.title || 'Untitled theme') + '</option>';
             }).join('');
@@ -3042,6 +3043,7 @@
                 '<div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="portal-theme-custom-' + portalDom + '" ' + customChecked + ' onchange="togglePortalThemeCustom(' + jsAttr(portal.id) + ', this.checked)"><label class="form-check-label small" for="portal-theme-custom-' + portalDom + '">Custom theme</label></div>' +
                 '</div>' +
                 '<div class="mb-2"><label class="form-label small mb-1" for="portal-theme-preset-' + portalDom + '">Apply saved custom theme</label><select class="form-select form-select-sm" id="portal-theme-preset-' + portalDom + '" onchange="applyDashboardPortalThemePreset(' + jsAttr(portal.id) + ', this.value)"><option value="">Choose saved custom theme...</option>' + presetOptions + '</select></div>' +
+                '<div class="mb-2"><label class="form-label small mb-1" for="portal-theme-amount-display-' + portalDom + '">Document amounts</label><select class="form-select form-select-sm" id="portal-theme-amount-display-' + portalDom + '" onchange="updatePortalThemePreview(' + jsAttr(portal.id) + ')"><option value="balance"' + (amountDisplay === 'balance' ? ' selected' : '') + '>Amount still owing</option><option value="total"' + (amountDisplay === 'total' ? ' selected' : '') + '>Document total</option></select><div class="small text-muted">Unaccepted quotes show their total. Balance Due always deducts recorded payments.</div></div>' +
                 '<div class="mb-2"><label class="form-label small mb-1" for="portal-theme-layout-' + portalDom + '">Portal layout style</label><select class="form-select form-select-sm" id="portal-theme-layout-' + portalDom + '" onchange="updatePortalThemePreview(' + jsAttr(portal.id) + ')"><option value="premium-hub"' + (layoutStyle === 'premium-hub' ? ' selected' : '') + '>Premium Client Hub</option><option value="quote-viewer"' + (layoutStyle === 'quote-viewer' ? ' selected' : '') + '>Quote Viewer Style</option><option value="client-os"' + (layoutStyle === 'client-os' ? ' selected' : '') + '>Client OS</option></select><div class="small text-muted">This changes the structure and feel of this client portal.</div></div>' +
                 '<div class="row g-2 align-items-end">' +
                 '<div class="col-sm-3"><label class="form-label small mb-1" for="portal-theme-header-' + portalDom + '">Header</label><input type="color" class="form-control form-control-color" id="portal-theme-header-' + portalDom + '" value="' + headerColor + '" oninput="updatePortalThemePreview(' + jsAttr(portal.id) + ')"></div>' +
@@ -3116,6 +3118,7 @@
             set('density', dashboardPortalThemeChoice(theme.headerDensity, ['compact', 'standard', 'spacious'], 'standard'));
             set('button-style', dashboardPortalThemeChoice(theme.buttonStyle, ['filled', 'outline', 'soft'], 'filled'));
             set('card-style', dashboardPortalThemeChoice(theme.cardStyle, ['flat', 'shadow', 'premium'], 'shadow'));
+            set('amount-display', theme.amountDisplay === 'total' ? 'total' : 'balance');
             var logo = document.getElementById('portal-theme-logo-' + portalDom);
             if (logo) logo.value = theme.portalLogo || '';
             updatePortalThemeLogoPreview(portalId);
@@ -3279,6 +3282,7 @@
                 bgStyle: document.getElementById('portal-theme-bg-style-' + portalDom)?.value || 'soft-fade',
                 bgStrength: parseInt(document.getElementById('portal-theme-bg-strength-' + portalDom)?.value, 10) || 0,
                 layoutStyle: cleanPortalLayoutStyle(document.getElementById('portal-theme-layout-' + portalDom)?.value),
+                amountDisplay: document.getElementById('portal-theme-amount-display-' + portalDom)?.value === 'total' ? 'total' : 'balance',
                 logoSize: dashboardPortalThemeChoice(document.getElementById('portal-theme-logo-size-' + portalDom)?.value, ['small', 'medium', 'large'], 'medium'),
                 logoScale: Math.max(70, Math.min(180, parseInt(document.getElementById('portal-theme-logo-scale-' + portalDom)?.value, 10) || 100)),
                 headerDensity: dashboardPortalThemeChoice(document.getElementById('portal-theme-density-' + portalDom)?.value, ['compact', 'standard', 'spacious'], 'standard'),

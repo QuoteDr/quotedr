@@ -2673,6 +2673,7 @@
     let portalIsAdminView = false;
     let portalResolvedClientName = '';
     let portalDefaultTheme = {};
+    let portalAmountDisplay = 'balance';
     let portalBusinessLogoSrc = '';
     let portalCompanyName = 'Your Contractor';
     const portalNeutralFaviconHref = document.getElementById('portalFavicon')?.href || '';
@@ -2875,7 +2876,7 @@
 
       if (portalId) {
         const css = document.createElement('link');css.rel='stylesheet';css.href='portal-designs.css?v=2026090802';document.head.append(css);
-        const designs = await import('./portal-designs.js?v=2026090803');
+        const designs = await import('./portal-designs.js?v=2026092504');
         portalDesignController = designs.mountDesignLibrary(document.getElementById('portalDesignLibrary'), {
           request:portalDesignRequest, isOwner:portalIsAdminView,
           getQuotes:()=>portalQuotesCache,onQuotesChanged:()=>loadQuotes(),
@@ -3092,6 +3093,7 @@
         bgStyle: bgStyle,
         bgStrength: bgStrength,
         layoutStyle: layoutStyle,
+        amountDisplay: ['balance', 'total'].includes(theme?.amountDisplay) ? theme.amountDisplay : '',
         portalLogo: theme?.portalLogo || '',
         logoSize: logoSize,
         logoScale: logoScale,
@@ -3255,6 +3257,7 @@
 
     function applyPortalTheme(theme) {
       const t = normalizePortalTheme(theme || {});
+      portalAmountDisplay = t.amountDisplay || 'balance';
       const header = document.querySelector('.header-bg');
       const layoutStyle = t.layoutStyle || 'premium-hub';
       document.body.classList.remove('portal-layout-premium-hub', 'portal-layout-quote-viewer', 'portal-layout-client-os');
@@ -3467,6 +3470,7 @@
     function applyThemeStudioDraft(theme) {
       portalDefaultTheme = normalizePortalTheme(theme || {});
       applyPortalTheme(portalDefaultTheme);
+      renderPortalDocuments();
       updatePortalAttention(portalQuotesCache);
       updatePortalActivity(portalQuotesCache);
       updateSummaryCards(portalQuotesCache);
@@ -5238,6 +5242,36 @@
       card.addEventListener('keydown', handlePortalCardKeyOpen);
     }
 
+    function portalDocumentAmounts(quote) {
+      const rawTotal = quote.total;
+      const totalCents = rawTotal !== null && rawTotal !== undefined && Number.isFinite(Number(rawTotal))
+        ? Math.round(Number(rawTotal) * 100) : null;
+      const data = quote.data || {};
+      const received = data.paymentsReceived || data.paymentReceived;
+      const receivedValue = received && (received.amount ?? received.value);
+      // The aggregate already includes mirrored ledger payments: never add both.
+      let paidCents = receivedValue !== undefined && receivedValue !== null && Number.isFinite(Number(receivedValue))
+        ? Math.max(0, Math.round(Number(receivedValue) * 100)) : null;
+      if (paidCents === null) {
+        paidCents = (Array.isArray(data.payments) ? data.payments : []).reduce(function(sum, payment) {
+          if (!payment || (payment.status && !['paid', 'confirmed'].includes(String(payment.status).toLowerCase()))) return sum;
+          const cents = Number(payment.amount_cents ?? payment.amountCents ?? 0);
+          return sum + (Number.isFinite(cents) ? Math.max(0, Math.round(cents)) : 0);
+        }, 0);
+      }
+      const settled = quoteStatus(quote) === 'paid' || String(data.paymentStatus || '').toLowerCase() === 'paid';
+      return { totalCents, paidCents, balanceCents: totalCents === null ? null : settled ? 0 : Math.max(0, totalCents - paidCents) };
+    }
+
+    function portalDocumentAmountDisplay(quote) {
+      const amounts = portalDocumentAmounts(quote);
+      if (documentIsInvalid(quote)) return { cents: amounts.totalCents, label: 'Reference total' };
+      if (portalAmountDisplay === 'total') return { cents: amounts.totalCents, label: 'Total' };
+      const status = quoteStatus(quote);
+      if (!isInvoiceDocument(quote) && !['accepted', 'paid'].includes(status)) return { cents: amounts.totalCents, label: 'Quote total' };
+      return { cents: amounts.balanceCents, label: 'Amount still owing' };
+    }
+
     function createQuoteCard(quote) {
       const card = document.createElement('div');
       card.className = 'card quote-card';
@@ -5274,10 +5308,11 @@
       const projectAddress = quote.data?.projectAddress || quote.data?.project_address || 'No address provided';
 
       // Format total
-      const total = quote.total != null && Number.isFinite(Number(quote.total)) ? new Intl.NumberFormat('en-US', {
+      const amountDisplay = portalDocumentAmountDisplay(quote);
+      const total = amountDisplay.cents !== null ? new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: quote.data?.currency || 'CAD'
-      }).format(quote.total) : 'Unavailable';
+      }).format(amountDisplay.cents / 100) : 'Unavailable';
       const designLocked=quote.designReview?.locked===true && (!portalIsAdminView || quote.total==null);
       const adminActivityMarkup = portalIsAdminView
         ? `<button type="button" class="btn btn-outline-primary btn-sm" data-replay-design="${escapeHtml(quote.id)}" ${portalDesignController?.reviewDesigns(quote.id).length?'':'hidden'} onclick="replayPortalDesignReview(event, '${escapeHtml(quote.id)}')" title="Restart your admin walkthrough. Client review progress is unchanged.">Replay design review</button>
@@ -5316,7 +5351,7 @@
 
           <div class="d-flex justify-content-between align-items-center mb-3 portal-doc-footer">
             <div class="portal-doc-total">
-              <h6>${designLocked?'Explore your design to see pricing':'<span class="portal-doc-total-label">Total: </span>'+total}</h6>
+              <h6>${designLocked?'Explore your design to see pricing':'<span class="portal-doc-total-label">'+amountDisplay.label+': </span>'+total}</h6>
               <small class="text-muted">Created: ${date}</small>
               ${portalAddedLabel ? `<small class="text-muted d-block"><i class="fas fa-folder-open me-1"></i>Added to portal: ${escapeHtml(portalAddedLabel)}</small>` : ''}
             </div>
@@ -5479,10 +5514,8 @@
 
       quotes.forEach(quote => {
         const total = parseFloat(quote.total || 0) || 0;
-        const payments = quote.data && Array.isArray(quote.data.payments) ? quote.data.payments : [];
-        const paidAmount = payments.reduce(function(sum, payment) {
-          return sum + ((parseFloat(payment.amount_cents || 0) || 0) / 100);
-        }, 0);
+        const amounts = portalDocumentAmounts(quote);
+        const remaining = amounts.balanceCents === null ? 0 : amounts.balanceCents / 100;
         const paymentStatus = String(quote.data?.paymentStatus || '').toLowerCase();
         const status = String(quote.status || '').toLowerCase();
         const isInvalid = documentIsInvalid(quote);
@@ -5496,8 +5529,8 @@
           if (isInvoice) invoiceDueCount++;
           else quoteWaitingCount++;
         }
-        if (!isInvalid && status === 'invoiced') balanceDue += Math.max(total - paidAmount, 0);
-        if (!isInvalid && paymentStatus === 'partially_paid' && status !== 'invoiced') balanceDue += Math.max(total - paidAmount, 0);
+        if (!isInvalid && status === 'invoiced') balanceDue += remaining;
+        if (!isInvalid && paymentStatus === 'partially_paid' && status !== 'invoiced') balanceDue += remaining;
 
         if (!isInvalid && (status === 'sent' || status === 'draft' || status === 'viewed')) {
           openQuotes++;

@@ -6,6 +6,11 @@ const el = (tag,text,className) => { const node=document.createElement(tag); if(
 const button = (text,fn,style='btn btn-outline-primary btn-sm') => { const b=el('button',text,style);b.type='button';b.onclick=fn;return b; };
 const binary64 = bytes => {let s='';for(let i=0;i<bytes.length;i+=16384)s+=String.fromCharCode(...bytes.subarray(i,i+16384));return btoa(s);};
 const imageMimes=new Set(['image/png','image/jpeg','image/webp']);
+export function presentationRows(rows, presentation) {
+  const available=rows.filter(row=>row.visible&&row.project===presentation.project);
+  const ids=Array.isArray(presentation.ids)?presentation.ids:[];
+  return [...ids.map(id=>available.find(row=>row.id===id)).filter(Boolean),...available.filter(row=>!ids.includes(row.id))];
+}
 async function thumbnailPayload(file){
   if(!file||!imageMimes.has(file.type))throw new Error('Choose a PNG, JPEG, or WebP thumbnail.');
   const source=URL.createObjectURL(file);
@@ -54,13 +59,17 @@ async function renderDrawingPdf(bytes,body,d){
 export async function showDesign(read, title, options={}) {
   const d=dialog(title,true);const body=el('div','Loading design…');d.append(body);
   d.addEventListener('close',()=>options.onClose?.(),{once:true});
-  const addContinue=()=>{if(options.onContinue)d.append(button(options.continueLabel||'Continue to quote',()=>{d.close();options.onContinue();},'btn btn-primary'));};
+  const addContinue=(link)=>{if(options.onContinue){const next=button(options.continueLabel||'Continue to quote',()=>{d.close();options.onContinue();},'btn btn-primary');
+    if(link&&options.requireExternalOpen){next.disabled=true;link.addEventListener('click',()=>{next.disabled=false;});body.append(el('p','Open the external link first, then return here to confirm you have watched or reviewed it. QDR cannot verify playback.'));}
+    d.append(next);
+  }};
+  if(options.onProblem)d.append(button('I can’t view this — continue anyway',()=>{d.close();options.onProblem();},'btn btn-outline-secondary'));
   try {
     const result=await read(); if(!d.isConnected)return;
     body.replaceChildren();
     if(result.url){
       const a=el('a','Open external design','btn btn-primary');a.href=designInput({kind:'link',title,url:result.url}).external_url;a.target='_blank';a.rel='noopener noreferrer';
-      body.append(el('p','This design is hosted by another provider. Its own privacy and sign-in settings apply.'),a);addContinue();return true;
+      body.append(el('p','This design is hosted by another provider. Its own privacy and sign-in settings apply.'),a);addContinue(a);return true;
     }
     const bytes=result.file ? new Uint8Array(await result.file.arrayBuffer()) : Uint8Array.from(atob(result.base64),c=>c.charCodeAt(0));
     if(result.kind==='interactive'){
@@ -79,7 +88,9 @@ export async function showDesign(read, title, options={}) {
 }
 
 export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQuotes=()=>[],onQuotesChanged=()=>{},onOpenDesign,onAttachmentsChanged=()=>{}}) {
-  let rows=[],attachments=[];
+  let rows=[],attachments=[],presentations=[],presentationRevision=null;
+  // Guided viewing, not approval or a playback receipt. Progress lasts this page visit.
+  const completed=new Set();
   root.className='qd-designs';
   const head=el('header');head.append(el('h2','Designs & Renderings'));
   const actions=el('div',null,'qd-design-actions');head.append(actions);
@@ -93,19 +104,27 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
     // Clipboard only ever receives the client URL, never the admin preview.
     await navigator.clipboard.writeText(url.href);status.textContent='Client design link copied. Share the existing portal PIN separately.';
   })));}
+  if(isOwner)actions.append(button('Presentation order',()=>editPresentation()));
   async function refresh(){
-    try{const result=await request({action:'list'});rows=result.designs||[];attachments=result.attachments||[];status.textContent=rows.length?'Design previews do not change or approve your quote.':'No designs shared yet.';
+    try{const result=await request({action:'list'});rows=result.designs||[];attachments=result.attachments||[];presentations=result.presentations||[];presentationRevision=result.presentationRevision||null;status.textContent=rows.length?'Design previews do not change or approve your quote.':'No designs shared yet.';
       const value=filter.value;filter.replaceChildren();const all=el('option','All projects');all.value='';filter.append(all);
       [...new Set(rows.map(r=>r.project))].sort().forEach(p=>{const o=el('option',p);o.value=p;filter.append(o);});filter.value=value;render();onAttachmentsChanged();
     }catch(e){grid.replaceChildren();status.replaceChildren(el('span',e.message+' '));if(!isOwner)status.append(button('Unlock designs',reunlock));}
   }
   function render(){
     grid.replaceChildren();filter.hidden=rows.length===0;
-    for(const row of rows.filter(r=>!filter.value||r.project===filter.value)){
+    const ordered=[];
+    for(const project of [...new Set(rows.map(row=>row.project))]){
+      const presentation=presentations.find(p=>p.project===project);
+      ordered.push(...(presentation?presentationRows(rows,presentation):rows.filter(row=>row.project===project&&row.visible)),...rows.filter(row=>row.project===project&&!row.visible));
+    }
+    for(const row of ordered.filter(r=>!filter.value||r.project===filter.value)){
       const card=el('article',null,'qd-design-card'+(!row.visible?' is-withdrawn':''));
       if(row.has_thumbnail){const image=el('img');image.className='qd-design-thumbnail';image.alt='Preview of '+row.title;image.loading='lazy';card.append(image);request({action:'thumbnail',id:row.id}).then(result=>{if(!image.isConnected)return;image.src='data:'+result.mime+';base64,'+result.base64;}).catch(()=>image.remove());}
       card.append(el('div',row.kind==='interactive'?'◈ Interactive preview':row.kind==='link'?'↗ Design link':row.kind==='pdf'?'▤ Drawing / PDF':'▧ Rendering','qd-design-icon'),el('div',row.project,'qd-design-meta'),el('h3',row.title),el('p',row.note,'qd-design-note'),el('p','Version '+row.version+' · '+new Date(row.updated_at).toLocaleDateString()+(!row.visible?' · Withdrawn':''),'qd-design-meta'));
-      const a=el('div',null,'qd-design-actions');a.append(button('Open design',()=>onOpenDesign?onOpenDesign(row,()=>showDesign(()=>request({action:'read',id:row.id}),row.title)):showDesign(()=>request({action:'read',id:row.id}),row.title),'btn btn-primary btn-sm'));
+      const presentation=presentations.find(p=>p.project===row.project);
+      if(presentation&&row.visible)card.append(el('p','Presentation step '+(presentationRows(rows,presentation).findIndex(r=>r.id===row.id)+1)+(presentation.requireReview?' · Review in order':''),'qd-design-meta'));
+      const a=el('div',null,'qd-design-actions');a.append(button('Open design',()=>openDesign(row),'btn btn-primary btn-sm'));
       if(isOwner && row.visible)a.append(button('Attach to quote',()=>attach(row)));
       if(isOwner)for(const link of attachments.filter(a=>(a.design_ids||[a.design_id]).includes(row.id))){const quote=getQuotes().find(q=>q.id===link.document_id);card.append(el('p',(quote?.data?.fileName||quote?.quote_number||'Quote')+' · Position '+((link.design_ids||[link.design_id]).indexOf(row.id)+1)+(link.require_review?' · Design before pricing':' · Attached design'),'qd-design-meta'));}
       if(isOwner)a.append(button('Replace / edit',()=>edit(row)),button(row.visible?'Withdraw':'Publish again',guarded(async()=>{
@@ -114,6 +133,50 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
       })));
       card.append(a);grid.append(card);
     }
+  }
+  function openDesign(row,preview=false){
+    const presentation=presentations.find(p=>p.project===row.project);
+    if(presentation&&(preview||!isOwner)){
+      const sequence=presentationRows(rows,presentation),target=sequence.findIndex(r=>r.id===row.id);
+      const prefix=JSON.stringify([presentation,sequence.map(r=>[r.id,r.updated_at])]);
+      const done=preview?new Set():completed;
+      const key=item=>prefix+item.id;
+      const start=presentation.requireReview?sequence.findIndex((r,i)=>i<=target&&!done.has(key(r))):target;
+      const index=start<0?target:start;
+      if(index<0)return;
+      function showAt(i){
+        const current=sequence[i];if(!current)return;
+        const next=sequence[i+1];
+        const finish=()=>{done.add(key(current));render();if(next)showAt(i+1);};
+        showDesign(()=>request({action:'read',id:current.id}),current.title,{
+          requireExternalOpen:true,
+          continueLabel:current.kind==='link'?'I’ve watched / reviewed this — '+(next?'continue':'finish'):(next?'Continue to '+next.title:'Finish presentation'),
+          onContinue:finish,onProblem:finish
+        });
+      }
+      showAt(index);return;
+    }
+    const fallback=()=>showDesign(()=>request({action:'read',id:row.id}),row.title);
+    return onOpenDesign?onOpenDesign(row,fallback):fallback();
+  }
+  function editPresentation(){
+    const projects=[...new Set(rows.filter(r=>r.visible).map(r=>r.project))].sort();
+    if(!projects.length){status.textContent='Add or publish a design first.';return;}
+    const d=dialog('Presentation order'),label=el('label','Project / room'),select=el('select');label.append(select);
+    projects.forEach(project=>{const option=el('option',project);option.value=project;select.append(option);});
+    select.value=projects.includes(filter.value)?filter.value:projects[0];
+    const reviewLabel=el('label','Require viewing in this order '),review=el('input');review.type='checkbox';reviewLabel.append(review);
+    const list=el('ol'),error=el('p');error.setAttribute('role','alert');let ordered=[],saved='';
+    const state=()=>JSON.stringify([ordered,review.checked]);
+    function paint(){list.replaceChildren();ordered.forEach((id,i)=>{const item=el('li',rows.find(r=>r.id===id)?.title||'Unavailable design');const up=button('Move up',()=>{[ordered[i-1],ordered[i]]=[ordered[i],ordered[i-1]];paint();});up.disabled=i===0;const down=button('Move down',()=>{[ordered[i+1],ordered[i]]=[ordered[i],ordered[i+1]];paint();});down.disabled=i===ordered.length-1;item.append(up,down);list.append(item);});}
+    let selectedProject=select.value;
+    function load(){selectedProject=select.value;const p=presentations.find(p=>p.project===select.value)||{project:select.value,ids:[]};ordered=presentationRows(rows,p).map(r=>r.id);review.checked=p.requireReview===true;saved=state();paint();}
+    select.onchange=()=>{if(state()!==saved&&!window.confirm('Discard unsaved presentation changes?')){select.value=selectedProject;return;}load();};
+    const save=button('Save presentation',async()=>{save.disabled=true;error.textContent='Saving…';try{await request({action:'save_presentation',project:select.value,designIds:ordered,requireReview:review.checked,baseVersion:presentationRevision});await refresh();d.close();status.textContent='Presentation order saved. Use Preview presentation to check the client flow.';}catch(e){error.textContent=e.message;}finally{save.disabled=false;}},'btn btn-primary');
+    const preview=button('Preview saved presentation',()=>{const p=presentations.find(p=>p.project===select.value);if(!p){error.textContent='Save the presentation first.';return;}if(state()!==saved){error.textContent='Save your changes before previewing.';return;}d.close();const first=presentationRows(rows,p)[0];if(first)openDesign(first,true);});
+    const close=()=>{if(!save.disabled&&(state()===saved||window.confirm('Discard unsaved presentation changes?')))d.close();};
+    d.querySelector('header button').onclick=close;d.addEventListener('cancel',event=>{event.preventDefault();close();});
+    d.append(label,el('p','Move the tutorial first, followed by the model. This applies to standalone portal designs, not quote attachment order. New designs appear last; withdrawn designs are skipped.'),list,reviewLabel,el('p','External links require opening and a watched / reviewed confirmation, not proof of playback. Clients can continue if a file cannot be viewed. Progress resets on page reload. This is guidance, not a security lock or quote approval.'),save,preview,error);load();
   }
   function attach(row){
     const d=dialog('Attach design to quote'),label=el('label','Quote'),select=el('select');label.append(select);
