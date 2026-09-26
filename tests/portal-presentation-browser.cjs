@@ -6,11 +6,14 @@ const {chromium}=require(process.env.QD_PLAYWRIGHT_MODULE);
 const fixture=`<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="/portal-designs.css"><main id="library"></main><script type="module">
 import {mountDesignLibrary} from '/portal-designs.js';
 const rows=[{id:'model',project:'Basement',title:'Interactive model',kind:'interactive',visible:true,updated_at:'2026-09-25'},{id:'video',project:'Basement',title:'Tutorial video',kind:'link',visible:true,updated_at:'2026-09-25'}];
-const request=async p=>p.action==='list'?{designs:rows,presentations:[{project:'Basement',ids:['video','model'],requireReview:true}],presentationRevision:'test'}:p.id==='video'?{url:'https://fixture.invalid/video'}:{kind:'interactive',base64:btoa('<p>Fixture model loaded</p>')};
+const request=async p=>{if(p.action==='track_activity'){window.activityCalls.push(p);return{ok:true};}if(p.action==='activity')return{events:[{event_type:'design_opened',title:'Fixture model',project:'Basement',created_at:'2026-09-25T12:00:00Z'}]};if(p.action==='complete_presentation'){const r=await fetch('/state',{method:'POST'});if(!r.ok)throw Error('Fixture connection interrupted');return r.json();}return p.action==='list'?{designs:rows,presentations:[await(await fetch('/state')).json()],presentationRevision:'test'}:p.id==='video'?{url:'https://fixture.invalid/video'}:{kind:'interactive',base64:btoa('<p>Fixture model loaded</p>')};};
+window.activityCalls=[];
 await mountDesignLibrary(document.querySelector('main'),{request,isOwner:location.hash==='#owner'}).refresh();
 </script>`;
 const allowed=new Set(['portal-designs.js','portal-designs.css','portal-design-policy.mjs','portal-design-prepare.mjs','storage-budget-client.mjs']);
-const server=http.createServer((req,res)=>{const path=req.url.slice(1).split('?')[0];if(!path){res.setHeader('Content-Type','text/html');res.end(fixture);}else if(path==='video'){res.end('Fixture video provider');}else if(allowed.has(path)){res.setHeader('Content-Type',path.endsWith('css')?'text/css':'text/javascript');res.end(fs.readFileSync(path));}else{res.writeHead(404);res.end();}});
+const state={project:'Basement',ids:['video','model'],requireReview:true,reviewId:'test-review'};
+let completionAttempts=0;
+const server=http.createServer((req,res)=>{const path=req.url.slice(1).split('?')[0];if(path==='state'){if(req.method==='POST'){if(++completionAttempts===1){res.writeHead(503);res.end();return;}state.completedAt=new Date().toISOString();}res.setHeader('Content-Type','application/json');res.end(JSON.stringify({...state,presentationRevision:'test'}));}else if(!path){res.setHeader('Content-Type','text/html');res.end(fixture);}else if(path==='video'){res.end('Fixture video provider');}else if(allowed.has(path)){res.setHeader('Content-Type',path.endsWith('css')?'text/css':'text/javascript');res.end(fs.readFileSync(path));}else{res.writeHead(404);res.end();}});
 (async()=>{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const browser=await chromium.launch({headless:true,executablePath:process.env.QD_BROWSER_PATH});
@@ -41,12 +44,29 @@ const server=http.createServer((req,res)=>{const path=req.url.slice(1).split('?'
    assert(closeBox.y>=0&&finishBox.y+finishBox.height<size.height,'Close and presentation actions visible');
   }
   await page.getByRole('button',{name:'Finish presentation',exact:true}).click();assert.equal(await page.getByRole('dialog').count(),0);
+  assert.deepEqual(await page.evaluate(()=>activityCalls.filter(e=>e.event!=='model_visible').map(e=>e.event)),['portal_visited','design_opened','external_clicked','design_opened']);
+  assert(await page.evaluate(()=>activityCalls.some(e=>e.event==='model_visible'&&Number.isInteger(e.seconds)&&e.visitId)));
+  await page.getByRole('button',{name:'Retry saving completion',exact:true}).click();
+  await page.getByText('Presentation reviewed. All designs',{exact:false}).waitFor();
   await page.setViewportSize({width:390,height:844});await page.reload();
   await page.locator('article').filter({has:page.getByRole('heading',{name:'Interactive model'})}).getByRole('button',{name:'Open design',exact:true}).click();
+  await page.getByRole('dialog').getByRole('heading',{name:'Interactive model'}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Finish presentation',exact:true}).count(),0);
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  const device=await browser.newPage();await device.goto('http://127.0.0.1:'+server.address().port);
+  await device.locator('article').filter({has:device.getByRole('heading',{name:'Interactive model'})}).getByRole('button',{name:'Open design',exact:true}).click();
+  await device.getByRole('dialog').getByRole('heading',{name:'Interactive model'}).waitFor();await device.close();
+  await page.getByRole('button',{name:/Replay presentation/}).click();
   await page.getByRole('dialog').getByRole('heading',{name:'Tutorial video'}).waitFor();
   await page.getByRole('button',{name:'I can’t view this — continue anyway'}).click();
   await page.getByRole('dialog').getByRole('heading',{name:'Interactive model'}).waitFor();
   await page.goto('http://127.0.0.1:'+server.address().port+'/#owner');await page.reload();
+  assert.equal(completionAttempts,2,'Independent opens and replay do not rewrite completion');
+  await page.getByRole('button',{name:'Design activity',exact:true}).click();
+  await page.getByText('0 portal visits · 1 design opens in the entries below',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Refresh activity',exact:true}).click();
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  assert.deepEqual(await page.evaluate(()=>activityCalls),[],'Admin browsing must not record client activity');
   await page.getByRole('button',{name:'Add design',exact:true}).click();
   const room=page.getByLabel('Project / room',{exact:true});
   await room.selectOption('Basement');assert.equal(await page.getByLabel('New room name').isVisible(),false);

@@ -114,10 +114,13 @@ for (const q of ['View expired quote portal activity', 'Do I have to renew a quo
  assert(searchHandbook(book,q).some(a=>a.id==='expired-quote-portal-activity'),q);
 }
 assert(searchHandbook(book,'Can I still email it?', 'expired quote portal activity').some(a=>a.id==='expired-quote-portal-activity'));
-for(const q of ['Standalone presentation order video before model', 'Require viewing in this order without a quote', 'I cannot view the tutorial how do I continue?', 'Does QDR verify external video playback?']) {
+for(const q of ['Standalone presentation order video before model', 'Require viewing in this order without a quote', 'I cannot view the tutorial how do I continue?', 'Does QDR verify external video playback?', 'Replay presentation after all designs unlock', 'Require another guided review for the portal', 'Presentation completion was not saved retry']) {
  assert(searchHandbook(book,q).some(a=>a.id==='standalone-design-presentation-order'),q);
 }
 assert(searchHandbook(book,'Does it remember after reloading?', 'standalone design presentation order').some(a=>a.id==='standalone-design-presentation-order'));
+for(const q of ['Track rendering views without a quote', 'Design-only portal activity repeat views', 'Can I see external video playback time?', 'Design activity failed to load'])assert(searchHandbook(book,q).some(a=>a.id==='standalone-design-activity'),q);
+assert(searchHandbook(book,'Does that prove they watched it?', 'design-only portal activity').some(a=>a.id==='standalone-design-activity'));
+assert(searchHandbook(book,'How long was the model visible?', 'design-only portal activity').some(a=>a.id==='standalone-design-activity'));
 console.log('Handbook retrieval: questions, follow-up, unknown, validation and limit passed');
 for(const q of ['Empty portal client link zero documents', 'Get a client link before adding a quote', 'Client link unavailable no documents']) {
  assert(searchHandbook(book,q).some(a=>a.id==='empty-portal-client-link'),q);

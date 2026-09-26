@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {modelVisibleTimer} from '../portal-designs.js';
+let now=0,tick,cleared=false;const sent=[];
+const doc=new EventTarget();doc.hidden=false;
+const win=new EventTarget();win.setInterval=fn=>(tick=fn,1);win.clearInterval=()=>cleared=true;
+const stop=modelVisibleTimer(n=>sent.push(n),doc,win,()=>now);
+now=15000;tick();assert.equal(sent.at(-1),15);
+now=20000;doc.hidden=true;doc.dispatchEvent(new Event('visibilitychange'));assert.equal(sent.at(-1),20);
+now=80000;tick();assert.equal(sent.at(-1),20);
+doc.hidden=false;doc.dispatchEvent(new Event('visibilitychange'));
+now=85000;stop();assert.equal(sent.at(-1),25);assert(cleared);
+const count=sent.length;stop();assert.equal(sent.length,count);
+console.log('PASS: model visible timer pauses while hidden, resumes, flushes on close and cleans up');

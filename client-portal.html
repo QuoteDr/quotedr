@@ -2877,7 +2877,7 @@
 
       if (portalId) {
         const css = document.createElement('link');css.rel='stylesheet';css.href='portal-designs.css?v=2026092505';document.head.append(css);
-        const designs = await import('./portal-designs.js?v=2026092506');
+        const designs = await import('./portal-designs.js?v=2026092508');
         portalDesignController = designs.mountDesignLibrary(document.getElementById('portalDesignLibrary'), {
           request:portalDesignRequest, isOwner:portalIsAdminView,
           getQuotes:()=>portalQuotesCache,onQuotesChanged:()=>loadQuotes(),
@@ -2931,7 +2931,7 @@
       let content;
       if(file instanceof Blob){content=new FormData();content.append('metadata',JSON.stringify(payload));content.append('file',file,'design');}
       else {headers['Content-Type']='application/json';content=JSON.stringify(payload);}
-      const response=await fetch(supabaseUrl+'/functions/v1/portal-designs',{method:'POST',headers,body:content});
+      const response=await fetch(supabaseUrl+'/functions/v1/portal-designs',{method:'POST',headers,body:content,keepalive:payload.action==='track_activity'});
       if(response.ok&&response.headers.get('Content-Type')?.startsWith('application/octet-stream'))return {file:await response.blob(),kind:response.headers.get('X-Design-Kind'),mime:response.headers.get('X-Design-Mime')};
       const result=await response.json();
       if(!response.ok||result.error){const error=new Error(result.error||'Design library unavailable. Please try again.');error.code=result.code;throw error;}

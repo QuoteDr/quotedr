@@ -21,7 +21,7 @@ assert.equal(designInput({kind:'link',title:'A',url:'https://example.com/view'})
 // The session validator and current-portal resolver are the real implementations.
 let storageReads=0, authPermission='', quotaFailure=false;
 const tables={
-  quotes:[],quote_design_links:[],
+  quotes:[],quote_design_links:[],portal_design_activity:[],
   user_data:[{user_id:owner,key:'client_portals',value:[{id:portal,name:'Design-only project',pin:'1847',updatedAt:new Date().toISOString()}]}],
   portal_design_libraries:[{id:'lib-a',user_id:owner,portal_id:portal,share_token:'a'.repeat(48)}],
   portal_designs:[
@@ -35,6 +35,7 @@ class Query{
   select(fields){this.fields=fields;return this;}eq(k,v){this.filters.push([k,v]);return this;}order(){return this;}maybeSingle(){this.one=true;return this;}single(){this.one=true;return this;}
   update(value){this.mode='update';this.value=value;return this;}insert(value){this.mode='insert';this.value=value;return this;}
   upsert(value){this.mode='insert';this.value=value;return this;}
+  gte(){return this;}limit(){return this;}
   in(k,values){this.inFilter=[k,values];return this;}delete(){this.mode='delete';return this;}
   then(resolve){if(quotaFailure&&this.table==='portal_designs'&&this.mode==='insert')return Promise.resolve({data:null,error:{message:'render_upload_quota_exceeded'}}).then(resolve);let rows=tables[this.table].filter(r=>this.filters.every(([k,v])=>k==='data->>portal_id'?r.data?.portal_id===v:r[k]===v));
     if(this.mode==='update')rows.forEach(r=>Object.assign(r,this.value));
@@ -145,12 +146,43 @@ assert.equal((await call({...presentation,designIds:[savedId,savedId]},true)).st
 assert.equal((await call({...presentation,designIds:[savedId]},true)).status,409);
 assert.equal((await call(presentation,true)).status,200);
 assert.equal(authPermission,'quotes.send');
-assert.deepEqual(library.presentations,[{project:'Basement',ids:[largeId,savedId],requireReview:true}]);
+assert.deepEqual(library.presentations,[{project:'Basement',ids:[largeId,savedId],requireReview:true,reviewId:'legacy',completedAt:null}]);
 assert.equal((await call(presentation,true)).status,409,'Stale order cannot overwrite a newer order');
 assert.deepEqual((await(await call({action:'list',session:token})).json()).presentations,library.presentations);
+const completion={action:'complete_presentation',session:token,project:'Basement',reviewId:'legacy',baseVersion:library.presentation_revision,designIds:[largeId,savedId]};
+assert.equal((await call({...completion,session:'invalid'})).status,401);
+assert.equal((await call({...completion,ownerMode:true},true)).status,403);
+assert.equal((await call({...completion,designIds:[savedId]})).status,409);
+assert.equal((await call({...completion,designIds:[savedId,savedId]})).status,409);
+assert.equal((await call({...completion,baseVersion:'stale'})).status,409);
+assert.equal((await call(completion)).status,200);
+const completedAt=library.presentations[0].completedAt;assert(completedAt);
+assert.equal((await call(completion)).status,200,'Completion retries are idempotent');
+assert.equal((await(await call({action:'list',session:token})).json()).presentations[0].completedAt,completedAt);
+assert.equal((await call({...presentation,baseVersion:library.presentation_revision},true)).status,200);
+assert.equal(library.presentations[0].completedAt,completedAt,'Ordinary order saves preserve completion');
+assert.equal((await call({...presentation,requireAgain:true,requireReview:false,baseVersion:library.presentation_revision},true)).status,200);
+assert.equal(library.presentations[0].completedAt,null);
+assert.equal(library.presentations[0].requireReview,true);
+assert.notEqual(library.presentations[0].reviewId,'legacy');
+assert.equal((await call(completion)).status,409,'An old completion cannot undo an owner reset');
 otherDesign.visible=false;
 assert.deepEqual((await(await call({action:'list',session:token})).json()).presentations[0].ids,[savedId]);
 assert.equal(tables.quote_design_links.length,0,'Standalone order does not attach designs to quotes');
+const track={action:'track_activity',session:token,event:'design_opened',id:savedId};
+assert.equal((await call({...track,session:'invalid'})).status,401);
+assert.equal((await call({...track,id:'other'})).status,404,'Cannot log another portal design');
+assert.equal((await call({...track,id:largeId})).status,404,'Cannot log withdrawn design');
+assert.equal((await call({...track,event:'invented'})).status,400);
+assert.equal((await call({...track,event:'external_clicked'})).status,400);
+assert.equal((await call({...track,ownerMode:true},true)).status,200);
+assert.equal(tables.portal_design_activity.length,0,'Admin preview excluded');
+assert.equal((await call(track)).status,200);
+assert.equal(tables.portal_design_activity[0].title,tables.portal_designs.find(r=>r.id===savedId).title);
+assert.notEqual(tables.portal_design_activity[0].session_hash,token,'No raw PIN session stored');
+assert.equal((await call({action:'activity',session:token})).status,403,'Clients cannot read analytics');
+assert.equal((await call({action:'activity',ownerMode:true},true)).status,200);
+assert.equal((await call({action:'activity',ownerMode:true})).status,403);
 tables.user_data[0].value[0].pin='2345';assert.equal((await call({action:'list',session:token})).status,401,'PIN reset invalidates old grants');
 tables.user_data[0].value=[];assert.equal((await call({action:'list',session:token})).status,404,'Deleted portal revokes access');
 // Execute the PIN endpoint too, including legacy-oracle throttling.

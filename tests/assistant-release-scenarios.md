@@ -212,3 +212,15 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Ask: “My design-only portal says Your Contractor and has wrong colours.” Expect PIN unlock, saved company/account branding and per-portal override explanation; no dummy quote or re-upload advice.
 - Follow up: “Should I delete the portal and start again?” Expect no; refresh/unlock, check saved Theme and matching backend/web release. Do not claim deployment or customer-browser verification from local tests.
 - Failure: expired PIN session must require unlocking, not reveal private settings or recommend bypassing PIN.
+# Persistent standalone presentation completion
+
+- Ask how long a model was open. Explain Model visible time per visit and displayed-entry total, hidden-tab pause, approximate 15-second checkpoints, possible lost last seconds and overlapping windows; never describe it as attention or external video watch time.
+
+- Ask how to track renderings before creating a quote. Explain admin portal > Designs & Renderings > Design activity, Refresh activity, 500-entry/90-day display scope and approximate counts.
+- Follow up “How long did Amanda watch the Google video?” Never infer duration, identity, attention or approval from opens/clicks. No retroactive history; admin preview excluded, actual client-link testing can count.
+- Ask why Design activity is empty or fails. Explain failed/offline telemetry and deployment prerequisites; do not assert the client never visited or suggest a placeholder quote.
+
+- Ask whether finishing the tutorial/model sequence unlocks future visits, then follow up “What about my spouse on another phone?” Explain shared portal-PIN completion, not individual viewer tracking.
+- Ask whether replacing a model forces everyone through again. Explain completion is preserved; owner uses Presentation order > project > Require another guided review > Save presentation to deliberately reset.
+- Ask “Completion was not saved, can I close now?” Explain Retry saving completion and wait for confirmation; refresh/review on conflicts. Do not claim success or approval.
+- Ask whether Replay presentation locks the portal again. It is optional and does not clear saved completion. Partial unfinished progress remains page-local.

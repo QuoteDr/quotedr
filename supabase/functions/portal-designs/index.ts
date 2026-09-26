@@ -9,7 +9,7 @@ const json = (data:unknown, status=200) => new Response(JSON.stringify(data), {s
 const randomToken = () => Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>b.toString(16).padStart(2,'0')).join('');
 const publicFields = 'id,project,title,note,version,kind,mime_type,size_bytes,thumbnail_path,visible,created_at,updated_at';
 const MAX_THUMBNAIL_BYTES = 1536 * 1024;
-type DesignPresentation = {project:string; ids:string[]; requireReview:boolean};
+type DesignPresentation = {project:string; ids:string[]; requireReview:boolean; reviewId?:string; completedAt?:string|null};
 const thumbnailMime = new Set(['image/png','image/jpeg','image/webp']);
 const encode = async (blob:Blob) => {
   const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';
@@ -97,6 +97,49 @@ export async function handleDesignRequest(req:Request) {
     }
     const library = result.data;
     if (!library) return action === 'list' ? json({designs:[]}) : json({error:'Design not found'},404);
+    if(action==='activity'){
+      if(!ownerMode)return json({error:'Contractor access required'},403);
+      const events=await db.from('portal_design_activity').select('event_type,design_key,title,project,created_at,duration_seconds').eq('library_id',library.id).gte('created_at',new Date(Date.now()-90*86400000).toISOString()).order('created_at',{ascending:false}).limit(500);
+      if(events.error)throw events.error;
+      return json({events:events.data||[],limit:500,days:90});
+    }
+    if(action==='track_activity'){
+      if(ownerMode)return json({ok:true,ignored:true});
+      const event=body.event;
+      if(!['portal_visited','design_opened','external_clicked','model_visible'].includes(event))return json({error:'Invalid activity'},400);
+      let design=null;
+      if(event!=='portal_visited'){
+        const found=await db.from('portal_designs').select('id,title,project,kind').eq('library_id',library.id).eq('id',body.id).eq('visible',true).maybeSingle();
+        if(found.error)throw found.error;design=found.data;
+        if(!design)return json({error:'Design not found'},404);
+        if(event==='external_clicked'&&design.kind!=='link')return json({error:'Not an external design'},400);
+      }
+      if(event==='model_visible'){
+        if(design?.kind!=='interactive'||!/^[a-f0-9-]{36}$/i.test(body.visitId||'')||!Number.isInteger(body.seconds)||body.seconds<0||body.seconds>86400)return json({error:'Invalid model timing'},400);
+        const saved=await db.rpc('record_model_visible',{p_library:library.id,p_session:await digest(body.session),p_design:design.id,p_visit:body.visitId,p_title:design.title,p_project:design.project||'',p_seconds:body.seconds});
+        if(saved.error)throw saved.error;return json({ok:true});
+      }
+      const saved=await db.from('portal_design_activity').upsert({library_id:library.id,session_hash:await digest(body.session),minute_bucket:Math.floor(Date.now()/60000),event_type:event,design_key:design?.id||'',title:design?.title||'',project:design?.project||''},{onConflict:'library_id,session_hash,minute_bucket,event_type,design_key,visit_id',ignoreDuplicates:true});
+      if(saved.error)throw saved.error;
+      return json({ok:true});
+    }
+    if(action === 'complete_presentation') {
+      if(ownerMode)return json({error:'Admin previews do not record client completion.'},403);
+      const presentations=(library.presentations || []) as DesignPresentation[];
+      const presentation=presentations.find(p=>p.project===body.project);
+      if(!presentation || (presentation.reviewId || 'legacy')!==body.reviewId)return json({error:'Presentation changed. Refresh and review the current presentation.'},409);
+      if(presentation.completedAt)return json({ok:true,completedAt:presentation.completedAt,presentationRevision:library.presentation_revision});
+      if(body.baseVersion!==library.presentation_revision)return json({error:'Presentation changed. Refresh and review the current presentation.'},409);
+      const found=await db.from('portal_designs').select('id').eq('library_id',library.id).eq('project',presentation.project).eq('visible',true);
+      if(found.error)throw found.error;
+      const ids=body.designIds,visible=found.data||[];
+      if(!Array.isArray(ids)||!visible.length||ids.length!==visible.length||new Set(ids).size!==ids.length||visible.some(row=>!ids.includes(row.id)))return json({error:'Review every current presentation step before finishing.'},409);
+      const completedAt=new Date().toISOString(),revision=crypto.randomUUID();
+      const changed=await db.from('portal_design_libraries').update({presentations:presentations.map(p=>p===presentation?{...p,completedAt}:p),presentation_revision:revision}).eq('id',library.id).eq('presentation_revision',library.presentation_revision).select('id');
+      if(changed.error)throw changed.error;
+      if(!changed.data?.length)return json({error:'Presentation changed. Refresh and try again.'},409);
+      return json({ok:true,completedAt,presentationRevision:revision});
+    }
     if(action === 'save_presentation') {
       const project=body.project, ids=body.designIds;
       if(typeof project!=='string'||!project||project.length>160||!Array.isArray(ids)||ids.length>200||new Set(ids).size!==ids.length||ids.some(id=>typeof id!=='string'))return json({error:'Choose a project and up to 200 distinct designs.'},400);
@@ -106,7 +149,8 @@ export async function handleDesignRequest(req:Request) {
       const visible=found.data||[];
       if(!visible.length||ids.length!==visible.length||ids.some(id=>!visible.some(row=>row.id===id)))return json({error:'The project designs changed. Refresh before saving the order.'},409);
       const presentations=(library.presentations as DesignPresentation[]||[]).filter(item=>item.project!==project);
-      presentations.push({project,ids,requireReview:body.requireReview===true});
+      const previous=(library.presentations as DesignPresentation[]||[]).find(item=>item.project===project);
+      presentations.push({project,ids,requireReview:body.requireAgain===true||body.requireReview===true,reviewId:body.requireAgain===true?crypto.randomUUID():(previous?.reviewId||'legacy'),completedAt:body.requireAgain===true?null:(previous?.completedAt||null)});
       const changed=await db.from('portal_design_libraries').update({presentations,presentation_revision:crypto.randomUUID()}).eq('id',library.id).eq('presentation_revision',body.baseVersion).select('id');
       if(changed.error)throw changed.error;
       if(!changed.data?.length)return json({error:'Presentation order changed. Refresh and try again.'},409);
