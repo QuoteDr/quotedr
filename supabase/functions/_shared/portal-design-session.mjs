@@ -21,7 +21,7 @@ export async function verifyDesignSession(secret, token, owner, portal, pin, now
   } catch { return false; }
 }
 
-// One current PIN, chosen from the latest portal record. Old copies never unlock designs.
+// The portal registry owns its PIN. Quote edits must not override or revive it.
 export async function currentDesignPortal(db, owner, portal) {
   const [quotes, registry] = await Promise.all([
     db.from('quotes').select('data,updated_at').eq('user_id',owner).eq('data->>portal_id',portal).order('updated_at',{ascending:false}),
@@ -32,7 +32,7 @@ export async function currentDesignPortal(db, owner, portal) {
     name:q.data.portal_name || 'Client Portal', pin:String(q.data.portal_pin || ''), updated:q.updated_at, theme:q.data.portal_theme || {}
   }));
   const saved = Array.isArray(registry.data?.value) ? registry.data.value.find(p=>p.id === portal) : null;
-  if (saved) records.push({ name:saved.name, pin:String(saved.pin || ''), updated:saved.updatedAt || saved.createdAt, theme:saved.theme || {} });
+  if (saved) return { name:saved.name, pin:String(saved.pin || ''), updated:saved.updatedAt || saved.createdAt, theme:saved.theme || {} };
   records.sort((a,b)=>new Date(b.updated || 0)-new Date(a.updated || 0));
   return records[0] || null;
 }

@@ -4204,6 +4204,11 @@
                 return emailKey && (qEmail === emailKey || qName === emailKey);
             });
             if (quotes && quotes.length > 0) {
+                // Registry-backed portals must rotate the authoritative PIN too.
+                for (var resetPortalId of new Set(quotes.map(q => q.data?.portal_id).filter(Boolean))) {
+                    var resetRecord = dashboardEmptyPortalRecordById(resetPortalId);
+                    if (resetRecord) await upsertDashboardEmptyPortal(Object.assign({}, resetRecord, { pin: newPin }), 'Reset portal PIN');
+                }
                 for (var q of quotes) {
                     var newData = Object.assign({}, q.data || {}, { portal_pin: newPin });
                     await qdDurableQuoteRowUpdate(q.id, { data: newData }, 'Reset portal PIN');

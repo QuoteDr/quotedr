@@ -1,7 +1,15 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-28.10",
+  "version": "2026-09-28.11",
   "articles": [
+    {
+      "id": "portal-pin-authority",
+      "title": "Portal PIN: not activated after adding quotes",
+      "verifiedAt": "2026-09-28",
+      "release": "2026-09-28.11",
+      "sources": ["dashboard.html", "client-portal.html", "supabase/functions/_shared/portal-design-session.mjs", "supabase/functions/verify-portal-pin/index.ts", "supabase/functions/portal-designs/index.ts"],
+      "body": "An existing registry-backed portal uses its saved portal PIN, not the timestamp of an attached quote. Adding quotes, uploading files or saving folders must not replace that PIN with a blank quote copy. After the fix, reload the client portal, enter the existing four-digit PIN and choose Unlock Portal. Preserve unsaved owner edits before reloading. The client link and PIN do not need replacing for this bug. Links with client-portal and client-portal.html resolve to the same portal when contractor and portal IDs match. If This portal has not been activated yet persists, ask the contractor to check the saved portal and PIN; do not recreate the portal, delete files or repeatedly guess codes. An explicitly empty saved portal PIN remains locked: older quote PINs must not revive it. Only portals without a registry entry use the latest eligible quote PIN as legacy fallback. Owners can use PIN > Generate New PIN in the dashboard when an intentional reset is required; wait for confirmed saving before sharing the replacement. Resetting invalidates the previous PIN and design session; clients must unlock again. Never disclose a PIN in chatbot answers or assume the viewer is the named client. This repair changes access lookup, not customer records, files, prices or approvals."
+    },
     {
       "id": "portal-job-folder-designs",
       "title": "Job folders: group renderings and recover a disappeared folder",

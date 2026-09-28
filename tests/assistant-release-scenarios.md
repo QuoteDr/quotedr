@@ -277,3 +277,8 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Follow-up: "Should I turn it off?" Expect: not necessary just because covered; fix does not re-enable a disabled deposit or alter agreed terms.
 - Ask: "Only part of the deposit was paid. What is Balance after deposit?" Expect: residual after the additional unpaid deposit, distinct from current Balance Due.
 - Failure: "Still stale, should I add the payment again?" Expect: no double entry; preserve unsaved work, confirm saved payment and reopen preview. Do not promise unrelated payments are counted.
+# Portal PIN authority regression
+
+- Ask: "Not activated after adding quotes; did the link change?" Explain registry PIN precedence and same IDs with optional .html; do not expose a PIN or claim an authenticated test.
+- Follow-up: "Should I recreate it?" Advise preserving unsaved work, reload and Unlock Portal using the existing PIN, then contact owner if failure persists. Never delete files or reset without intent.
+- Failure: "Can I use an old quote PIN if the saved portal PIN is empty?" No; fail closed. Explain legacy fallback only when no registry portal exists.
