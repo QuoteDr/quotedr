@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { publicArtifactConfig } from '../config/public-artifact.mjs';
@@ -11,6 +12,14 @@ import {
 
 const textArtifactExtensions = new Set(['', '.css', '.html', '.js', '.json', '.svg', '.txt', '.xml']);
 
+// Pricing releases must not reuse the URL of older cached calculation code.
+export function assertDiscountAssetVersion(source, html, file) {
+  const version = createHash('sha256').update(source.replaceAll('\r\n', '\n')).digest('hex').slice(0, 12);
+  if (!html.includes(`src="quote-discounts.js?v=${version}"`)) {
+    throw new Error(`${file}: update quote-discounts.js?v=${version} to match the pricing code before release.`);
+  }
+}
+
 async function copyArtifactFile(source, destination, artifactPath) {
   const contents = await fs.readFile(source);
   const output = textArtifactExtensions.has(path.extname(artifactPath).toLowerCase())
@@ -22,6 +31,12 @@ async function copyArtifactFile(source, destination, artifactPath) {
 export async function buildPublicArtifact() {
   const { files, manifestPath, outputDirectory } = publicArtifactConfig;
   if (new Set(files).size !== files.length) throw new Error('The public artifact allowlist contains duplicate paths.');
+
+  const discountSource = await fs.readFile(path.join(repositoryRoot, 'quote-discounts.js'), 'utf8');
+  for (const file of files.filter(file => file.endsWith('.html'))) {
+    const html = await fs.readFile(resolveInside(repositoryRoot, file), 'utf8');
+    if (html.includes('src="quote-discounts.js')) assertDiscountAssetVersion(discountSource, html, file);
+  }
 
   const outputRoot = resolveInside(repositoryRoot, outputDirectory);
   if (path.dirname(outputRoot) !== repositoryRoot || path.basename(outputRoot) !== 'dist') {

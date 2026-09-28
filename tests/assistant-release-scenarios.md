@@ -253,6 +253,8 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Ask why saving with no selected eligible choices fails. Expect check at least one or change to All choices; never invent a saved discount.
 - Ask whether a $100 pick-multiple discount repeats per card. Expect once against the eligible selected total; explain separate upgrade eligibility and review Client View before sharing.
 - Require save/cloud confirmation and no editing signed customer records as a test. These are conversational regression cases, not proof authenticated answers passed.
+- Cache regression (2026-09-28.6): "Selected choices only stays saved but both versions still get $300 off." Explain a stale pricing asset is a possible cause, not proof of lost selections. After the matching web release, reopen the preview; do not lower rates or add another discount to compensate.
+- Follow-up: "Should I clear storage or save it to my item database?" No. Preserve/export unsaved draft and confirm quote cloud save before reload; database item saving is not required. If it persists, gather quote number and screenshots for support, without promising a live fix or modifying customer records.
 # Quote settings current draft (2026-09-28.5)
 
 - "Description length returns to the old value after Done" → Done applies current draft, normal save/cloud confirmation still required; Save Defaults is for future quotes.
