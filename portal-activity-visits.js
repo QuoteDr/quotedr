@@ -35,5 +35,18 @@
         });
         return result;
     }
-    root.QuoteDrActivityVisits = {designVisits};
+    function locationDetails(event) {
+        const meta = event && event.metadata || {};
+        const escape = value => String(value).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        let country = meta.location_country || '';
+        if (/^[A-Z]{2}$/.test(country)) {
+            try { country = new Intl.DisplayNames(['en'], {type:'region'}).of(country); } catch (_) {}
+        }
+        const parts = meta.location_source === 'cloudflare_approximate'
+            ? [meta.location_city, meta.location_region, country].filter(v=>typeof v==='string' && v.trim()).map(v=>v.slice(0,100)) : [];
+        return '<details class="small mt-1"><summary>More info</summary><div>Approximate location: ' +
+            (parts.length ? parts.map(escape).join(', ') : 'Location unavailable') +
+            '</div><div class="text-muted">Network estimate, not GPS or proof of identity. VPNs and mobile networks can show another location. Older or unrecorded visits may have no location.</div></details>';
+    }
+    root.QuoteDrActivityVisits = {designVisits, locationDetails};
 })(typeof window !== 'undefined' ? window : globalThis);

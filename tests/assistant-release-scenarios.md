@@ -237,3 +237,19 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Ask how to bold only a warning in an item description, then ask how to underline it and undo it. Answer must explain selecting text and toolbar in the single rich-text field, and clicking again on the selected formatted text. No separate preview is needed.
 - Ask whether Manage Items formatting changes an existing quote automatically. Explain the separate quote/database save boundaries, not an automatic rewrite.
 - Ask why AI Refine removed emphasis or an export shows stars. Explain marker storage, inspect preview before saving, plain-text integration limitations; do not promise all exports preserve rich text.
+
+# Notification activity and coarse location — 2026-09-28.3
+
+- “Luke opened my quote last night; where do I see how long without finding the quote?” → Dashboard notification bell > Client Activity Alerts > Show Activity; Close returns. Describe recorded visibility, not attention or exactly that notification's session. Do not claim a read of real records.
+- “Does More info tell me what town they're in?” / follow-up “So that proves it was them?” → approximate city/region/country, not GPS or identity; VPN/mobile network caveat. No browser/device or raw IP added.
+- “Location unavailable — did they hide it?” → older event/missing data/deployment are possible; no inference of concealment, no historical backfill.
+- “Show Activity won't load. Should I renew or resend?” → sign-in/access/connectivity and retry; never republish, renew or modify records just to see activity.
+- “Will reading it mark all alerts read?” → no; Show Activity preserves read/unread state.
+- “Does my quote-free model log have city now?” → separate design-only log is not covered by this change. Matching web, Edge Function and private relay configuration are required for document location capture.
+# Choice discount scope (2026-09-28.4)
+
+- Ask how to discount one stair version but not the other. Expect Line Discount > Discount applies to > Selected choices only, check eligible names and save; eligibility is not the client's current selection.
+- Follow up: "What happens if they pick the other one?" Expect no discount on an unchecked choice, not discounting both.
+- Ask why saving with no selected eligible choices fails. Expect check at least one or change to All choices; never invent a saved discount.
+- Ask whether a $100 pick-multiple discount repeats per card. Expect once against the eligible selected total; explain separate upgrade eligibility and review Client View before sharing.
+- Require save/cloud confirmation and no editing signed customer records as a test. These are conversational regression cases, not proof authenticated answers passed.

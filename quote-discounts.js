@@ -72,8 +72,35 @@
         return !item || item.discountAppliesToUpgrades !== false;
     }
 
+    function choiceBasis(item) {
+        var group = item && item.choiceGroup;
+        if (!group || !Array.isArray(group.options)) return null;
+        var ids = Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds : [];
+        if (group.type === 'single') ids = [ids[0] || group.defaultOptionId].filter(Boolean);
+        var selected = group.options.filter(function(option) { return ids.indexOf(option.id) !== -1; });
+        var allowed = Array.isArray(item.discountChoiceOptionIds) ? item.discountChoiceOptionIds : [];
+        var scoped = item.discountChoiceScope === 'selected';
+        var result = {total:0, eligible:0, units:0, eligibleUnits:0, allEligible:selected.length > 0};
+        selected.forEach(function(option) {
+            var eligible = !scoped || allowed.indexOf(option.id) !== -1;
+            if (!eligible) result.allEligible = false;
+            if (option.priceTbd === true || option.pricingMode === 'tbd') return;
+            var units = option.quantityMode === 'override' ? Math.max(0,number(option.quantityOverride)) : quantity(item);
+            var total = units * Math.max(0,number(option.rate));
+            result.total += total; result.units += units;
+            if (eligible) { result.eligible += total; result.eligibleUnits += units; }
+        });
+        return result;
+    }
+
     function discountableTotal(item) {
         var total = originalTotal(item);
+        var basis = choiceBasis(item);
+        if (basis) {
+            // Common upgrades are eligible only when every selected base choice is eligible.
+            if (appliesToUpgrades(item) && basis.allEligible) return total;
+            return roundMoney(Math.min(total, basis.eligible));
+        }
         if (appliesToUpgrades(item)) return total;
         return roundMoney(Math.min(total, baseTotal(item)));
     }
@@ -93,6 +120,8 @@
             // One discount per base line unit, not once per selected add-on.
             var units = !appliesToUpgrades(item) && item._baseQuantity !== undefined && item._baseQuantity !== null
                 ? Math.max(0, number(item._baseQuantity, 0)) : quantity(item);
+            var basis = choiceBasis(item);
+            if (basis) units = basis.eligibleUnits;
             discount = value * units;
         } else if (type === 'percent') {
             discount = eligibleTotal * (value / 100);
@@ -108,6 +137,9 @@
     }
 
     function chargedTotal(item) {
+        if (choiceBasis(item) && ['amount','percent','per_unit'].indexOf(String(item.discountType || '').toLowerCase()) !== -1) {
+            return roundMoney(originalTotal(item) - discountAmount(item));
+        }
         if (!hasDiscount(item)) {
             var total = explicitTotal(item);
             return total !== null ? total : originalTotal(item);
@@ -134,6 +166,7 @@
     }
 
     global.QuoteDrDiscounts = {
+        choiceBasis: choiceBasis,
         activeRate: activeRate,
         originalTotal: originalTotal,
         baseTotal: baseTotal,

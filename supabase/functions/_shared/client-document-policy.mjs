@@ -1,3 +1,5 @@
+import '../../../quote-discounts.js';
+const choiceDiscounts = globalThis.QuoteDrDiscounts;
 const MAX_DECISION_ITEMS = 1000;
 const MAX_DECISION_GROUPS = 100;
 const MAX_SELECTION_IDS = 100;
@@ -238,7 +240,7 @@ function applyUpgradePricing(baseTotal, parentQuantity, groups) {
   return { total, hasTbd };
 }
 
-function activeItemTotal(item, options = {}) {
+export function activeItemTotal(item, options = {}) {
   if (!isRecord(item) || isPriceTbd(item) || item._removed === true) return 0;
   const quantity = Math.max(0, finiteNumber(item.quantity, 0));
   const discountType = cleanString(item.discountType, 30).toLowerCase();
@@ -291,6 +293,10 @@ function activeItemTotal(item, options = {}) {
   if (groups.length) total = applyUpgradePricing(total, quantity, groups).total;
 
   const discountValue = Math.max(0, finiteNumber(item.discountValue, 0));
+  if (isRecord(item.choiceGroup)) {
+    // Same choice eligibility and caps as the web app, using server-recomputed prices.
+    return rounded(choiceDiscounts.chargedTotal({...item, total, _undiscountedTotal:total}), 2);
+  }
   if (discountType === 'amount') total -= Math.min(total, discountValue);
   if (discountType === 'per_unit') {
     const baseQuantity = Math.max(0, finiteNumber(item._baseQuantity ?? item.quantity, 0));
@@ -522,6 +528,8 @@ function sanitizeItem(source, room) {
   }
   if (source.discountType !== undefined) output.discountType = cleanString(source.discountType, 30);
   if (source.discountLabel !== undefined) output.discountLabel = cleanString(source.discountLabel, 500);
+  if (source.discountChoiceScope !== undefined) output.discountChoiceScope = source.discountChoiceScope === 'selected' ? 'selected' : 'all';
+  if (Array.isArray(source.discountChoiceOptionIds)) output.discountChoiceOptionIds = source.discountChoiceOptionIds.map(cleanId).filter(Boolean).slice(0, MAX_SELECTION_IDS);
   if (source.discountValue !== undefined) {
     output.discountValue = ['amount', 'per_unit'].includes(cleanString(source.discountType, 30).toLowerCase())
       ? scaled(source.discountValue, factor)

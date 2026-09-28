@@ -6,6 +6,8 @@ export const publicArtifactConfig = Object.freeze({
   files: Object.freeze([
     '_headers',
     '_redirects',
+    '_worker.js',
+    '_routes.json',
     '404.html',
 
     // Public, authenticated, client-document, integration, legal, and marketing routes.

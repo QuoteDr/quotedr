@@ -185,7 +185,7 @@
         var toggle = document.getElementById('dashboardSelectMode');
         if (toggle) { toggle.textContent = selectionMode ? 'Done selecting' : 'Select'; toggle.setAttribute('aria-pressed', String(selectionMode)); }
     }
-    async function activity(quoteId, title) {
+    async function activity(quoteId, title, onClose) {
         var dialog = element('dialog', 'qd-appearance');
         dialog.setAttribute('aria-label', 'Activity for ' + title);
         var head = element('div', 'qd-dialog-head');
@@ -193,7 +193,7 @@
         var panel = element('div', '', 'Loading activity…');
         panel.setAttribute('aria-live', 'polite');
         dialog.append(head, element('p', 'text-muted', title), panel);
-        dialog.addEventListener('close', function () { dialog.remove(); }, {once: true});
+        dialog.addEventListener('close', function () { dialog.remove(); if (typeof onClose === 'function') onClose(); }, {once: true});
         document.body.append(dialog); dialog.showModal();
         try {
             var result = await window.loadSecureClientDocumentActivity(quoteId);
@@ -333,7 +333,7 @@
             });
         });
     }
-    window.QuoteDrDashboardUI = {compactCards: compactCards, syncSelection: syncSelection, setUser: setUser, appearance: appearance};
+    window.QuoteDrDashboardUI = {compactCards: compactCards, syncSelection: syncSelection, setUser: setUser, appearance: appearance, activity: activity};
     applyTheme('light');
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
 })();

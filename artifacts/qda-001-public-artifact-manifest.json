@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 139,
-  "totalBytes": 27966965,
-  "treeSha256": "33c623813be29f2b9beceba54e76c644de82c9ed6c73ca3f8e8f626912484cc0",
+  "fileCount": 141,
+  "totalBytes": 27987746,
+  "treeSha256": "fc85e99aedf4f06bb0b4f14117dda410f9fe63d2a2afc2bfd3cfc0b113bc4698",
   "files": [
     {
       "path": "404.html",
@@ -19,6 +19,16 @@
       "path": "_redirects",
       "bytes": 172,
       "sha256": "9a72f5118b79f6bd5de6a1f106c87f9dd05e6a55c61c5e9462cf9eb0816a759e"
+    },
+    {
+      "path": "_routes.json",
+      "bytes": 77,
+      "sha256": "1b9e40434968f635ec6a8f0386287ace9af10ed9a81230bbd9d989efa38fe589"
+    },
+    {
+      "path": "_worker.js",
+      "bytes": 3418,
+      "sha256": "91fbeada58c75cd4a1d9c7daed3dbe94f2d8d42f6b706873a1b0d2ba3639e249"
     },
     {
       "path": "about.html",
@@ -157,8 +167,8 @@
     },
     {
       "path": "client-portal.html",
-      "bytes": 235274,
-      "sha256": "34363d7ba76a177a7b4954c524526c1b69f98c3d53e9cac0c9f34c5eb6e06272"
+      "bytes": 235438,
+      "sha256": "6e7d55e1054151c80dbcbb77db424cd8ddc98ddd0e0de63a674ccb24a3c08dd9"
     },
     {
       "path": "community-starter-templates.js",
@@ -177,13 +187,13 @@
     },
     {
       "path": "dashboard-compact.js",
-      "bytes": 23526,
-      "sha256": "373bc36299b44c2ad02c1d6b877ff3ac45ca5e1f606fcbf20e9b8028d366571c"
+      "bytes": 23601,
+      "sha256": "a0e161d183023ed8612d0367ce61a393fc48dc28fdae6f4d435739e5eed5234b"
     },
     {
       "path": "dashboard.html",
-      "bytes": 417906,
-      "sha256": "b66a836b9881dc0b68f9b2e1cc27f405823d0485acc4acba8bb4fc2428612c97"
+      "bytes": 419474,
+      "sha256": "c1b6ef0ff52511257297d9cc110840c29cb53b610e6dedc7c961951ca6503a66"
     },
     {
       "path": "data/whats-new.json",
@@ -272,13 +282,13 @@
     },
     {
       "path": "interactive-quote-viewer.html",
-      "bytes": 374298,
-      "sha256": "728ca692b113d23a5bbaf25d14bd68ac1d1dcbe22ce094341aa34c43fc4e6fb5"
+      "bytes": 375844,
+      "sha256": "cc0a5129d0d18e62a50bafe310cb91867ca016be4aa8251cb19bcabf826bd8a6"
     },
     {
       "path": "invoice-viewer.html",
-      "bytes": 142601,
-      "sha256": "aabfd59a77bc177984412a3796fbd9de9df5c64d452c5ba0bd93fa4a62f27921"
+      "bytes": 142713,
+      "sha256": "243801869eb1fdc41a566682ccd6bbd4501da43e8c6dc640d35216779c57dcd2"
     },
     {
       "path": "labor-reminders.js",
@@ -337,8 +347,8 @@
     },
     {
       "path": "portal-activity-visits.js",
-      "bytes": 2058,
-      "sha256": "89dfbe53f8a2e7ca7857b5e52122ae5f5553495743abe5b059fa3eb98423c887"
+      "bytes": 3122,
+      "sha256": "067ee104ef4b022c8c8a14a09e06e9ce09b532a822cd664b1d006128f2ba448c"
     },
     {
       "path": "portal-design-policy.mjs",
@@ -372,8 +382,8 @@
     },
     {
       "path": "privacy.html",
-      "bytes": 16497,
-      "sha256": "d5b54e817809d3fe9750b57dbd88a1d215876b4b71a5c872931bec107f7b2391"
+      "bytes": 17117,
+      "sha256": "12fc178b1b66a87b7e5af72c8555e19f9e01b63242c813e754cac560a23adc70"
     },
     {
       "path": "property-memory.js",
@@ -392,8 +402,8 @@
     },
     {
       "path": "qdr-handbook.json",
-      "bytes": 77433,
-      "sha256": "1f18da54512afa2f0d190ffa10079057cb12aa54d2c1fbbae1901157c85dba68"
+      "bytes": 81973,
+      "sha256": "d61c5a904a70c0254daaa9e4253a034298c78a0cf4966927951c024110fbe045"
     },
     {
       "path": "quickbooks-import-controller.js",
@@ -412,8 +422,8 @@
     },
     {
       "path": "quote-builder.html",
-      "bytes": 1543164,
-      "sha256": "198dc0b760720b0e528165952a5f1078cb6a52fd6c2f10c1e1e23c95d2475bfc"
+      "bytes": 1548171,
+      "sha256": "fd5201ce45418fa2fd5ed203775d1f9bdd6c9b463a71d977affa83b3808c3011"
     },
     {
       "path": "quote-calculators.js",
@@ -452,8 +462,8 @@
     },
     {
       "path": "quote-discounts.js",
-      "bytes": 5727,
-      "sha256": "9a3175549bf8f07a6715d69b7471952b749bc7dc713437cb0672127764c6c455"
+      "bytes": 7705,
+      "sha256": "08dda5bfea396d26bf95741da6ab2b9061a50c639a4bcba7e81d736853722d49"
     },
     {
       "path": "quote-find.js",
@@ -577,8 +587,8 @@
     },
     {
       "path": "supabase-v2.js",
-      "bytes": 195474,
-      "sha256": "52b614d8759800905261d1f4ac3c92bf5bca4639d7ee70e6e38239d6dc879b29"
+      "bytes": 196086,
+      "sha256": "fe701610d5f80792e615faa9befccebf3d3a5db65ee666374e4f8039b067e0fd"
     },
     {
       "path": "supplier-materials.js",

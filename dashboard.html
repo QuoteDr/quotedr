@@ -747,10 +747,29 @@
                             '<div class="fw-semibold">' + escapeHtml(title) + (unread ? ' <span class="badge bg-primary ms-1">New</span>' : '') + '</div>' +
                             '<div class="small text-muted">' + escapeHtml(meta || 'Client document') + ' · ' + escapeHtml(timeAgo(event.created_at)) + '</div>' +
                             message +
+                            (event.document_id ? '<button type="button" class="btn btn-sm btn-outline-primary mt-2" data-activity-id="' + escapeHtml(event.id || '') + '" onclick="showNotificationActivity(this)"><i class="fas fa-chart-line me-1" aria-hidden="true"></i>Show Activity</button>' : '<div class="small text-muted mt-2">Activity unavailable: document no longer linked.</div>') +
                         '</div>' +
                     '</div>' +
                 '</div>';
             }).join('');
+        }
+
+        function showNotificationActivity(button) {
+            var id = button && button.getAttribute('data-activity-id');
+            var event = clientActivityEvents.find(function(item) { return String(item.id) === String(id); });
+            if (!event || !event.document_id || !window.QuoteDrDashboardUI || !QuoteDrDashboardUI.activity) return;
+            var modalEl = document.getElementById('clientActivityModal');
+            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            // Release Bootstrap's focus trap before opening the native activity dialog.
+            modalEl.addEventListener('hidden.bs.modal', function() {
+                QuoteDrDashboardUI.activity(event.document_id, [event.client_name, event.quote_number, event.document_title].filter(Boolean).join(' · '), function() {
+                    modalEl.addEventListener('shown.bs.modal', function() {
+                        if (button.isConnected) button.focus();
+                    }, {once: true});
+                    modal.show();
+                });
+            }, {once: true});
+            modal.hide();
         }
 
         async function toggleClientActivityRead(checkbox) {
@@ -4121,7 +4140,7 @@
                 return total + (activityEvent.event_type === 'document_view_duration' ? (parseInt(activityEvent.duration_seconds || 0, 10) || 0) : 0);
             }, 0);
             var timeline = dashboardPortalActivityTimeline(events).slice(0, 20).map(function(activityEvent) {
-                return '<div class="d-flex gap-2 py-2 border-top"><i class="fas ' + dashboardPortalActivityIcon(activityEvent) + ' text-primary mt-1" aria-hidden="true"></i><div><strong class="small">' + escapeHtml(dashboardPortalActivityLabel(activityEvent)) + '</strong><div class="text-muted small">' + escapeHtml(dashboardPortalActivityDate(activityEvent.created_at)) + '</div></div></div>';
+                return '<div class="d-flex gap-2 py-2 border-top"><i class="fas ' + dashboardPortalActivityIcon(activityEvent) + ' text-primary mt-1" aria-hidden="true"></i><div><strong class="small">' + escapeHtml(dashboardPortalActivityLabel(activityEvent)) + '</strong><div class="text-muted small">' + escapeHtml(dashboardPortalActivityDate(activityEvent.created_at)) + '</div>' + QuoteDrActivityVisits.locationDetails(activityEvent) + '</div></div>';
             }).join('');
             var designSeconds = events.reduce((sum,e) => sum + (e.event_type === 'design_view_duration' ? Math.max(0, parseInt(e.duration_seconds,10)||0) : 0), 0);
             var designOpens = events.filter(e => e.event_type === 'design_opened').length;

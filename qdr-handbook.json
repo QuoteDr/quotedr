@@ -1,7 +1,23 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-28.2",
+  "version": "2026-09-28.4",
   "articles": [
+    {
+      "id": "choice-discount-scope",
+      "title": "Choice group discounts: all choices or selected versions only, Was and Now prices",
+      "verifiedAt": "2026-09-28",
+      "release": "2026-09-28.4",
+      "sources": ["quote-builder.html", "quote-discounts.js", "interactive-quote-viewer.html", "supabase/functions/_shared/client-document-policy.mjs", "supabase/functions/_shared/accounting-export.mjs"],
+      "body": "In the builder, add or edit a line with a choice group. Under Line Discount choose the discount type, value and label. Discount applies to defaults to All choices for compatibility with existing discounts. To discount only certain versions, choose Selected choices only and check the eligible choice names, then Save Changes (or add the item). At least one choice must be checked. Eligibility is independent of the client's current selection: switching to an unchecked version removes that discount. For 12 stairs at $225 each, $25 off each unit gives $300 off and $2,400 total; an unchecked $235 version remains $2,820. Single-choice client cards show Was, the discount label and Now alongside the discounted total, consistent with normal line items. Pick-multiple groups show the combined selected-choice discount below the cards; a fixed amount is applied once, not once per card. Per-unit discounts use eligible choice quantities and discounts cannot exceed eligible prices. Apply discount to selected upgrades/add-ons remains separate; shared upgrades are eligible only when all currently selected base choices are discount-eligible. Price TBD does not become a priced item. Save the quote and confirm cloud save before sharing, then inspect Client View and switch choices to verify totals. Cancel does not save modal changes. Keep a backup before editing pricing; do not alter accepted documents just to test. If the choice selector is absent, confirm the line is grouped and a discount is enabled. Existing discounts remain All choices until explicitly changed. Web and matching backend pricing functions must be released together; refresh after release if the preview is stale. Local checks do not prove a production acceptance or accounting export."
+    },
+    {
+      "id": "notification-activity-location",
+      "title": "Notification bell alerts: Show Activity, viewing time and approximate location city region country",
+      "verifiedAt": "2026-09-28",
+      "release": "2026-09-28.3",
+      "sources": ["dashboard.html", "dashboard-compact.js", "portal-activity-visits.js", "supabase-v2.js", "_worker.js", "supabase/functions/client-document/index.ts", "supabase/functions/_shared/activity-location.mjs", "privacy.html"],
+      "body": "On Dashboard, open Client Activity Alerts with the notification bell and choose Show Activity on a linked quote or invoice alert. This opens the same owner-only activity report without finding the document card or sharing it again. Close returns to the alerts panel and keeps the alert's read/unread state unchanged. Sign in with access to that document. A deleted or unlinked document may have no activity available; if Could not load activity appears, close and retry after checking login/connectivity. Do not renew, republish, delete or restore customer documents merely to inspect activity. Document viewing time is the recorded page-visible time for the returned events, not proof of attention, a unique person's time, or necessarily the duration of the single alert. Newest 20 visits/actions are displayed; document totals exclude design time. Expand More info on an activity entry for approximate city, region and country. This is a Cloudflare network estimate, not GPS or identity evidence; VPNs and mobile networks may show another city. Location unavailable is normal for older events, missing network data or unconfigured hosting. No historical location is backfilled. The matching web release, client-document Edge Function and matching private relay secret on Cloudflare and Supabase must be deployed to capture new locations. No raw IP or browser/device details are added to these records. Location is implemented for quote/invoice document activity, not the separate design-only portal log. Failed telemetry can miss visits or time; empty history does not prove no visit. Show Activity does not edit documents, send client messages, mark alerts read or change payments. Keep normal backups before actual document edits. Local tests do not prove live capture or chatbot answer quality."
+    },
     {
       "id": "standalone-design-activity",
       "title": "Design-only portal activity: visits, rendering opens, repeat views and external video clicks without a quote",
@@ -347,9 +363,9 @@
     },
     {
       "id": "saved-choice-groups",
-      "title": "Saved Choice Groups",
-      "verifiedAt": "2026-09-15",
-      "release": "6c4ba1f",
+      "title": "Saved Choice Groups: let my client pick one material or option",
+      "verifiedAt": "2026-09-28",
+      "release": "2026-09-28.4",
       "sources": [
         "quote-builder.html",
         "quote-items.js"

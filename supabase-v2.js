@@ -999,7 +999,7 @@ async function logSecureClientDocumentEvent(documentId, token, eventType, payloa
     payload = payload || {};
     if (!documentId || !token || !eventType) return { error: 'Missing secure activity details' };
     try {
-        const response = await fetch(CLIENT_DOCUMENT_FUNCTION_URL, {
+        const activityRequest = {
             method: 'POST',
             headers: payload.headers || getSupabaseAnonFunctionHeaders(),
             keepalive: payload.keepalive === true,
@@ -1014,7 +1014,14 @@ async function logSecureClientDocumentEvent(documentId, token, eventType, payloa
                 durationSeconds: payload.durationSeconds,
                 metadata: payload.metadata || {}
             })
-        });
+        };
+        // The same-origin relay adds signed, coarse Cloudflare location. No IP/device
+        // data enters the event. A missing relay safely retains ordinary logging.
+        const useRelay = typeof location !== 'undefined' && location.protocol === 'https:';
+        let response = await fetch(useRelay ? '/api/document-activity' : CLIENT_DOCUMENT_FUNCTION_URL, activityRequest);
+        if (useRelay && ((response.status === 404 && !response.headers.get('X-QDR-Activity-Proxy')) || response.headers.get('X-QDR-Activity-Proxy') === 'not-forwarded')) {
+            response = await fetch(CLIENT_DOCUMENT_FUNCTION_URL, activityRequest);
+        }
         const data = await response.json().catch(function() { return {}; });
         if (!response.ok || data.error) throw new Error(data.error || 'Secure client activity request failed');
         return { data: data.event, skipped: data.skipped };

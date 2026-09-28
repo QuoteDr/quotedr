@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { verifiedActivityLocation } from "../_shared/activity-location.mjs";
 import { MAX_DESIGN_BYTES } from '../../../portal-design-policy.mjs';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import {
@@ -1169,6 +1170,10 @@ async function logDocumentEvent(req: Request, body: Record<string, unknown>) {
   if (!sessionId) return json({ error: "Missing activity session id" }, 400);
 
   const activePortalId = portalId(anchor || target) || portalId(target) || null;
+  const activityMetadata = sanitizeEventMetadata(body.metadata);
+  // Reserved location fields may only be populated by our signed Cloudflare relay.
+  for (const key of Object.keys(activityMetadata)) if (key.startsWith('location_')) delete activityMetadata[key];
+  Object.assign(activityMetadata, await verifiedActivityLocation(req, body, Deno.env.get('QDR_ACTIVITY_LOCATION_SECRET') || ''));
   const supabase = adminClient();
   const { data, error } = await supabase
     .from("portal_document_events")
@@ -1180,7 +1185,7 @@ async function logDocumentEvent(req: Request, body: Record<string, unknown>) {
       event_type: eventType,
       session_id: sessionId,
       duration_seconds: sanitizeDurationSeconds(body.durationSeconds || body.duration_seconds),
-      metadata: sanitizeEventMetadata(body.metadata),
+      metadata: activityMetadata,
     })
     .select("*")
     .maybeSingle();

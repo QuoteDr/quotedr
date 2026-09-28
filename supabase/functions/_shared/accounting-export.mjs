@@ -249,6 +249,7 @@ function discountAmount(item) {
 
 function chargedLineTotal(item) {
   if (!item || priceIsTbd(item)) return 0;
+  if (item.choiceGroup) return activeItemTotal(item);
   const discount = discountAmount(item);
   if (discount > 0) return roundMoney(originalLineTotal(item) - discount);
   if (item.total !== undefined && item.total !== null && item.total !== '' && Number.isFinite(Number(item.total))) {
@@ -608,3 +609,4 @@ export function accountingExportFilename(date = new Date()) {
   const day = Number.isFinite(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
   return `quotedr-accounting-transactions-${day}.csv`;
 }
+import { activeItemTotal } from './client-document-policy.mjs';

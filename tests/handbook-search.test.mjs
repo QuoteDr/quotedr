@@ -4,6 +4,9 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Choice group discount only one stair version selected choices','choice-discount-scope'],
+ ['All choices discount Was Now client cards','choice-discount-scope'],
+ ['Selected choices only no choices checked discount','choice-discount-scope'],
  ['Find in Quote Show Values on by default reopen hide prices','find-quote-show-values'],
  ['Bold underline italic highlight item description formatting','item-description-formatting'],
  ['Remove emphasis markers from reusable description preview','item-description-formatting'],
@@ -134,6 +137,10 @@ for(const q of ['Track rendering views without a quote', 'Design-only portal act
 assert(searchHandbook(book,'Does that prove they watched it?', 'design-only portal activity').some(a=>a.id==='standalone-design-activity'));
 assert(searchHandbook(book,'How long was the model visible?', 'design-only portal activity').some(a=>a.id==='standalone-design-activity'));
 console.log('Handbook retrieval: questions, follow-up, unknown, validation and limit passed');
+for (const q of ['Show Activity from notification bell', 'Client Activity Alerts approximate city region country', 'Location unavailable on a quote visit', 'Can a VPN change the activity location?']) {
+ assert(searchHandbook(book,q).some(a=>a.id==='notification-activity-location'),q);
+}
+assert(searchHandbook(book,'Does this prove it was them?', 'Client Activity Alerts approximate location').some(a=>a.id==='notification-activity-location'));
 for(const q of ['Empty portal client link zero documents', 'Get a client link before adding a quote', 'Client link unavailable no documents']) {
  assert(searchHandbook(book,q).some(a=>a.id==='empty-portal-client-link'),q);
 }

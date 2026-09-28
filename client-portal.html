@@ -2535,7 +2535,7 @@
     </div>
   </main>
   <div class="portal-access-log-note">
-    <i class="fas fa-shield-halved me-1"></i>For security and service quality, document access may be logged.
+    <i class="fas fa-shield-halved me-1"></i>Document access and visible time may be logged for your contractor, including approximate city, region and country from your network. Location is not GPS and may be inaccurate.
   </div>
 </div>
 
@@ -4971,7 +4971,7 @@
       if (!panel) return;
       const summary = portalDocumentActivitySummary(events);
       const timeline = portalDocumentActivityTimeline(events).slice(0, 40).map(function(event) {
-        return '<li><i class="fas ' + portalActivityEventIcon(event) + '"></i><div><strong>' + escapeHtml(portalActivityEventLabel(event)) + '</strong><div class="text-muted">' + escapeHtml(formatPortalActivityDate(event.created_at)) + '</div></div></li>';
+        return '<li><i class="fas ' + portalActivityEventIcon(event) + '"></i><div><strong>' + escapeHtml(portalActivityEventLabel(event)) + '</strong><div class="text-muted">' + escapeHtml(formatPortalActivityDate(event.created_at)) + '</div>' + QuoteDrActivityVisits.locationDetails(event) + '</div></li>';
       }).join('');
       panel.innerHTML = '<div class="portal-activity-summary">' +
         '<div class="portal-activity-stat"><strong>' + escapeHtml(formatPortalActivityDate(summary.lastOpened)) + '</strong><span>Last opened</span></div>' +

@@ -1216,6 +1216,9 @@
         .choice-option-btn.choice-option-selected .opacity-75 {
             opacity: 0.9 !important;
         }
+        .choice-option-selected .choice-discount-details .text-muted,
+        .choice-option-selected .choice-discount-details .text-success { color: inherit !important; }
+        .choice-discount-details { overflow-wrap: anywhere; }
         .choice-option-upgrades-wrap {
             clear: both;
             display: grid;
@@ -3330,6 +3333,7 @@ if (location.search.includes('debug')) {
                 total += optionQty * rate;
             });
             item.total = total;
+            item._undiscountedTotal = total;
             item.rate = group.type === 'single' && selected[0] ? (parseFloat(selected[0].rate) || 0) : rateSum;
             if (selectedEnhancements.length) item.rate = rateSum;
             if (group.type === 'single' && selected[0] && isViewerPriceTbd(selected[0])) {
@@ -4615,7 +4619,14 @@ if (location.search.includes('debug')) {
             visibleOptions.forEach(function(option) {
                 var checked = selectedIds.indexOf(option.id) !== -1;
                 var optionQty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : (parseFloat(item.quantity) || 0);
-                var optionTotal = viewerItemMarkedAmount(room, item, optionQty * (parseFloat(option.rate) || 0));
+                var optionRawTotal = optionQty * (parseFloat(option.rate) || 0);
+                var optionDiscountItem = Object.assign({}, item, {
+                    quantity: optionQty, rate: option.rate, total: optionRawTotal, _undiscountedTotal: optionRawTotal,
+                    _baseRate: option.rate, _baseQuantity: optionQty, upgraded: false, upgrade: null,
+                    choiceGroup: Object.assign({}, group, {type:'single', selectedOptionIds:[option.id], defaultOptionId:option.id})
+                });
+                var showOptionDiscount = group.type !== 'multiple' && !isViewerPriceTbd(option) && qvDiscounts().hasDiscount(optionDiscountItem);
+                var optionTotal = viewerItemMarkedAmount(room, item, showOptionDiscount ? qvDiscounts().chargedTotal(optionDiscountItem) : optionRawTotal);
                 var optionPriceText = isViewerPriceTbd(option) ? viewerPriceTbdLabel() : viewerMoney(optionTotal);
                 var optionRateText = isViewerPriceTbd(option) ? viewerPriceTbdLabel() : viewerMoney(viewerItemMarkedAmount(room, item, option.rate));
                 var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
@@ -4623,9 +4634,13 @@ if (location.search.includes('debug')) {
                 html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>' + optionPriceText + '</strong></div>';
                 if (option.itemDescription || option.description) html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.itemDescription || option.description) + '</div>';
                 html += '<div class="small opacity-75 mt-1">' + optionQty + ' ' + escapeHtml(option.unitType || item.unitType || '') + ' @ ' + optionRateText + '</div>';
+                if (showOptionDiscount) html += '<div class="choice-discount-details mt-2">' + qvDiscountDetailsHtml(optionDiscountItem, room) + '</div>';
                 html += '</button>' + (!isSignedDiff && option.photo ? '<div class="viewer-choice-option-photo-actions">' + renderViewerPhotoButton(option.photos || option.photo, 'Picture', 'btn-outline-secondary', option.photosFull || option.photoFull) + '</div>' : '') + '</div>';
             });
             html += '</div>';
+            if (group.type === 'multiple' && item.discountType && item.discountType !== 'none') {
+                html += '<div class="small mt-2">Discount applies once to the eligible selected choices, not separately to each card.</div>' + qvDiscountDetailsHtml(item, room);
+            }
             html += renderViewerChoiceGroupEnhancements(roomIdx, itemIndex, item, isSignedDiff, choicesLocked);
             html += renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff, choicesLocked);
             if (groupNote) {
@@ -6741,7 +6756,7 @@ if (location.search.includes('debug')) {
         }
     </script>
     <div class="text-center text-muted small py-3 d-print-none">
-        <i class="fas fa-shield-halved me-1"></i>For security and service quality, document access may be logged.
+        <i class="fas fa-shield-halved me-1"></i>Document access and visible time may be logged for your contractor, including approximate city, region and country from your network. Location is not GPS and may be inaccurate.
     </div>
 </body>
 </html>

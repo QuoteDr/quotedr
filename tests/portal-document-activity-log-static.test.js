@@ -55,7 +55,7 @@ assert(portalSource.includes('renderPortalDocumentActivityPanel'), 'client porta
 assert(portalSource.includes('portalDocumentActivitySummary'), 'client portal should summarize activity');
 assert(portalSource.includes('portalDocumentActivityTimeline'), 'client portal should combine heartbeat durations into viewing sessions');
 assert(portalSource.includes('view.duration_seconds +='), 'viewing sessions should accumulate duration heartbeat seconds');
-assert(portalSource.includes('For security and service quality, document access may be logged.'), 'client portal should show the client logging notice');
+assert(portalSource.includes('Document access and visible time may be logged for your contractor, including approximate city, region and country'), 'client portal should disclose document activity and approximate location');
 assert(portalSource.includes('pdf_opened'), 'portal PDF sharing flow should log PDF opens');
 
 console.log('portal document activity log static test passed');
