@@ -143,6 +143,10 @@ for(const q of ['Track rendering views without a quote', 'Design-only portal act
 assert(searchHandbook(book,'Does that prove they watched it?', 'design-only portal activity').some(a=>a.id==='standalone-design-activity'));
 assert(searchHandbook(book,'How long was the model visible?', 'design-only portal activity').some(a=>a.id==='standalone-design-activity'));
 console.log('Handbook retrieval: questions, follow-up, unknown, validation and limit passed');
+for (const q of ['Portal amount still owing on Needs Review quotes', 'Portal document total instead of outstanding balance', 'Portal theme recorded payments missing']) {
+ assert(searchHandbook(book,q).some(a=>a.id==='portal-document-amount-display'),q);
+}
+assert(searchHandbook(book,'Even before acceptance?', 'portal theme amount still owing').some(a=>a.id==='portal-document-amount-display'));
 for (const q of ['Deposit already covered but balance remains', 'Deposit still due after partial payments', 'Deposit summary stale do I enter payment twice?']) {
  assert(searchHandbook(book,q).some(a=>a.id==='quote-deposit-paid-summary'),q);
 }

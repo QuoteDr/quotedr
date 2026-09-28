@@ -5300,8 +5300,6 @@
       const amounts = portalDocumentAmounts(quote);
       if (documentIsInvalid(quote)) return { cents: amounts.totalCents, label: 'Reference total' };
       if (portalAmountDisplay === 'total') return { cents: amounts.totalCents, label: 'Total' };
-      const status = quoteStatus(quote);
-      if (!isInvoiceDocument(quote) && !['accepted', 'paid'].includes(status)) return { cents: amounts.totalCents, label: 'Quote total' };
       return { cents: amounts.balanceCents, label: 'Amount still owing' };
     }
 

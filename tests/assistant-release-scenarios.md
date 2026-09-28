@@ -261,6 +261,12 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - "I saved defaults, is my client link updated?" → no, do not claim republishing or cloud quote save.
 - "The slider does nothing" → check Always show full descriptions and the separate scope/job-note controls.
 - "Storage failed, should I refresh?" → keep unsaved work open and preserve/export before recovery, never clear browser storage.
+# Portal outstanding balance — 2026-09-28.8
+
+- "Needs Review quote shows original total despite payments" → Amount still owing now subtracts recorded payments regardless of acceptance. Check Document amounts and per-portal custom-theme override; do not duplicate payments.
+- "Even before acceptance?" → yes for the display; this does not issue an invoice or change payment due terms.
+- "Can I show the full value instead?" → choose Document total and save the intended default or portal override; preserve unsaved work before refreshing.
+
 # Deposit summary after recorded payments — 2026-09-28.7
 
 - Ask: "My client paid nearly everything. Why request a 50% deposit?" Expect: ordinary quote deposit split hides once recorded payments cover its requirement; Balance Due remains. No claim that QDR verified receipt.

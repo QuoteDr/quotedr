@@ -15,7 +15,12 @@ assert.equal(balance.amounts({...row,data:{paymentsReceived:{amount:5000}}}).bal
 assert.equal(balance.amounts({...row,status:'paid',data:{}}).balanceCents,0);
 assert.equal(balance.amounts({...row,data:{paymentStatus:'paid'}}).balanceCents,0);
 assert.equal(balance.display({...row,status:'accepted'}).cents,274391);
-assert.deepEqual(balance.display({...row,status:'sent',data:{}}),{cents:474391,label:'Quote total'});
+assert.deepEqual(balance.display({...row,status:'sent',data:{}}),{cents:474391,label:'Amount still owing'});
+for (const status of ['sent','draft','needs_review','accepted']) {
+ const revised={total:230925.25,status,data:{paymentsReceived:{amount:230000}}};
+ assert.deepEqual(balance.display(revised),{cents:92525,label:'Amount still owing'});
+ assert.deepEqual(total.display(revised),{cents:23092525,label:'Total'});
+}
 assert.deepEqual(balance.display({...row,status:'voided'}),{cents:474391,label:'Reference total'});
 assert.equal(balance.display({...row,total:null}).cents,null);
 assert.equal(balance.amounts({...row,total:0,data:{}}).balanceCents,0);
