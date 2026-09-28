@@ -4517,7 +4517,7 @@
                                         <button type="button" class="btn btn-sm btn-outline-primary refine-desc-btn" style="font-size:0.75rem;padding:2px 8px;">AI Refine</button>
                                     </div>
                                 </div>
-                                <textarea class="form-control form-control-sm item-description-textarea mt-2" rows="3" placeholder="e.g., Complete drywall installation including hanging, mudding, taping, sanding and priming. Professional finish ready for paint." spellcheck="true" oninput="markPricingDirty()">${item.itemDescription || ''}</textarea>
+                                <textarea class="form-control form-control-sm item-description-textarea mt-2" rows="3" placeholder="e.g., Complete drywall installation including hanging, mudding, taping, sanding and priming. Professional finish ready for paint." spellcheck="true" oninput="markPricingDirty()">${manageItemsEscape(item.itemDescription || '')}</textarea>
                             </div>
                         </td>
                     </tr>

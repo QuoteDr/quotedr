@@ -1,0 +1,10 @@
+const assert = require('node:assert/strict');
+require('../description-format.js');
+const render = globalThis.QDRDescriptionFormat.render;
+assert.equal(render('Plain <script>x</script> & text'), 'Plain &lt;script&gt;x&lt;/script&gt; &amp; text');
+assert.equal(render('**Bold** *italic* __under__ ==bright=='), '<strong>Bold</strong> <em>italic</em> <u>under</u> <mark>bright</mark>');
+assert.equal(render('==**Important**=='), '<mark><strong>Important</strong></mark>');
+assert.equal(render('***Both***'), '<strong><em>Both</em></strong>');
+assert.equal(render('**unclosed'), '**unclosed');
+assert.equal(render('line 1\nline 2'), 'line 1\nline 2');
+console.log('Description formatting safety and rendering passed');

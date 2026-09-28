@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="description-format.js?v=2026092801"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#475569">
@@ -2667,7 +2668,7 @@ if (location.search.includes('debug')) {
         }
 
         function formatDescriptionText(value) {
-            return escapeHtml(value).replace(/\n/g, '<br>');
+            return QDRDescriptionFormat.render(value).replace(/\n/g, '<br>');
         }
 
         function hexToRgb(hex) {

@@ -48,4 +48,5 @@ assert.equal(ctx.deleteQuoteFindItems([{room,item:a}]),false);
 ctx.quoteDataIsPortalLockedForBuilder=()=>true;
 assert.equal(ctx.deleteQuoteFindItems([{room,item:b}]),false);
 assert.equal(pushes,1);
-console.log('Bulk find deletion: identity validation, one undo snapshot, retained originals and locked guard passed');
+assert.match(fs.readFileSync('quote-find.js','utf8'), /function open\(getRooms\)\s*\{\s*let showValues = true;/);
+console.log('Bulk find deletion and default-on values passed');

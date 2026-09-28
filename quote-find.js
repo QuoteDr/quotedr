@@ -1,7 +1,6 @@
 (function(global) {
     'use strict';
     let lastQuery = '';
-    let showValues = false;
     function valuesText(room, item) {
         const quantity = Number(item.quantity);
         const qty = item.quantity !== '' && item.quantity != null && Number.isFinite(quantity) ? quantity.toLocaleString(undefined, {maximumFractionDigits: 6}) : 'Not set';
@@ -31,6 +30,7 @@
         return results;
     }
     function open(getRooms) {
+        let showValues = true;
         const existing = document.getElementById('quoteFindDialog');
         if (existing) { existing.querySelector('input').focus(); return; }
         const previousFocus = document.activeElement;

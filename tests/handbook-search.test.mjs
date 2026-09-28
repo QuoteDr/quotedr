@@ -4,6 +4,10 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Find in Quote Show Values on by default reopen hide prices','find-quote-show-values'],
+ ['Bold underline italic highlight item description formatting','item-description-formatting'],
+ ['Remove emphasis markers from reusable description preview','item-description-formatting'],
+ ['AI Refine changed formatting markers before saving','item-description-formatting'],
  ['Compressed by Client accordion organize alphabetical drag order','dashboard-settings-and-feedback'],
  ['How do I change dashboard Command Center dark theme appearance?','dashboard-settings-and-feedback'],
  ['Where are dashboard backup export buttons now?','saving-backups-and-recovery'],

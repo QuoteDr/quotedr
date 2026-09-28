@@ -20,6 +20,7 @@ export const publicArtifactConfig = Object.freeze({
     'quote-profit-report.js',
     'quote-pdf-export.js',
     'quote-find.js',
+    'description-format.js',
   'quote-backups.js',
   'quote-folder-backups.js',
     'portal-activity-visits.js',

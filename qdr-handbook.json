@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-28.1",
+  "version": "2026-09-28.2",
   "articles": [
     {
       "id": "standalone-design-activity",
@@ -194,10 +194,10 @@
     {
       "id": "find-quote-show-values",
       "title": "Find in Quote: Show Values for matching quantities and prices",
-      "verifiedAt": "2026-09-18",
-      "release": "2026-09-18.2",
+      "verifiedAt": "2026-09-28",
+      "release": "2026-09-28.2",
       "sources": ["quote-find.js", "quote-builder.html"],
-      "body": "Open the builder Tools menu > Find in Quote. Search item names, categories, descriptions, job notes or rooms; all search words must match. Turn on Show Values to display each result's actual Quantity and unit, Rate (before discounts) and Line total (before tax). Rate includes applicable markup and the active rate; line totals use the builder's discount and change-order calculations. Price TBD is labelled instead of shown as a zero price. Items excluded from the quote total are labelled Not included in quote total. The toggle starts off and is remembered only within the current page session, including closing and reopening Find in Quote. It does not edit or save quote data or affect client views. Results show stored quantities, not measurements extracted from descriptions. Search can match incidental mentions of drywall or other work: inspect each match before adding quantities and keep square feet, linear feet and other units separate. There is no automatic aggregate total. Toggle off to hide values; the search text and scroll position remain. Click a result title to close search and jump to that item."
+      "body": "Open the builder Tools menu > Find in Quote. Search item names, categories, descriptions, job notes or rooms; all search words must match. Show Values starts ON every time the modal opens, displaying each result's actual Quantity and unit, Rate (before discounts) and Line total (before tax). You can turn it off while searching; changing the search keeps that choice until the modal closes. Reopening turns values on again. Rate includes applicable markup and the active rate; line totals use the builder's discount and change-order calculations. Price TBD is labelled instead of shown as a zero price. Items excluded from the quote total are labelled Not included in quote total. This does not edit or save quote data or affect client views. Results show stored quantities, not measurements extracted from descriptions. Search can match incidental mentions of drywall or other work: inspect each match before adding quantities and keep square feet, linear feet and other units separate. There is no automatic aggregate total. Toggle off to hide values; the search text and scroll position remain. Click a result title to close search and jump to that item."
     },
     {
       "id": "pdf-print-layout-size",
@@ -325,6 +325,14 @@
         "quote-items.js"
       ],
       "body": "- Tools > Import Old Quote accepts supported PDF, image, spreadsheet and text sources. Parse Quote, review rooms, descriptions, quantities, rates and totals, then Apply to Quote. It can replace the quote or append rooms.\n- Missing-unit labels can be chosen in the importer. Review warnings and the review acknowledgement can block Apply until checked. Save Selected Items saves selected reusable items to the library; Apply to Quote is a separate action.\n- Undo Import requests confirmation before restoring the pre-import quote. Do not promise it remains available after refresh or that later edits will be preserved.\n- AI Refine is available for reusable descriptions, job-specific notes and highlight explanations. It improves wording; the user should verify scope and facts before applying.\n- Job-specific notes belong to the current job; reusable descriptions belong to the item template. Do not advise saving job-specific details into the reusable database."
+    },
+    {
+      "id": "item-description-formatting",
+      "title": "Description formatting markers: bold, italic, underline and AI Refine",
+      "verifiedAt": "2026-09-28",
+      "release": "2026-09-28.2",
+      "sources": ["description-format.js", "quote-builder.html", "quote-items.js", "invoice-viewer.html", "interactive-quote-viewer.html"],
+      "body": "- In the builder Add/Edit Line Item or Manage Items expanded item details, select part of the reusable description, then click Bold, Italic, Underline or Highlight. Formatting appears directly in the same editable text field, without a second preview. These controls also appear for the builder job-specific note.\n- Existing **bold**, *italic*, __underline__ and ==highlight== markers are displayed as formatting when the editor opens. Select formatted text and click its button to toggle emphasis. To remove highlighting select the whole highlighted segment. Highlight is yellow. Browser printing may require Background graphics enabled to print highlighting.\n- Save Changes saves the quote line; Save To Database or Update Database explicitly changes the reusable saved item. In Manage Items use Save Changed or Save All. Cancel does not save. Keep a backup before bulk edits. Existing quotes are not automatically rewritten when a saved item changes.\n- Formatting markers remain in the stored description for compatibility, not arbitrary HTML. Plain-text exports or integrations may show markers. AI Refine may alter formatting markers: review the field before saving. Missing or unmatched markers display literally. Paste inserts plain text, not external HTML styling. No fonts, custom colours or links are supported. The controls do not format the item name or upgrade-option fields."
     },
     {
       "id": "manage-items-and-saved-pricing",

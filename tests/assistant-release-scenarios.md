@@ -230,3 +230,10 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Ask whether replacing a model forces everyone through again. Explain completion is preserved; owner uses Presentation order > project > Require another guided review > Save presentation to deliberately reset.
 - Ask “Completion was not saved, can I close now?” Explain Retry saving completion and wait for confirmation; refresh/review on conflicts. Do not claim success or approval.
 - Ask whether Replay presentation locks the portal again. It is optional and does not clear saved completion. Partial unfinished progress remains page-local.
+# Item description formatting — 2026-09-28.2
+
+- Ask why Find in Quote shows prices automatically, then how to hide them. Explain Show Values starts on each time the modal opens; turning it off lasts while the modal stays open, including query changes. It does not change quote data or client views.
+
+- Ask how to bold only a warning in an item description, then ask how to underline it and undo it. Answer must explain selecting text and toolbar in the single rich-text field, and clicking again on the selected formatted text. No separate preview is needed.
+- Ask whether Manage Items formatting changes an existing quote automatically. Explain the separate quote/database save boundaries, not an automatic rewrite.
+- Ask why AI Refine removed emphasis or an export shows stars. Explain marker storage, inspect preview before saving, plain-text integration limitations; do not promise all exports preserve rich text.
