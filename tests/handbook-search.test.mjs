@@ -4,6 +4,14 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Compressed by Client accordion organize alphabetical drag order','dashboard-settings-and-feedback'],
+ ['How do I change dashboard Command Center dark theme appearance?','dashboard-settings-and-feedback'],
+ ['Where are dashboard backup export buttons now?','saving-backups-and-recovery'],
+ ['Activity directly without opening Client Portal expired quote','expired-quote-portal-activity'],
+ ['Activity failed does that mean client never viewed quote?','expired-quote-portal-activity'],
+ ['Does Cancel save my custom client order?','dashboard-settings-and-feedback'],
+ ['Dashboard appearance theme: will that change client documents too?','dashboard-settings-and-feedback'],
+ ['Client order did not persist after changing browser','dashboard-settings-and-feedback'],
  ['Empty portal missing logo shows Your Contractor branding','quote-free-portal-branding'],
  ['Design-only portal wrong colours no quote theme','quote-free-portal-branding'],
  ['Should I add a placeholder quote to restore portal branding?','quote-free-portal-branding'],

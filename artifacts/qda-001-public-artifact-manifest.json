@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 136,
-  "totalBytes": 27918111,
-  "treeSha256": "e8eab9bfe2d47ce50d8635089a045569a72126ba0a37afce7955f2676b70770c",
+  "fileCount": 138,
+  "totalBytes": 28050990,
+  "treeSha256": "e068136184527ce69e540e46b54feacb1c85f5f23f395d8dd2485404791e98d4",
   "files": [
     {
       "path": "404.html",
@@ -171,9 +171,19 @@
       "sha256": "bee2b05e880eeeac854508821a8093f9fc57736f04835c5e42f1c0e854db80be"
     },
     {
+      "path": "dashboard-compact.css",
+      "bytes": 12530,
+      "sha256": "fcf89dba9313916719588fd6d3695dc4fbccd7b59d241254a1914340a6d355a3"
+    },
+    {
+      "path": "dashboard-compact.js",
+      "bytes": 23526,
+      "sha256": "373bc36299b44c2ad02c1d6b877ff3ac45ca5e1f606fcbf20e9b8028d366571c"
+    },
+    {
       "path": "dashboard.html",
-      "bytes": 416987,
-      "sha256": "45b9ce8f82ec89748382b248567df5cd23663e8028985c394be49e0d244e76cb"
+      "bytes": 417906,
+      "sha256": "b66a836b9881dc0b68f9b2e1cc27f405823d0485acc4acba8bb4fc2428612c97"
     },
     {
       "path": "data/whats-new.json",
@@ -202,8 +212,8 @@
     },
     {
       "path": "handbook-search.mjs",
-      "bytes": 1524,
-      "sha256": "32810afddec1c077e794128f8168b560aa2bc3d23f6fb36c3c32426e6bc20c00"
+      "bytes": 1543,
+      "sha256": "7bd574659486d08626020dbf3421fb27872c0d004903b035f766e78e9983d5a7"
     },
     {
       "path": "handbook.html",
@@ -327,13 +337,13 @@
     },
     {
       "path": "portal-design-policy.mjs",
-      "bytes": 1586,
-      "sha256": "e2873d4266fef0d2453c6b0e97f03570ae850e830620c61dbcad31084f5196b5"
+      "bytes": 1607,
+      "sha256": "9caadd774d4ee5c6655f0a3f9721104d58774479838241ef5873f2bd0468baf8"
     },
     {
       "path": "portal-design-prepare.mjs",
-      "bytes": 4126,
-      "sha256": "2c0a9d72dbc5389c068ee9adb54ca5f464d3285b17681d1c0327ba98514b891d"
+      "bytes": 4177,
+      "sha256": "661faad53e6dba8ddc56cc0e8800af7bae642e74dde363f15a9514c9c0506b32"
     },
     {
       "path": "portal-designs.css",
@@ -377,8 +387,8 @@
     },
     {
       "path": "qdr-handbook.json",
-      "bytes": 73216,
-      "sha256": "0c34ee64e04ebe715bee80d851301963a33b7c34fb1e33a130d5536a01d90f4e"
+      "bytes": 75635,
+      "sha256": "b51200f459c49e6b971db041903172bbfa1ecac09492d6c37ddf316c99facb61"
     },
     {
       "path": "quickbooks-import-controller.js",
@@ -557,8 +567,8 @@
     },
     {
       "path": "storage-budget-client.mjs",
-      "bytes": 2409,
-      "sha256": "66def50fcf499945cc5a603b333398abdd0fadf242cf3e93003d4ec54da72c7b"
+      "bytes": 2455,
+      "sha256": "d03f6b2f05f5ae98eee2406c8d102522a2fad56cb0079f8c84459b25eaefe35c"
     },
     {
       "path": "supabase-v2.js",
@@ -612,13 +622,13 @@
     },
     {
       "path": "vendor/pdfjs-6.3.289/pdf.mjs",
-      "bytes": 860384,
-      "sha256": "495588717f62303a839e91a5343deebf1b41f52e2f9f6361e73dee6ea6a4355e"
+      "bytes": 888649,
+      "sha256": "4d9d77a3662e250da3b4f2b7fc467c8a562cd1ef59548fed8dd929cd18a766e4"
     },
     {
       "path": "vendor/pdfjs-6.3.289/pdf.worker.mjs",
-      "bytes": 2228489,
-      "sha256": "f2870db902eaff8397442c912b69459980ac91f6f4b5ed827167b12cf7057930"
+      "bytes": 2293572,
+      "sha256": "2c36ad19110a73873fbdcc30124a445e1e681a5bbe6463546d56696f1124ced5"
     },
     {
       "path": "videos/tutorials/ai-voice-quote.mp4",

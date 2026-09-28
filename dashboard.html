@@ -190,6 +190,9 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="dashboard-compact.css?v=2026092501">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js" defer></script>
+    <script src="dashboard-compact.js?v=2026092501" defer></script>
     <script src="analytics.js?v=1778059000"></script>
 </head>
 <body>
@@ -398,11 +401,15 @@
                                     <option value="all">All Statuses</option>
                                     <option value="draft">Draft</option>
                                     <option value="sent">Sent</option>
+                                    <option value="viewed">Viewed</option>
+                                    <option value="in_review">In Review</option>
                                     <option value="accepted">Accepted</option>
                                     <option value="invoiced">Invoiced</option>
                                     <option value="paid">Paid</option>
                                     <option value="voided">Invalid / Voided</option>
                                     <option value="declined">Declined</option>
+                                    <option value="pending_approval">Pending CO Approval</option>
+                                    <option value="approved">CO Approved</option>
                                 </select>
                             </div>
                             <div class="col-md-3 text-md-end">
@@ -1353,6 +1360,7 @@
                 box.checked = dashboardQuoteSelection.has(box.dataset.quoteSelect);
                 box.disabled = dashboardBulkBusy;
             });
+            if (window.QuoteDrDashboardUI) QuoteDrDashboardUI.syncSelection(dashboardQuoteSelection.size);
         }
         function toggleDashboardQuoteSelection(id, checked) {
             if (dashboardBulkBusy) return;
@@ -1467,7 +1475,7 @@
                 var reviewSentAt = q.data && q.data.review_request_sent_at;
                 var reviewNudge = shouldShowReviewNudge(q);
                 return `
-                <div class="quote-card ${isChangeOrder ? 'change-order-card' : ''} ${isInvalid ? 'voided-document-card' : ''}" onclick="handleDashboardQuoteCardClick(event, ${jsAttr(q.id)})">
+                <div class="quote-card ${isChangeOrder ? 'change-order-card' : ''} ${isInvalid ? 'voided-document-card' : ''}" data-client-name="${escapeHtml(clientName)}" onclick="handleDashboardQuoteCardClick(event, ${jsAttr(q.id)})">
                     <div class="d-flex justify-content-between align-items-start">
                         <div class="quote-card-open-area">
                             ${q.id === lastOpenedId ? '<span class="badge bg-primary me-1" style="font-size:0.65rem; vertical-align:middle;">Last Opened</span>' : ''}
@@ -1529,6 +1537,7 @@
                 </div>
             `;
             }).join('');
+            if (window.QuoteDrDashboardUI) QuoteDrDashboardUI.compactCards(el);
             if (window.QuoteDrAccount) QuoteDrAccount.applyDocumentAccess(el);
         }
 
@@ -4102,8 +4111,8 @@
             return icons[activityEvent && activityEvent.event_type] || 'fa-circle-info';
         }
 
-        function renderPortalShareActivity(events) {
-            var panel = document.getElementById('portalShareActivityPanel');
+        function renderPortalShareActivity(events, targetPanel) {
+            var panel = targetPanel || document.getElementById('portalShareActivityPanel');
             if (!panel) return;
             events = Array.isArray(events) ? events : [];
             var opened = events.filter(function(activityEvent) { return activityEvent.event_type === 'document_opened'; });
@@ -4554,6 +4563,7 @@
             const { data: { session } } = await _supabase.auth.getSession();
             if (!session) { window.location.href = 'login.html'; return; }
             window.currentUser = session.user;
+            if (window.QuoteDrDashboardUI) QuoteDrDashboardUI.setUser(session.user.id);
             QuoteDrLaborReminders.mount(document.getElementById('laborReminderCard')).catch(() => {});
             refreshDashboardSaveIncidents(session.user);
             const userName = localStorage.getItem('ald_user_name') || 'User';

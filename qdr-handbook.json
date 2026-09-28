@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-25.14",
+  "version": "2026-09-28.1",
   "articles": [
     {
       "id": "standalone-design-activity",
@@ -117,10 +117,15 @@
     {
       "id": "expired-quote-portal-activity",
       "title": "View an expired quote's existing portal and activity",
-      "verifiedAt": "2026-09-24",
-      "release": "2026-09-24.1",
-      "sources": ["dashboard.html", "quote-portal-readiness.js"],
-      "body": "On the Dashboard, find the already-shared quote and click its green Client Portal button, then Activity in the portal window. An expired quote can still open its existing portal and recorded activity; viewing does not renew its expiry, republish the document, or require a deposit or zero-price review. Sign in with the appropriate account access; the document must still be assigned and visible in its portal. Opening the window can copy its existing link, but does not email the client. Publishing a document or Email Portal Follow-up still runs send-readiness checks and blocks expired or invalid quote dates. Do not renew, remove or resend a quote merely to inspect its history. If opening an existing portal shows Update Quote Expiry, refresh after the fix is deployed; if it persists, report the action and error instead of changing customer records. Activity requires a successful authenticated load; an error or empty history is not proof the client never viewed it. Keep normal save and backup precautions when making any actual quote edits."
+      "verifiedAt": "2026-09-28",
+      "release": "2026-09-28.1",
+      "sources": [
+        "dashboard.html",
+        "quote-portal-readiness.js",
+        "dashboard-compact.js",
+        "dashboard-compact.css"
+      ],
+      "body": "On the Dashboard, open the document card's more-actions menu (•••) and choose Activity, directly above View Quote & Profit (private). This opens a separate activity window without the sharing or PIN controls; it does not publish, copy a link, email, renew or edit the document. The green Client Portal button still offers See Activity in its sharing window. Sign in with permission to read the document's activity. If Activity says Could not load activity, close and retry or report the error; never republish or renew a document merely to inspect history. Empty history or a failed authenticated load does not prove the client never viewed it. Viewing time measures page visibility, not attention; document viewing excludes design viewing. Publishing and Email Portal Follow-up retain their expiry/readiness checks. Preserve normal saves and backups before actual quote edits."
     },
     {
       "id": "portal-render-upload-limits",
@@ -299,13 +304,16 @@
     {
       "id": "saving-backups-and-recovery",
       "title": "Saving, backups and recovery: Export All Quotes, unsaved edits and photos",
-      "verifiedAt": "2026-09-17",
-      "release": "2026-09-17.3",
+      "verifiedAt": "2026-09-28",
+      "release": "2026-09-28.1",
       "sources": [
         "quote-builder.html",
-        "quote-items.js"
+        "quote-items.js",
+        "dashboard.html",
+        "dashboard-compact.js",
+        "dashboard-compact.css"
       ],
-      "body": "- Cloud saved and folder backup verified are separate statuses. Saved on this device or syncing is NOT confirmation of a cloud save. Do not promise a draft is in the dashboard until cloud saving succeeds.\n- Connect Backup Folder lets a supported browser save versioned quote files into a user-chosen folder while QuoteDr is open. Back Up Now requests a backup. The browser must grant folder access; this is not an always-running desktop backup service.\n- Folder backups are organized beneath QuoteDr Backups by account, client and quote. Unchanged snapshots are deduplicated, earlier changed versions are retained. Files are not encrypted and do not include all uploaded media.\n- Changing folders replaces the connection after confirmation; Disconnect forgets the connection without deleting existing files. A remembered connection is not a verified write. If an error occurs, retain existing files and report the exact error; do not assume Google Drive is the cause or that a file's existence proves verification.\n- Dashboard Export All Quotes creates a portable backup of cloud quote records. It is not a backup of unsynced browser edits, every invoice or all media. Save a local copy of unsynced work separately.\n- Open a local recovery file with File > Open > Open Local File, review the recovered content, then explicitly Save to the intended cloud destination. Opening a recovery is not itself a cloud save.\n- If cloud saving fails or conflicts, keep the local recovery copy, check the displayed error and contact support if needed. Do not instruct users to repeatedly overwrite or clear storage."
+      "body": "Dashboard: Options > Backup & export contains Export All Quotes, Connect Backup Folder, Back Up Now, Disconnect and Restore Backup Help. Manage backup below the header opens the menu. Backup status remains visible; browser folder permission and write verification remain required. - Cloud saved and folder backup verified are separate statuses. Saved on this device or syncing is NOT confirmation of a cloud save. Do not promise a draft is in the dashboard until cloud saving succeeds.\n- Connect Backup Folder lets a supported browser save versioned quote files into a user-chosen folder while QuoteDr is open. Back Up Now requests a backup. The browser must grant folder access; this is not an always-running desktop backup service.\n- Folder backups are organized beneath QuoteDr Backups by account, client and quote. Unchanged snapshots are deduplicated, earlier changed versions are retained. Files are not encrypted and do not include all uploaded media.\n- Changing folders replaces the connection after confirmation; Disconnect forgets the connection without deleting existing files. A remembered connection is not a verified write. If an error occurs, retain existing files and report the exact error; do not assume Google Drive is the cause or that a file's existence proves verification.\n- Dashboard Export All Quotes creates a portable backup of cloud quote records. It is not a backup of unsynced browser edits, every invoice or all media. Save a local copy of unsynced work separately.\n- Open a local recovery file with File > Open > Open Local File, review the recovered content, then explicitly Save to the intended cloud destination. Opening a recovery is not itself a cloud save.\n- If cloud saving fails or conflicts, keep the local recovery copy, check the displayed error and contact support if needed. Do not instruct users to repeatedly overwrite or clear storage."
     },
     {
       "id": "old-quote-import-and-writing-assistance",
@@ -375,14 +383,17 @@
     },
     {
       "id": "dashboard-settings-and-feedback",
-      "title": "Dashboard, settings, and feedback",
-      "verifiedAt": "2026-09-15",
-      "release": "6c4ba1f",
+      "title": "Dashboard appearance themes, organization, order persistence across browsers, settings and feedback",
+      "verifiedAt": "2026-09-28",
+      "release": "2026-09-28.1",
       "sources": [
         "quote-builder.html",
-        "quote-items.js"
+        "quote-items.js",
+        "dashboard.html",
+        "dashboard-compact.js",
+        "dashboard-compact.css"
       ],
-      "body": "- Dashboard is where users create, open, manage, and track saved quotes.\n- Settings includes Business Profile, Quote Preferences, Manage Items entry point, AI Voice Learning, email/reminder settings, Feedback, Payments, QuickBooks, and Account/Plan controls.\n- Feedback is the correct place for bugs and feature ideas. Direct users to Settings > Feedback when QuoteDr does not have a requested feature yet.\n- Basic includes core quoting, invoicing, clients, branding, sync, templates, and Stripe payments. Pro unlocks AI voice quote tools, AI assistant, smart import, floor plan scanner, QuickBooks, upsells, profit tracking, and reminders where available."
+      "body": "Dashboard List view uses compact cards with title, client, date/number, total/status and visible In portal badge. Expand Details for timing, locks, payment evidence, received amounts and deposit decisions. Primary buttons open Client Portal or Review Client Notes; ••• contains Open, Rename document, Activity above View Quote & Profit (private), Client View and applicable change order/invoice/Junk actions. Existing permissions and confirmations apply. Options contains Backup & export, Manage Portals, Junk, Job Tracker, Labour Tracker, Default, Appearance and Organize by… . New Quote and refresh remain visible. Options > Appearance offers QDR Light, Command Center, Graphite, Soft Blue or Follow system, applied immediately per account/browser; Close retains the choice. Client themes are unchanged. Options > Organize by… offers Recent (default), By Client (expanded), Compressed by Client (collapsed); click a client heading to expand files. Client names initially sort alphabetically using normalized names like Clients view; identical names may group together. Drag ☰ or use arrow buttons then Apply organization; rows shift while dragging. Cancel discards changes. Reset alphabetical then Apply clears custom order. New clients append alphabetically after custom entries. Search/status filters still apply; organizer lists available clients even while filtered. Grouped recent-open history builds from dashboard opens on this browser; older files retain existing order. Preferences are per account/browser, not across devices. Select expands groups for bulk controls. Default separately sets List/Board/Clients. If preference storage fails, changes may last only this visit; never clear browser storage with unsynced edits. If controls appear missing, refresh and select List with appropriate permissions. Organization does not alter contents, payments or sharing; preserve local recovery copies and confirm cloud saves before actual edits. - Dashboard is where users create, open, manage, and track saved quotes.\n- Settings includes Business Profile, Quote Preferences, Manage Items entry point, AI Voice Learning, email/reminder settings, Feedback, Payments, QuickBooks, and Account/Plan controls.\n- Feedback is the correct place for bugs and feature ideas. Direct users to Settings > Feedback when QuoteDr does not have a requested feature yet.\n- Basic includes core quoting, invoicing, clients, branding, sync, templates, and Stripe payments. Pro unlocks AI voice quote tools, AI assistant, smart import, floor plan scanner, QuickBooks, upsells, profit tracking, and reminders where available."
     },
     {
       "id": "job-note-preview-length",

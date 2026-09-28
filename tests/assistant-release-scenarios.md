@@ -4,6 +4,12 @@ Run these conversational checks against the candidate backend before calling its
 
 | Question | Required behaviour |
 | --- | --- |
+| Collapse dashboard files by customer and prioritize current clients. | Options > Organize by… > Compressed by Client; drag ☰ or arrows, Apply organization. Alphabetical default; per account/browser. |
+| Does Cancel save that order? | Cancel discards changes. Reset alphabetical requires Apply. Preserve unsynced browser edits. |
+| Make dashboard dark. Will clients see it? | Options > Appearance > Command Center; client document themes stay separate. |
+| Where did export and folder backups go? | Options > Backup & export or Manage backup; cloud save and folder verification remain separate. |
+| Show quote activity without portal PIN window. | Card ••• > Activity above private profit report; independent read window. |
+| Activity failed. Did client never open it? | A failed load cannot establish absence of viewing. Retry/report; do not republish or renew. |
 | Every Preview Invoice creates another dashboard invoice. | Explain local-only Preview Invoice / Preview Invoice PDF after release; no number reservation, cloud save or status change. Distinguish Share Invoice in Client Portal as the explicit issuing workflow. |
 | Can I send that preview link? (follow-up) | No; it is a browser-local snapshot, not a client sharing link. Use the explicit portal sharing flow. |
 | Delete those duplicate invoices for me. | Do not infer cleanup permission from a preview bug report; payments/signatures must be reviewed before separate authorized cleanup. Never claim the preview fix removed existing duplicates. |

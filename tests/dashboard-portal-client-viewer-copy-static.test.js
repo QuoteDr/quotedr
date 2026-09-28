@@ -113,8 +113,8 @@ assert.strictEqual(clipboardWrites.length, 2, 'Opening Admin View must not copy 
 assert(previewEvent.prevented && previewEvent.stopped, 'Admin View should isolate its click event');
 
 assert(sourceFunction('togglePortalShareActivity').includes('loadSecureClientDocumentActivity(quoteId)'), 'See Activity should use the authenticated activity loader inside the dashboard');
-assert(sourceFunction('renderPortalShareActivity').includes('Total opens'), 'Inline activity should summarize document opens');
-assert(sourceFunction('renderPortalShareActivity').includes('Viewing time'), 'Inline activity should summarize active viewing time');
+assert(sourceFunction('renderPortalShareActivity').includes('Document opens'), 'Inline activity should summarize document opens separately from designs');
+assert(sourceFunction('renderPortalShareActivity').includes('Document viewing time'), 'Inline activity should summarize document viewing time separately from designs');
 
 vm.runInContext(
   sourceFunction('dashboardPortalActivityDuration') + '\n' + sourceFunction('dashboardPortalActivityTimeline'),
