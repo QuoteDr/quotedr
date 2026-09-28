@@ -280,10 +280,13 @@
 
         async function saveQuoteStyleDefaultsToCloud(style) {
             try {
-                if (typeof saveUserDataValue !== 'function') return;
-                await saveUserDataValue('quote_send_style', style, { entityType: 'quote_style', entityLabel: 'Quote send style', localStorageKey: 'ald_quote_send_style' });
+                if (typeof saveUserDataValue !== 'function') throw new Error('Cloud saving is unavailable.');
+                var result = await saveUserDataValue('quote_send_style', style, { entityType: 'quote_style', entityLabel: 'Quote send style', localStorageKey: 'ald_quote_send_style' });
+                if (result && result.error) throw new Error(result.error.message || result.error);
+                if (!result || (result.state || result.saveState) !== 'cloud_saved') throw new Error('Cloud save is not confirmed.');
             } catch(e) {
                 console.warn('Quote send defaults cloud save failed:', e);
+                throw e;
             }
         }
 
@@ -752,7 +755,7 @@
                 }
                 return true;
             } catch(e) {
-                alert('Could not save defaults in this browser.');
+                alert('Could not confirm saving defaults to your account. Keep this window open and retry. Your current quote has not been saved by Save Defaults.');
                 return false;
             }
         }
@@ -1366,10 +1369,30 @@
             else alert(message);
         }
 
+        function applyQuoteStyleToCurrentDraft() {
+            var style = readQuoteStyleFromControls();
+            try {
+                // Persist the snapshot first. Do not report success after a storage failure.
+                var draft = collectQuoteData();
+                draft.style = quoteStudioClone(style);
+                localStorage.setItem('ald_session_quote', JSON.stringify(draft));
+                _quoteStyle = style;
+                syncQuoteStyleGlobal();
+                [window._loadedQuoteData, window._currentQuoteData].forEach(function(data) {
+                    if (data) data.style = quoteStudioClone(style);
+                });
+                if (typeof markUnsaved === 'function') markUnsaved();
+                return true;
+            } catch (error) {
+                alert('Could not apply quote settings. Keep this window open and retry; the quote is not confirmed saved.');
+                return false;
+            }
+        }
+
         async function confirmGenerateQuote() {
             var styleModal = bootstrap.Modal.getInstance(document.getElementById('quoteStyleModal'));
             if (window._quoteStyleSettingsOnly) {
-                await saveQuoteStyleDefaults(true);
+                if (!applyQuoteStyleToCurrentDraft()) return;
                 if (styleModal) styleModal.hide();
                 return;
             }
@@ -1563,7 +1586,7 @@
                 throw new Error('Enter a fixed deposit amount greater than $0 before sharing this document.');
             }
             if (document.getElementById('quoteSaveDefaultStyle')?.checked) {
-                await saveQuoteStyleDefaults(false);
+                if (!await saveQuoteStyleDefaults(false)) throw new Error('Could not confirm saving quote defaults. Retry before sharing.');
             }
 
             if (window._categoryStylesReadyPromise) {

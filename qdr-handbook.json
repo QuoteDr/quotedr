@@ -1,7 +1,15 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-28.4",
+  "version": "2026-09-28.5",
   "articles": [
+    {
+      "id": "quote-settings-current-save",
+      "title": "Quote Settings Done versus Save Defaults: description length changes not saving",
+      "verifiedAt": "2026-09-28",
+      "release": "2026-09-28.5",
+      "sources": ["quote-style.js", "quote-builder.html", "quote-storage.js", "interactive-quote-viewer.html"],
+      "body": "In the builder open Quote Settings, adjust Description preview length and choose Done to apply the controls to the current draft. Done updates the local recovery snapshot and marks the quote unsaved; normal auto-save runs if enabled. Otherwise save the quote normally. Wait for Cloud saved before leaving or sharing; applying settings is not a confirmed cloud save and does not republish an existing client link. Reopen or regenerate the preview after saving. Save Defaults and Use these settings for future quotes separately save account defaults, not the current quote. They require sign-in and a confirmed cloud save; a failure keeps the controls available for retry and must not be treated as saved. Existing quotes retain their own settings. Turn off Always show full descriptions to use the description length sliders; scope notes and job notes have separate controls. No text is deleted by shortening a preview. If Done reports a storage error, keep the window open and preserve/export the draft before recovery; do not clear browser storage or reload unsaved work. Do not edit accepted customer records as a test. Change orders may inherit parent styling. This release was locally checked; authenticated cloud saving and chatbot answers are separate verification steps."
+    },
     {
       "id": "choice-discount-scope",
       "title": "Choice group discounts: all choices or selected versions only, Was and Now prices",
@@ -12,7 +20,7 @@
     },
     {
       "id": "notification-activity-location",
-      "title": "Notification bell alerts: Show Activity, viewing time and approximate location city region country",
+      "title": "Notification bell alerts: Show Activity, viewing time and approximate location city region country does not prove identity",
       "verifiedAt": "2026-09-28",
       "release": "2026-09-28.3",
       "sources": ["dashboard.html", "dashboard-compact.js", "portal-activity-visits.js", "supabase-v2.js", "_worker.js", "supabase/functions/client-document/index.ts", "supabase/functions/_shared/activity-location.mjs", "privacy.html"],

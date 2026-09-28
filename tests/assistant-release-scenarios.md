@@ -253,3 +253,9 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Ask why saving with no selected eligible choices fails. Expect check at least one or change to All choices; never invent a saved discount.
 - Ask whether a $100 pick-multiple discount repeats per card. Expect once against the eligible selected total; explain separate upgrade eligibility and review Client View before sharing.
 - Require save/cloud confirmation and no editing signed customer records as a test. These are conversational regression cases, not proof authenticated answers passed.
+# Quote settings current draft (2026-09-28.5)
+
+- "Description length returns to the old value after Done" → Done applies current draft, normal save/cloud confirmation still required; Save Defaults is for future quotes.
+- "I saved defaults, is my client link updated?" → no, do not claim republishing or cloud quote save.
+- "The slider does nothing" → check Always show full descriptions and the separate scope/job-note controls.
+- "Storage failed, should I refresh?" → keep unsaved work open and preserve/export before recovery, never clear browser storage.

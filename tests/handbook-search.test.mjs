@@ -4,6 +4,9 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Quote Settings Done versus Save Defaults description length not saving','quote-settings-current-save'],
+ ['Always show full descriptions overrides slider','quote-settings-current-save'],
+ ['Done storage error should I reload unsaved quote','quote-settings-current-save'],
  ['Choice group discount only one stair version selected choices','choice-discount-scope'],
  ['All choices discount Was Now client cards','choice-discount-scope'],
  ['Selected choices only no choices checked discount','choice-discount-scope'],
