@@ -292,6 +292,10 @@ export function activeItemTotal(item, options = {}) {
   const groups = effectiveUpgradeGroups(item, selectedBaseOption);
   if (groups.length) total = applyUpgradePricing(total, quantity, groups).total;
 
+  // Negative-priced lines are deliberate credits, not discounts to clamp to zero.
+  // Preserve them before applying positive-charge discount caps.
+  if (total < 0) return rounded(total, 2);
+
   const discountValue = Math.max(0, finiteNumber(item.discountValue, 0));
   if (isRecord(item.choiceGroup)) {
     // Same choice eligibility and caps as the web app, using server-recomputed prices.

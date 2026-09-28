@@ -263,6 +263,8 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - "Storage failed, should I refresh?" → keep unsaved work open and preserve/export before recovery, never clear browser storage.
 # Portal outstanding balance — 2026-09-28.8
 
+- Credit regression 2026-09-28.9: "Portal amount higher than open quote, negative credit missing" → credit reduces pre-tax total; refresh saved view, report persistent mismatch, never create duplicate credits/payments as compensation. Follow-up "Add another credit?" → no. Do not claim any particular customer record was repaired.
+
 - "Needs Review quote shows original total despite payments" → Amount still owing now subtracts recorded payments regardless of acceptance. Check Document amounts and per-portal custom-theme override; do not duplicate payments.
 - "Even before acceptance?" → yes for the display; this does not issue an invoice or change payment due terms.
 - "Can I show the full value instead?" → choose Document total and save the intended default or portal override; preserve unsaved work before refreshing.

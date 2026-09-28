@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {activeItemTotal, sanitizeClientDocumentRow} from '../supabase/functions/_shared/client-document-policy.mjs';
+const credit={quantity:9,rate:-16.75,total:-150.75,discountType:'none'};
+assert.equal(activeItemTotal(credit),-150.75);
+assert.equal(activeItemTotal({...credit,discountType:'percent',discountValue:50}),-150.75,'discount must not erase or enlarge a credit');
+assert.equal(activeItemTotal({...credit,_removed:true}),0);
+assert.equal(activeItemTotal({...credit,priceTbd:true}),0);
+assert.equal(activeItemTotal({quantity:1,rate:100,discountType:'amount',discountValue:200}),0,'positive discounts still capped');
+const row={status:'sent',data:{taxEnabled:true,taxRate:.13,paymentsReceived:{amount:230000},rooms:[{items:[{quantity:1,rate:204358.63,total:204358.63},credit]}]}};
+const before=JSON.stringify(row);
+const view=sanitizeClientDocumentRow(row);
+assert.equal(Math.round(view.total*100),23075490);
+assert.equal(Math.round(view.total*100)-23000000,75490);
+assert.equal(view.data.rooms[0].items[1].total,-150.75);
+assert.equal(JSON.stringify(row),before);
+console.log('PASS credit preserved, $754.90 outstanding, discount caps and source immutability');
