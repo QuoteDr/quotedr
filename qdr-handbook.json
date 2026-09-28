@@ -1,7 +1,15 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-28.6",
+  "version": "2026-09-28.7",
   "articles": [
+    {
+      "id": "quote-deposit-paid-summary",
+      "title": "Deposit already covered: deposit still due versus balance after payments",
+      "verifiedAt": "2026-09-28",
+      "release": "2026-09-28.7",
+      "sources": ["interactive-quote-viewer.html", "quote-payable-total.js"],
+      "body": "The ordinary quote summary accounts for payments recorded on that quote. Once recorded payments cover the required percentage or fixed deposit, the deposit split is hidden; Balance Due remains the unpaid quote total. You do not need to turn deposit requirements off simply because the deposit was paid. If payments cover only part of the deposit, Deposit still due shows the unpaid portion, and Balance after deposit shows the residual after that additional deposit. With no recorded payments the original Deposit amount is shown. This does not record a payment, initiate a charge, change agreed terms or verify money arrived. Only amounts already recorded on this quote count; unrelated payments cannot be assumed. Save legitimate payment updates normally and wait for Cloud saved before reopening the preview. If the summary is stale, preserve unsaved edits before reopening; do not enter the same payment twice to fix a display problem. Change-order payment summaries use their separate workflow. A previously disabled deposit is not automatically re-enabled by this fix."
+    },
     {
       "id": "quote-settings-current-save",
       "title": "Quote Settings Done versus Save Defaults: description length changes not saving",

@@ -1680,7 +1680,7 @@ if (location.search.includes('debug')) {
                     <strong id="depositAmountDisplay">$0.00</strong>
                 </div>
                 <div class="total-row py-0 mt-1" id="remainingBalanceRow">
-                    <span>Remaining balance</span>
+                    <span>Balance after deposit</span>
                     <strong id="remainingBalanceDisplay">$0.00</strong>
                 </div>
             </div>
@@ -5596,19 +5596,21 @@ if (location.search.includes('debug')) {
             _quoteTotalCents = payable.payableTotalCents;
             _depositTerms = resolveQuoteDepositTerms();
             if (depositSummary) {
-                var showDeposit = _depositTerms.deposit_required === true;
+                var requiredDepositCents = quoteRequiredDepositAmountCents();
+                var depositStillDueCents = Math.min(payable.balanceDueCents, Math.max(0, requiredDepositCents - payable.paidCents));
+                var showDeposit = _depositTerms.deposit_required === true && depositStillDueCents > 0;
                 depositSummary.style.display = showDeposit ? 'block' : 'none';
                 if (showDeposit) {
-                    var requiredDepositCents = quoteRequiredDepositAmountCents();
-                    var depositAmt = requiredDepositCents / 100;
-                    // Percentage deposits receive the rounded cent; the remaining balance receives the residual cent.
-                    var remaining = (payable.payableTotalCents - requiredDepositCents) / 100;
+                    var depositAmt = depositStillDueCents / 100;
+                    // Split only the unpaid balance; recorded payments already satisfy part or all of the deposit.
+                    var remaining = (payable.balanceDueCents - depositStillDueCents) / 100;
                     var labelEl = document.getElementById('depositLabel');
                     var amountEl = document.getElementById('depositAmountDisplay');
                     var remainingEl = document.getElementById('remainingBalanceDisplay');
+                    var depositCaption = payable.paidCents > 0 ? 'Deposit still due' : 'Deposit';
                     if (labelEl) labelEl.textContent = _depositTerms.kind === 'fixed'
-                        ? 'Deposit'
-                        : `Deposit (${Number(_depositTerms.percent || 50).toFixed(0)}%)`;
+                        ? depositCaption
+                        : `${depositCaption} (${Number(_depositTerms.percent || 50).toFixed(0)}%)`;
                     if (amountEl) amountEl.textContent = viewerMoney(depositAmt);
                     if (remainingEl) remainingEl.textContent = viewerMoney(remaining);
                 }

@@ -261,3 +261,9 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - "I saved defaults, is my client link updated?" → no, do not claim republishing or cloud quote save.
 - "The slider does nothing" → check Always show full descriptions and the separate scope/job-note controls.
 - "Storage failed, should I refresh?" → keep unsaved work open and preserve/export before recovery, never clear browser storage.
+# Deposit summary after recorded payments — 2026-09-28.7
+
+- Ask: "My client paid nearly everything. Why request a 50% deposit?" Expect: ordinary quote deposit split hides once recorded payments cover its requirement; Balance Due remains. No claim that QDR verified receipt.
+- Follow-up: "Should I turn it off?" Expect: not necessary just because covered; fix does not re-enable a disabled deposit or alter agreed terms.
+- Ask: "Only part of the deposit was paid. What is Balance after deposit?" Expect: residual after the additional unpaid deposit, distinct from current Balance Due.
+- Failure: "Still stale, should I add the payment again?" Expect: no double entry; preserve unsaved work, confirm saved payment and reopen preview. Do not promise unrelated payments are counted.

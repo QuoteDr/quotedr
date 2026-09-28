@@ -143,6 +143,10 @@ for(const q of ['Track rendering views without a quote', 'Design-only portal act
 assert(searchHandbook(book,'Does that prove they watched it?', 'design-only portal activity').some(a=>a.id==='standalone-design-activity'));
 assert(searchHandbook(book,'How long was the model visible?', 'design-only portal activity').some(a=>a.id==='standalone-design-activity'));
 console.log('Handbook retrieval: questions, follow-up, unknown, validation and limit passed');
+for (const q of ['Deposit already covered but balance remains', 'Deposit still due after partial payments', 'Deposit summary stale do I enter payment twice?']) {
+ assert(searchHandbook(book,q).some(a=>a.id==='quote-deposit-paid-summary'),q);
+}
+assert(searchHandbook(book,'Should I turn it off?', 'deposit already covered balance after payments').some(a=>a.id==='quote-deposit-paid-summary'));
 for (const q of ['Show Activity from notification bell', 'Client Activity Alerts approximate city region country', 'Location unavailable on a quote visit', 'Can a VPN change the activity location?']) {
  assert(searchHandbook(book,q).some(a=>a.id==='notification-activity-location'),q);
 }
