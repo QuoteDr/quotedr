@@ -909,6 +909,18 @@ export function projectClientDocumentData(data, options = {}) {
 export function sanitizeClientDocumentRow(row, options = {}) {
   row = isRecord(row) ? row : {};
   const data = projectClientDocumentData(row.data, { ...options, documentType: row.type });
+  // Folder membership is presentation metadata, not quote pricing or private notes.
+  if (Array.isArray(row.data?.portal_job_folders)) data.portal_job_folders = row.data.portal_job_folders.slice(0, 100).filter(f => isRecord(f) && f.id && f.name).map(f => ({
+    id: cleanId(f.id), name: cleanString(f.name, 200),
+    documentIds: Array.isArray(f.documentIds) ? f.documentIds.slice(0, 1000).map(cleanId).filter(Boolean) : [],
+    designIds: Array.isArray(f.designIds) ? f.designIds.slice(0, 1000).map(cleanId).filter(Boolean) : [],
+    assets: Object.fromEntries(['photos','files','videos'].map(kind=>[kind,
+      (Array.isArray(f.assets?.[kind])?f.assets[kind]:[]).slice(0,100).filter(isRecord).map(a=>({
+        id:cleanId(a.id),title:cleanString(a.title,200),url:sanitizeClientMediaUrl(a.url),createdAt:cleanString(a.createdAt,100),
+      })).filter(a=>a.url)
+    ])),
+    createdAt: cleanString(f.createdAt, 100), updatedAt: cleanString(f.updatedAt, 100),
+  }));
   const acceptedSnapshot = acceptedClientTotalSnapshot(row);
   if (acceptedSnapshot) {
     data.subtotal = acceptedSnapshot.subtotalCents / 100;

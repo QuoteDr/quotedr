@@ -263,6 +263,8 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - "Storage failed, should I refresh?" → keep unsaved work open and preserve/export before recovery, never clear browser storage.
 # Portal outstanding balance — 2026-09-28.8
 
+- Folder designs 2026-09-28.10: "Group my renderings into a job folder" → owner Jobs > Create Job Folder / Edit folder > Select designs & renderings > save confirmation. Follow-up "Re-upload?" → no, existing links; preserves ordered review. "Folder disappeared" → may be omitted metadata, do not assume deletion or create duplicates. "Save failed halfway" → keep selections, inspect reload/recovery, sequential partial saves possible. Private folder notes are not promised visible to clients; design-only portals with no documents remain unsupported for folder storage.
+
 - Credit regression 2026-09-28.9: "Portal amount higher than open quote, negative credit missing" → credit reduces pre-tax total; refresh saved view, report persistent mismatch, never create duplicate credits/payments as compensation. Follow-up "Add another credit?" → no. Do not claim any particular customer record was repaired.
 
 - "Needs Review quote shows original total despite payments" → Amount still owing now subtracts recorded payments regardless of acceptance. Check Document amounts and per-portal custom-theme override; do not duplicate payments.

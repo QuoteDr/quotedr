@@ -2460,6 +2460,7 @@
               </button>
             </div>
           </div>
+          <section id="portalJobFolderDesigns" class="qd-designs" aria-label="Job folder designs"></section>
           <div class="portal-job-dashboard-grid">
             <div class="portal-job-panel">
               <h3><i class="fas fa-note-sticky me-1"></i>Notes</h3>
@@ -2606,6 +2607,8 @@
           <div id="portalJobFolderDocuments" class="portal-job-document-list">
             <div class="text-muted p-3">No documents available yet.</div>
           </div>
+          <div class="mt-3 mb-2 fw-bold">Select designs &amp; renderings</div>
+          <div id="portalJobFolderDesignOptions" class="portal-job-document-list"></div>
           <div id="portalJobFolderStatus" class="small mt-3 text-muted" aria-live="polite"></div>
         </div>
         <div class="modal-footer">
@@ -2877,11 +2880,11 @@
 
       if (portalId) {
         const css = document.createElement('link');css.rel='stylesheet';css.href='portal-designs.css?v=2026092505';document.head.append(css);
-        const designs = await import('./portal-designs.js?v=2026092508');
+        const designs = await import('./portal-designs.js?v=2026092801');
         portalDesignController = designs.mountDesignLibrary(document.getElementById('portalDesignLibrary'), {
           request:portalDesignRequest, isOwner:portalIsAdminView,
           getQuotes:()=>portalQuotesCache,onQuotesChanged:()=>loadQuotes(),
-          onAttachmentsChanged:updateDesignReplayButtons,
+          onAttachmentsChanged:()=>{updateDesignReplayButtons();updatePortalJobDashboard();},
           onOpenDesign:async function(design,fallback){
             const quote=portalQuotesCache.find(q=>(q.designReview?.designs||[q.designReview]).some(d=>d?.id===design.id));
             if(portalIsAdminView||!quote||!portalToken)return fallback();
@@ -3604,6 +3607,12 @@
           });
           portalBootstrapResult = null;
           const quotes = dedupePortalDocuments(portalResult.documents || []);
+          if (portalIsAdminView && quotes.length) {
+            // Secure document projection excludes private notes. Restore only owner folder metadata.
+            const {data: folderRows, error: folderError} = await _sbClient.from('quotes').select('id,data,updated_at').eq('user_id',contractorId).in('id',quotes.map(q=>q.id));
+            if(folderError) throw folderError;
+            for(const quote of quotes){const source=folderRows?.find(r=>r.id===quote.id);if(source)quote.data.portal_job_folders=source.data?.portal_job_folders||[];}
+          }
           const portalMeta = portalResult.portal || {};
           portalResolvedClientName = portalMeta.clientName || portalResolvedClientName;
           clientNameEl.textContent = titleCase(portalResolvedClientName || clientEmail || 'Client');
@@ -3770,6 +3779,7 @@
         id: String(folder.id),
         name: String(folder.name).trim(),
         documentIds: Array.from(new Set(documentIds)),
+        designIds: Array.from(new Set((Array.isArray(folder.designIds)?folder.designIds:[]).map(String).filter(Boolean))),
         notes: String(folder.notes || '').trim(),
         assets: normalizePortalJobAssets(folder.assets),
         createdAt: folder.createdAt || new Date().toISOString(),
@@ -3788,6 +3798,7 @@
             byId[clean.id] = clean;
           } else {
             byId[clean.id].documentIds = Array.from(new Set(byId[clean.id].documentIds.concat(clean.documentIds)));
+            byId[clean.id].designIds = Array.from(new Set(byId[clean.id].designIds.concat(clean.designIds)));
           }
         });
       });
@@ -3952,6 +3963,8 @@
       if (title) title.textContent = folder.name;
       if (meta) meta.textContent = docs.length + ' ' + (docs.length === 1 ? 'document' : 'documents') + ' in this job folder';
       if (notes) notes.textContent = folder.notes || 'No notes added yet.';
+      const designRoot=document.getElementById('portalJobFolderDesigns');
+      if(designRoot)portalDesignController?.renderFolder(designRoot,folder.designIds||[]);
       renderPortalJobAssets(folder);
       dashboard.classList.add('is-visible');
     }
@@ -4193,6 +4206,18 @@
       }
 
       renderPortalJobFolderDocumentOptions();
+      const designsEl=document.getElementById('portalJobFolderDesignOptions');
+      if(designsEl){
+        designsEl.replaceChildren();
+        const designs=portalDesignController?.listDesigns()||[];
+        if(!designs.length)designsEl.textContent='No published designs available. Add a design to the portal first.';
+        for(const design of designs){
+          const label=document.createElement('label');label.className='portal-job-document-option';
+          const input=document.createElement('input');input.type='checkbox';input.value=design.id;input.checked=(folder?.designIds||[]).includes(design.id);
+          const text=document.createElement('span');text.textContent=design.title+' — '+design.project;
+          label.append(input,text);designsEl.append(label);
+        }
+      }
 
       const modalEl = document.getElementById('portalJobFolderModal');
       if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -4205,7 +4230,10 @@
       const sanitizedFolders = folders.map(sanitizePortalJobFolder).filter(Boolean);
 
       for (const row of rows) {
-        const data = Object.assign({}, row.data || {});
+        const {data: fresh,error: readError}=await _sbClient.from('quotes').select('data,updated_at').eq('id',row.id).eq('user_id',contractorId).single();
+        if(readError)throw readError;
+        if(row.updated_at && fresh.updated_at!==row.updated_at)throw new Error('This quote changed elsewhere. Keep your folder selections, refresh the portal after saving other work, then retry.');
+        const data = Object.assign({}, fresh.data || {});
         data.portal_job_folders = sanitizedFolders;
         await portalDurableDatabaseSave({
           entityType: 'portal_job_folder',
@@ -4220,8 +4248,12 @@
             filters: [{ column: 'id', value: row.id }],
             versionRead: { table: 'quotes', column: 'updated_at', filters: [{ column: 'id', value: row.id }] }
           },
-          baseVersion: row.updated_at || null
+          baseVersion: fresh.updated_at || null
         });
+        const {data: saved,error: verifyError}=await _sbClient.from('quotes').select('data,updated_at').eq('id',row.id).eq('user_id',contractorId).single();
+        if(verifyError)throw verifyError;
+        if(JSON.stringify((saved.data?.portal_job_folders||[]).map(sanitizePortalJobFolder))!==JSON.stringify(sanitizedFolders))throw new Error('Folder save could not be confirmed. Keep this window open and retry after checking Sync and Recovery.');
+        row.updated_at=saved.updated_at;
         row.data = data;
       }
 
@@ -4242,6 +4274,9 @@
       const notes = String(notesInput?.value || '').trim();
       syncPortalJobFolderDocumentSelection();
       const selectedIds = Array.from(portalJobFolderEditorSelectedIds);
+      const designIds=Array.from(document.querySelectorAll('#portalJobFolderDesignOptions input:checked')).map(input=>input.value);
+      const availableDesignIds=new Set((portalDesignController?.listDesigns()||[]).map(d=>d.id));
+      for(const id of existing?.designIds||[])if(!availableDesignIds.has(id))designIds.push(id);
 
       function setStatus(message, className) {
         if (!statusEl) return;
@@ -4254,8 +4289,8 @@
         nameInput?.focus();
         return;
       }
-      if (!selectedIds.length) {
-        setStatus('Choose at least one document for this job folder.', 'text-danger');
+      if (!selectedIds.length && !designIds.length) {
+        setStatus('Choose at least one document or design for this job folder.', 'text-danger');
         return;
       }
 
@@ -4263,6 +4298,7 @@
         id: existing?.id || ((window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'job-' + Date.now().toString(36)),
         name: name,
         documentIds: Array.from(new Set(selectedIds)),
+        designIds: Array.from(new Set(designIds)),
         notes: notes,
         assets: existing?.assets || { photos: [], files: [] },
         createdAt: existing?.createdAt || new Date().toISOString(),

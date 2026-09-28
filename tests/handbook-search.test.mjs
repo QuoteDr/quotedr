@@ -143,6 +143,8 @@ for(const q of ['Track rendering views without a quote', 'Design-only portal act
 assert(searchHandbook(book,'Does that prove they watched it?', 'design-only portal activity').some(a=>a.id==='standalone-design-activity'));
 assert(searchHandbook(book,'How long was the model visible?', 'design-only portal activity').some(a=>a.id==='standalone-design-activity'));
 console.log('Handbook retrieval: questions, follow-up, unknown, validation and limit passed');
+for(const q of ['Job folder renderings group existing designs','Job folder disappeared after reload','Folder saving unconfirmed retry duplicates'])assert(searchHandbook(book,q).some(a=>a.id==='portal-job-folder-designs'),q);
+assert(searchHandbook(book,'Do I upload them again?','job folder renderings').some(a=>a.id==='portal-job-folder-designs'));
 assert(searchHandbook(book,'Portal total higher missing credit line').some(a=>a.id==='portal-document-amount-display'));
 assert(searchHandbook(book,'Should I add another credit?', 'portal total mismatch').some(a=>a.id==='portal-document-amount-display'));
 for (const q of ['Portal amount still owing on Needs Review quotes', 'Portal document total instead of outstanding balance', 'Portal theme recorded payments missing']) {

@@ -1,7 +1,15 @@
 {
   "schemaVersion": 1,
-  "version": "2026-09-28.9",
+  "version": "2026-09-28.10",
   "articles": [
+    {
+      "id": "portal-job-folder-designs",
+      "title": "Job folders: group renderings and recover a disappeared folder",
+      "verifiedAt": "2026-09-28",
+      "release": "2026-09-28.10",
+      "sources": ["client-portal.html", "portal-designs.js", "supabase/functions/_shared/client-document-policy.mjs"],
+      "body": "In the owner portal open Jobs > Create Job Folder, or open an existing folder and choose Edit folder. Enter a name, select documents and tick existing published designs under Select designs & renderings. Choose Save Job Folder or Save Folder and wait for confirmed saving. A folder can select only designs, but this existing folder system still needs at least one portal document to store its metadata. Upload or publish designs in Designs & Renderings first; grouping links existing uploads without duplicating storage or changing project/room names. Open design in a folder preserves the existing presentation order and design-before-pricing checks. Withdrawn designs are not displayed, but their assignments are retained. Documents and designs remain available on the main portal. Folder notes are private owner notes and are omitted from the client projection. A folder may appear missing if an older secure response omitted its metadata; reload after the matching backend and web update before recreating it. Missing on screen is not proof of deletion. Saves read the full stored quote, reject concurrent changes and read back folder metadata before confirming. If save is unconfirmed, keep the editor open, preserve selections and check Sync and Recovery; do not repeatedly create duplicates or delete uploaded files. Do not clear browser storage with unsaved work. Saving across multiple documents is sequential: a failure can leave a partial save, so reload and inspect before retrying. Grouping is not client approval, does not send messages and does not alter quote prices or payments."
+    },
     {
       "id": "quote-deposit-paid-summary",
       "title": "Deposit already covered: deposit still due versus balance after payments",

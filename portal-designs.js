@@ -326,5 +326,15 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
     if(!link?.require_review)return [];
     return (link.design_ids||[link.design_id]).map(id=>rows.find(r=>r.id===id&&r.visible)).filter(Boolean);
   }
-  return {refresh,reviewDesigns};
+  function renderFolder(target, ids) {
+    target.replaceChildren(el('h3','Designs & Renderings'));
+    const available=rows.filter(row=>row.visible && ids.includes(row.id));
+    if(!available.length)target.append(el('p','No available designs assigned to this folder.'));
+    for(const row of available){
+      const card=el('article',null,'qd-design-card');
+      card.append(el('h4',row.title),el('p',row.project,'qd-design-meta'),button('Open design',()=>openDesign(row),'btn btn-primary btn-sm'));
+      target.append(card);
+    }
+  }
+  return {refresh,reviewDesigns,renderFolder,listDesigns:()=>rows.filter(row=>row.visible).map(row=>({id:row.id,title:row.title,project:row.project}))};
 }
