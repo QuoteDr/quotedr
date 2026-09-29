@@ -9,6 +9,7 @@ const body = {action:'log_event',documentId:'synthetic',token:'fixture',eventTyp
 let calls = 0, forwarded;
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async (url, options) => {
+    assert.equal(options.redirect,'manual');
     calls++; forwarded = new Request(url,options);
     return Response.json({event:{id:'fixture'}});
 };
@@ -45,6 +46,8 @@ try {
     assert.equal(await staticResult.text(),'static');
     globalThis.fetch = async()=>{throw Error('offline');};
     assert.equal((await worker.fetch(req(),{QDR_ACTIVITY_LOCATION_SECRET:secret})).headers.get('X-QDR-Activity-Proxy'),'forwarded');
+    globalThis.fetch = async()=>new Response(null,{status:302,headers:{Location:'https://untrusted.test'}});
+    assert.equal((await worker.fetch(req(),{QDR_ACTIVITY_LOCATION_SECRET:secret})).status,502);
 } finally { globalThis.fetch = originalFetch; }
 const scope = {Intl}; vm.createContext(scope);
 vm.runInContext(fs.readFileSync(new URL('../portal-activity-visits.js',import.meta.url),'utf8'),scope);

@@ -1,6 +1,8 @@
 # Activity shortcut and coarse location release
 
-Local implementation; extension not deployed by this change.
+Extension deployed on 2026-09-28 with the metadata migration and both Edge Functions.
+
+2026-09-28 release verification: both production domains returned verified coarse city/region/country from the no-write diagnostic after replacing `redirect: error` with `redirect: manual` and explicitly refusing 3xx responses. The former mode produced live relay gateway failures despite passing Node mocks. The diagnostic is not a customer visit or a persisted-event/owner-UI test. Synthetic handler persistence and privacy checks passed locally; authenticated chatbot and live synthetic customer-document persistence remain unverified.
 
 Extension release: apply `20260929012841_design_activity_location.sql`, deploy both `client-document` and `portal-designs` with current dependencies, then publish the web artifact. The relay now supports attached design review and standalone tracking. Preserve binary design response headers. POST `{ "action": "location_check" }` to `/api/document-activity` on each production host: this makes no database writes and returns only the requesting network's verified coarse location. A false result is a release blocker for location claims; check matching secrets and Cloudflare network fields. Then use an authorised synthetic fixture to verify persistence and owner display; do not manufacture visits on customer documents.
 
