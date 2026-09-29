@@ -279,6 +279,14 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Failure: "Still stale, should I add the payment again?" Expect: no double entry; preserve unsaved work, confirm saved payment and reopen preview. Do not promise unrelated payments are counted.
 # Portal PIN authority regression
 
+- Unsaved item: "I clicked outside Add Line Item. Can I keep typing?" Explain Save Item, Other Options then Keep Editing or Discard Changes. Incomplete Save Item stays open. Do not equate adding to quote with Cloud saved or saving reusable database; no claim of crash recovery.
+
+## Location capture coverage
+
+- Ask why today's portal opens show unknown location without a VPN. Explain missing telemetry routes or configuration/data failure, not presumed VPN use. No backfill or identity claims.
+- Follow-up: "Does your diagnostic prove her location was saved?" No: it validates the requesting network and signed relay only; persisted synthetic-event verification is separate.
+- Ask how to inspect model location: Activity > More info; standalone visits, model timing and attached design skip/open paths require matching web/functions and metadata migration. Never fabricate a city.
+
 - Ask: "Not activated after adding quotes; did the link change?" Explain registry PIN precedence and same IDs with optional .html; do not expose a PIN or claim an authenticated test.
 - Follow-up: "Should I recreate it?" Advise preserving unsaved work, reload and Unlock Portal using the existing PIN, then contact owner if failure persists. Never delete files or reset without intent.
 - Failure: "Can I use an old quote PIN if the saved portal PIN is empty?" No; fail closed. Explain legacy fallback only when no registry portal exists.

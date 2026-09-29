@@ -24,6 +24,12 @@ try {
     assert.equal(forwarded.headers.get('user-agent'),null);
     const loc = await verifiedActivityLocation(forwarded,body,secret);
     assert.deepEqual(loc,{location_city:'Oakville',location_region:'Ontario',location_country:'CA',location_source:'cloudflare_approximate'});
+    for(const data of [{action:'design_review',operation:'problem'}, {action:'design_review',operation:'open'}, {action:'track_activity',event:'portal_visited'}, {action:'track_activity',event:'model_visible'}, {action:'location_check'}]) {
+        await worker.fetch(req(data),{QDR_ACTIVITY_LOCATION_SECRET:secret});
+        assert.equal((await verifiedActivityLocation(forwarded,data,secret)).location_city,'Oakville');
+        assert(forwarded.url.endsWith(data.action==='track_activity'?'/portal-designs':'/client-document'));
+    }
+    await worker.fetch(req(),{QDR_ACTIVITY_LOCATION_SECRET:secret});
     assert.deepEqual(await verifiedActivityLocation(forwarded,{...body,documentId:'other'},secret),{});
     assert.deepEqual(await verifiedActivityLocation(forwarded,body,'wrong-secret-with-at-least-32-characters'),{});
     assert.deepEqual(await verifiedActivityLocation(forwarded,body,secret,Date.now()+120000),{});

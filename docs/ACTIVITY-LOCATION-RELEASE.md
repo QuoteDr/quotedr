@@ -1,6 +1,8 @@
 # Activity shortcut and coarse location release
 
-Local implementation; not deployed by this change.
+Local implementation; extension not deployed by this change.
+
+Extension release: apply `20260929012841_design_activity_location.sql`, deploy both `client-document` and `portal-designs` with current dependencies, then publish the web artifact. The relay now supports attached design review and standalone tracking. Preserve binary design response headers. POST `{ "action": "location_check" }` to `/api/document-activity` on each production host: this makes no database writes and returns only the requesting network's verified coarse location. A false result is a release blocker for location claims; check matching secrets and Cloudflare network fields. Then use an authorised synthetic fixture to verify persistence and owner display; do not manufacture visits on customer documents.
 
 ## Required activation
 
@@ -13,9 +15,9 @@ Local implementation; not deployed by this change.
 ## Behaviour and limits
 
 - Notifications > Show Activity uses the authenticated existing activity endpoint. Closing returns to notifications without changing read/unread state.
-- Only `log_event` requests are relayed. Existing token access, owner-preview exclusions and owner-only report access remain in Supabase. The relay is not an authentication substitute.
+- Only `log_event`, supported `design_review` operations, `track_activity`, and the no-write `location_check` are relayed. Existing token access, owner-preview exclusions and owner-only report access remain in Supabase. The relay is not an authentication substitute.
 - Cloudflare's city, region and country are signed with a timestamp and exact request payload. Supabase verifies HMAC and freshness, discards client-supplied `location_*` fields, and stores only verified coarse fields. Raw IP, browser/device, coordinates and postal codes are not added to activity records or forwarded headers. Hosting providers may retain their normal infrastructure logs.
-- Existing events are not backfilled. Standalone design-only activity uses a different table/endpoint and is not given location by this change. Quote/invoice document events (including design duration events sent via that document logger) are covered.
+- Existing events are not backfilled. Standalone design-only activity uses a different table/endpoint; its metadata column now stores verified coarse fields. Quote/invoice events and attached design opens, durations and skip actions are covered too.
 - A missing/unconfigured relay falls back to ordinary event logging with no location. Once forwarding begins, a failure is NOT retried automatically, avoiding duplicate events. A disconnected browser can lose telemetry; never treat missing logs as proof of no visit.
 - Native mobile files/config/dependencies are unchanged. HTTPS web clients use the relay; local HTTP preview uses unsigned direct logging with no location. No new native build or bundle sync is performed.
 - Rollback web and Edge Function together when possible. Removing the relay alone falls back on 404; leave the current Edge Function's stripping of untrusted location fields in place. No stored customer records need editing.

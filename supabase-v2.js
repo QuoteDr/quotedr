@@ -772,11 +772,11 @@ async function callClientDocumentFunction(body, requireUser) {
     requestBody.designViewerId=qdDesignViewerId();
     if(requestBody.action==='design_review')requestBody.binary=true;
     if (requireUser) requestBody.accountId = qdActiveAccountId();
-    const response = await fetch(CLIENT_DOCUMENT_FUNCTION_URL, {
+    const response = await qdActivityFetch(CLIENT_DOCUMENT_FUNCTION_URL, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(requestBody)
-    });
+    }, requestBody.action==='design_review');
     if(response.ok&&response.headers.get('Content-Type')?.startsWith('application/octet-stream'))return {file:await response.blob(),kind:response.headers.get('X-Design-Kind'),mime:response.headers.get('X-Design-Mime')};
     const data = await response.json().catch(function() { return {}; });
     if (!response.ok || data.error) throw new Error(data.error || 'Secure client document request failed');
@@ -995,6 +995,12 @@ function qdRegisterSecureClientSaveAdapters() {
     }
 }
 
+async function qdActivityFetch(upstream, options, eligible=true) {
+    const relay=eligible && typeof location!=='undefined' && location.protocol==='https:';
+    let response=await fetch(relay?'/api/document-activity':upstream,options);
+    if(relay && ((response.status===404&&!response.headers.get('X-QDR-Activity-Proxy'))||response.headers.get('X-QDR-Activity-Proxy')==='not-forwarded'))response=await fetch(upstream,options);
+    return response;
+}
 async function logSecureClientDocumentEvent(documentId, token, eventType, payload, portalAnchorId) {
     payload = payload || {};
     if (!documentId || !token || !eventType) return { error: 'Missing secure activity details' };

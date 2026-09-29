@@ -25,7 +25,9 @@ export default {
         for (const chunk of chunks) { raw.set(chunk, offset); offset += chunk.length; }
         let body;
         try { body = JSON.parse(new TextDecoder().decode(raw)); } catch { return reply('Invalid JSON', 400); }
-        if (!body || body.action !== 'log_event') return reply('Unsupported action', 400);
+        const designReview = body?.action === 'design_review' && ['open','duration','continue','problem'].includes(body.operation);
+        const portalActivity = body?.action === 'track_activity';
+        if (!body || !(body.action === 'log_event' || designReview || portalActivity || body.action === 'location_check')) return reply('Unsupported action', 400);
         const cf = request.cf || {};
         const location = {city: clean(cf.city), region: clean(cf.region), country: /^[A-Z]{2}$/.test(cf.country || '') && !['XX','T1'].includes(cf.country) ? cf.country : ''};
         const proof = JSON.stringify({at: Date.now(), location});
@@ -35,8 +37,10 @@ export default {
         const headers = new Headers({'Content-Type':'application/json', 'X-QDR-Location':encoded, 'X-QDR-Location-Signature':Array.from(new Uint8Array(signature), b=>b.toString(16).padStart(2,'0')).join('')});
         for (const name of ['authorization','apikey']) { const value = request.headers.get(name); if (value) headers.set(name,value); }
         try {
-            const response = await fetch(UPSTREAM, {method:'POST', headers, body:JSON.stringify(body), redirect:'error'});
-            return new Response(response.body, {status:response.status, headers:{'Content-Type':'application/json', 'Cache-Control':'no-store', 'X-Content-Type-Options':'nosniff', 'X-QDR-Activity-Proxy':'forwarded'}});
+            const response = await fetch(portalActivity ? UPSTREAM.replace('/client-document','/portal-designs') : UPSTREAM, {method:'POST', headers, body:JSON.stringify(body), redirect:'error'});
+            const outputHeaders = new Headers({'Content-Type':response.headers.get('Content-Type') || 'application/json', 'Cache-Control':'no-store', 'X-Content-Type-Options':'nosniff', 'X-QDR-Activity-Proxy':'forwarded'});
+            for (const name of ['X-Design-Kind','X-Design-Mime']) if(response.headers.has(name))outputHeaders.set(name,response.headers.get(name));
+            return new Response(response.body, {status:response.status, headers:outputHeaders});
         } catch { return reply('Activity request unavailable', 502, true); }
     }
 };

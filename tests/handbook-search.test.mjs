@@ -4,6 +4,10 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Add item clicked outside lost unsaved changes','line-item-unsaved-close'],
+ ['Escape edit line item save before closing','line-item-unsaved-close'],
+ ['Portal visits design opens unknown location More info','notification-activity-location'],
+ ['Model visible time approximate city region country','notification-activity-location'],
  ['Portal PIN not activated after adding quotes','portal-pin-authority'],
  ['Portal passcode stopped working after saving folders','portal-pin-authority'],
  ['Quote Settings Done versus Save Defaults description length not saving','quote-settings-current-save'],

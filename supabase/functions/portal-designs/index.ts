@@ -3,6 +3,7 @@ import { currentDesignPortal, verifyDesignSession, digest } from '../_shared/por
 import { designInput, MAX_DESIGN_BYTES } from '../../../portal-design-policy.mjs';
 import { budgetedUpload, storageBudgetMessage, storageUsage } from '../_shared/storage-budget.ts';
 import { loadPortalBranding, publicPortalTheme } from '../_shared/portal-branding.mjs';
+import { verifiedActivityLocation } from '../_shared/activity-location.mjs';
 
 const headers = { 'Access-Control-Allow-Origin':'*', 'Access-Control-Allow-Headers':'authorization,apikey,content-type,x-client-info', 'Cache-Control':'private, no-store', 'X-Robots-Tag':'noindex, nofollow', 'Content-Type':'application/json' };
 const json = (data:unknown, status=200) => new Response(JSON.stringify(data), {status,headers});
@@ -99,12 +100,13 @@ export async function handleDesignRequest(req:Request) {
     if (!library) return action === 'list' ? json({designs:[]}) : json({error:'Design not found'},404);
     if(action==='activity'){
       if(!ownerMode)return json({error:'Contractor access required'},403);
-      const events=await db.from('portal_design_activity').select('event_type,design_key,title,project,created_at,duration_seconds').eq('library_id',library.id).gte('created_at',new Date(Date.now()-90*86400000).toISOString()).order('created_at',{ascending:false}).limit(500);
+      const events=await db.from('portal_design_activity').select('event_type,design_key,title,project,created_at,duration_seconds,metadata').eq('library_id',library.id).gte('created_at',new Date(Date.now()-90*86400000).toISOString()).order('created_at',{ascending:false}).limit(500);
       if(events.error)throw events.error;
       return json({events:events.data||[],limit:500,days:90});
     }
     if(action==='track_activity'){
       if(ownerMode)return json({ok:true,ignored:true});
+      const metadata=await verifiedActivityLocation(req,body,Deno.env.get('QDR_ACTIVITY_LOCATION_SECRET') || '');
       const event=body.event;
       if(!['portal_visited','design_opened','external_clicked','model_visible'].includes(event))return json({error:'Invalid activity'},400);
       let design=null;
@@ -117,9 +119,14 @@ export async function handleDesignRequest(req:Request) {
       if(event==='model_visible'){
         if(design?.kind!=='interactive'||!/^[a-f0-9-]{36}$/i.test(body.visitId||'')||!Number.isInteger(body.seconds)||body.seconds<0||body.seconds>86400)return json({error:'Invalid model timing'},400);
         const saved=await db.rpc('record_model_visible',{p_library:library.id,p_session:await digest(body.session),p_design:design.id,p_visit:body.visitId,p_title:design.title,p_project:design.project||'',p_seconds:body.seconds});
-        if(saved.error)throw saved.error;return json({ok:true});
+        if(saved.error)throw saved.error;
+        if(metadata.location_source){
+          const located=await db.from('portal_design_activity').update({metadata}).eq('library_id',library.id).eq('session_hash',await digest(body.session)).eq('minute_bucket',0).eq('event_type','model_visible').eq('design_key',design.id).eq('visit_id',body.visitId);
+          if(located.error)throw located.error;
+        }
+        return json({ok:true});
       }
-      const saved=await db.from('portal_design_activity').upsert({library_id:library.id,session_hash:await digest(body.session),minute_bucket:Math.floor(Date.now()/60000),event_type:event,design_key:design?.id||'',title:design?.title||'',project:design?.project||''},{onConflict:'library_id,session_hash,minute_bucket,event_type,design_key,visit_id',ignoreDuplicates:true});
+      const saved=await db.from('portal_design_activity').upsert({library_id:library.id,session_hash:await digest(body.session),minute_bucket:Math.floor(Date.now()/60000),event_type:event,design_key:design?.id||'',title:design?.title||'',project:design?.project||'',metadata},{onConflict:'library_id,session_hash,minute_bucket,event_type,design_key,visit_id',ignoreDuplicates:true});
       if(saved.error)throw saved.error;
       return json({ok:true});
     }

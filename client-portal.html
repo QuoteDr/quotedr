@@ -2630,7 +2630,7 @@
 <script src="modal-help.js?v=1777741200"></script>
 <script src="change-orders.js?v=1778060200"></script>
 <script src="portal-activity-visits.js"></script>
-    <script src="supabase-v2.js?v=2026090802"></script>
+    <script src="supabase-v2.js?v=2026092901"></script>
     <script src="save-coordinator.js?v=2026081801"></script>
 
   <script>
@@ -2880,7 +2880,7 @@
 
       if (portalId) {
         const css = document.createElement('link');css.rel='stylesheet';css.href='portal-designs.css?v=2026092505';document.head.append(css);
-        const designs = await import('./portal-designs.js?v=2026092801');
+        const designs = await import('./portal-designs.js?v=2026092901');
         portalDesignController = designs.mountDesignLibrary(document.getElementById('portalDesignLibrary'), {
           request:portalDesignRequest, isOwner:portalIsAdminView,
           getQuotes:()=>portalQuotesCache,onQuotesChanged:()=>loadQuotes(),
@@ -2934,7 +2934,7 @@
       let content;
       if(file instanceof Blob){content=new FormData();content.append('metadata',JSON.stringify(payload));content.append('file',file,'design');}
       else {headers['Content-Type']='application/json';content=JSON.stringify(payload);}
-      const response=await fetch(supabaseUrl+'/functions/v1/portal-designs',{method:'POST',headers,body:content,keepalive:payload.action==='track_activity'});
+      const response=await qdActivityFetch(supabaseUrl+'/functions/v1/portal-designs',{method:'POST',headers,body:content,keepalive:payload.action==='track_activity'},payload.action==='track_activity');
       if(response.ok&&response.headers.get('Content-Type')?.startsWith('application/octet-stream'))return {file:await response.blob(),kind:response.headers.get('X-Design-Kind'),mime:response.headers.get('X-Design-Mime')};
       const result=await response.json();
       if(!response.ok||result.error){const error=new Error(result.error||'Design library unavailable. Please try again.');error.code=result.code;throw error;}
@@ -2949,7 +2949,7 @@
         const accessToken = sessionResult?.data?.session?.access_token || '';
         if (accessToken) bearer = accessToken;
       } catch (error) {}
-      const resp = await fetch(supabaseUrl + '/functions/v1/client-document', {
+      const resp = await qdActivityFetch(supabaseUrl + '/functions/v1/client-document', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2957,7 +2957,7 @@
           'Authorization': 'Bearer ' + bearer
         },
         body: JSON.stringify(body || {})
-      });
+      }, body.action==='design_review');
       if(resp.ok&&resp.headers.get('Content-Type')?.startsWith('application/octet-stream'))return {file:await resp.blob(),kind:resp.headers.get('X-Design-Kind'),mime:resp.headers.get('X-Design-Mime')};
       const data = await resp.json().catch(function() { return {}; });
       if (!resp.ok || data.error) throw new Error(data.error || 'Secure portal request failed');

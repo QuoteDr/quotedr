@@ -5,8 +5,10 @@ import { designInput, MAX_DESIGN_BYTES } from '../portal-design-policy.mjs';
 import { budgetedUpload, storageBudgetMessage, storageUsage } from '../supabase/functions/_shared/storage-budget.ts';
 import { issueDesignSession, verifyDesignSession, currentDesignPortal, digest } from '../supabase/functions/_shared/portal-design-session.mjs';
 import { loadPortalBranding, publicPortalTheme } from '../supabase/functions/_shared/portal-branding.mjs';
+import { verifiedActivityLocation } from '../supabase/functions/_shared/activity-location.mjs';
+globalThis.verifiedActivityLocation = verifiedActivityLocation;
 
-const secret='test-only-secret';
+const secret='test-only-secret-long-enough-for-location-proof';
 const owner='11111111-1111-4111-8111-111111111111', portal='project-a';
 const token=await issueDesignSession(secret,owner,portal,'1847');
 assert(await verifyDesignSession(secret,token,owner,portal,'1847'));
@@ -55,6 +57,17 @@ let source=await fs.readFile('supabase/functions/portal-designs/index.ts','utf8'
 source=source.replace(/^import .*;\r?\n/gm,'').replace('export async function handleDesignRequest','async function handleDesignRequest').replace('Deno.serve(handleDesignRequest);','');
 const handler=new Function('ACCOUNT_PERMISSION','AccountAccessError','requireAccountPermissionWithDefault','serviceClient','currentDesignPortal','verifyDesignSession','designInput','MAX_DESIGN_BYTES','Deno','budgetedUpload','storageBudgetMessage','storageUsage','digest','loadPortalBranding','publicPortalTheme',stripTypeScriptTypes(source)+'\nreturn handleDesignRequest;')({QUOTES_SEND:'quotes.send',QUOTES_READ:'quotes.read'},AccountAccessError,authorize,()=>db,currentDesignPortal,verifyDesignSession,designInput,MAX_DESIGN_BYTES,{env:{get:()=>secret}},budgetedUpload,storageBudgetMessage,storageUsage,digest,loadPortalBranding,publicPortalTheme);
 async function call(body,ownerAuth=false){return handler(new Request('https://local.test',{method:'POST',headers:{'content-type':'application/json',authorization:ownerAuth?'Bearer owner-test':'Bearer anon'},body:JSON.stringify({contractorId:owner,portalId:portal,...body})}));}
+// Exercise verified location through the actual handler into its persistence adapter.
+{
+  const body={contractorId:owner,portalId:portal,action:'track_activity',event:'portal_visited',session:token};
+  const encoded=btoa(JSON.stringify({at:Date.now(),location:{city:'Oakville',region:'Ontario',country:'CA'}}));
+  const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const sig=Buffer.from(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(encoded+'\n'+JSON.stringify(body)))).toString('hex');
+  const result=await handler(new Request('https://local.test',{method:'POST',headers:{'content-type':'application/json','x-qdr-location':encoded,'x-qdr-location-signature':sig},body:JSON.stringify(body)}));
+  assert.equal(result.status,200);
+  assert.equal(tables.portal_design_activity.at(-1).metadata.location_city,'Oakville');
+  tables.portal_design_activity=[];
+}
 // Empty full-portal entry requires a current PIN grant, and creates no fake quote.
 tables.user_data.push({user_id:owner,key:'business_profile',value:{business_name:'Example Builder',privateSecret:'hidden'}},{user_id:owner,key:'portal_theme',value:{layoutStyle:'client-hub',privateSecret:'hidden'}});
 tables.user_data[0].value[0].theme={headerColor:'#abcdef',privateSecret:'hidden'};

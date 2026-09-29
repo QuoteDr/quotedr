@@ -970,7 +970,7 @@ async function designReviewRequest(req:Request,body:Record<string,unknown>) {
   async function log(eventType:string,duration:number|null=null){
     if(owner)return;
     const inserted=await db.from('portal_document_events').insert({user_id:target.user_id,portal_id:portalId(target)||null,document_id:target.id,
-      event_type:eventType,session_id:sessionId,duration_seconds:duration,metadata:{design_id:reviewedDesign.id,design_title:reviewedDesign.title,design_version:reviewedDesign.version}});
+      event_type:eventType,session_id:sessionId,duration_seconds:duration,metadata:{design_id:reviewedDesign.id,design_title:reviewedDesign.title,design_version:reviewedDesign.version,...await verifiedActivityLocation(req,body,Deno.env.get('QDR_ACTIVITY_LOCATION_SECRET') || '')}});
     if(inserted.error)throw inserted.error;
   }
   const receipt={document_id:target.id,viewer_id:viewer,revision:state.revision};
@@ -1531,6 +1531,11 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
+    // No database access: verify this request's relay location without creating a visit.
+    if(body.action==='location_check') {
+      const location=await verifiedActivityLocation(req,body,Deno.env.get('QDR_ACTIVITY_LOCATION_SECRET') || '');
+      return json({verified:location.location_source==='cloudflare_approximate',location});
+    }
     const action = String(body.action || "").trim();
     if (action === "create_link") return await createLink(req, body);
     if (action === "view") return await viewDocument(body);

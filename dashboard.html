@@ -52,6 +52,9 @@
             background: #f97316;
             color: #fff;
         }
+        /* Keep the unread bubble above the neighbouring Sync button. */
+        #clientActivityAlertBtn { z-index: 2; }
+        #clientActivityUnreadBadge { z-index: 1; }
         .status-draft { color: #6c757d; }
         .status-sent { color: #0d6efd; }
         .status-viewed { color: #0dcaf0; font-weight: 600; }

@@ -133,7 +133,10 @@ export function mountDesignLibrary(root,{request,isOwner,reunlock,shareBase,getQ
       const events=result.events||[],visits=events.filter(e=>e.event_type==='portal_visited').length,opens=events.filter(e=>e.event_type==='design_opened').length;
       const seconds=events.filter(e=>e.event_type==='model_visible').reduce((n,e)=>n+(e.duration_seconds||0),0);
       content.replaceChildren(el('p',visits+' portal visits · '+opens+' design opens in the entries below'),el('p','Model visible time: '+Math.floor(seconds/60)+'m '+seconds%60+'s in these entries'),el('p','Latest 500 entries within 90 days. Repeat opens in the same PIN session and minute are combined. Model visible time pauses in hidden tabs; it is approximate, not attention, video playback or approval. Admin previews are excluded. Tracking begins after deployment; failed/offline tracking and the last unsent seconds may be missing.'));
-      const list=el('ol');for(const e of events)list.append(el('li',new Date(e.created_at).toLocaleString()+' — '+({portal_visited:'Portal visited',design_opened:'Design opened',external_clicked:'External link clicked',model_visible:'Model visible time: '+Math.floor((e.duration_seconds||0)/60)+'m '+(e.duration_seconds||0)%60+'s'}[e.event_type]||e.event_type)+(e.title?' · '+e.title:'')+(e.project?' ('+e.project+')':'')));
+      const list=el('ol');for(const e of events){
+        const item=el('li',new Date(e.created_at).toLocaleString()+' — '+({portal_visited:'Portal visited',design_opened:'Design opened',external_clicked:'External link clicked',model_visible:'Model visible time: '+Math.floor((e.duration_seconds||0)/60)+'m '+(e.duration_seconds||0)%60+'s'}[e.event_type]||e.event_type)+(e.title?' · '+e.title:'')+(e.project?' ('+e.project+')':''));
+        const info=el('div');info.innerHTML=window.QuoteDrActivityVisits?.locationDetails(e)||'';item.append(info);list.append(item);
+      }
       content.append(events.length?list:el('p','No recorded client design activity yet.'));
     }catch(e){content.textContent='Could not load activity: '+e.message;}};
     d.append(button('Refresh activity',load));await load();

@@ -8686,6 +8686,30 @@ Example:
         }
         document.getElementById('addLineModal').addEventListener('shown.bs.modal', syncLineRateSign);
         document.getElementById('addLineModal').addEventListener('shown.bs.modal', function() { renderLineDiscountChoices(); });
+        // A backdrop click, Escape, Cancel or X must not silently discard a draft.
+        function lineItemDraftSnapshot() {
+            const modal=document.getElementById('addLineModal');
+            return JSON.stringify([
+                Array.from(modal.querySelectorAll('input,select,textarea,[contenteditable="true"]')).map(el=>[el.id,el.type==='checkbox'||el.type==='radio'?el.checked:el.isContentEditable?el.innerHTML:el.value]),
+                linePhotoDraft.photos, linePhotoDraft.full, linePhotoDraft.busy
+            ]);
+        }
+        const lineDraftModal=document.getElementById('addLineModal');
+        lineDraftModal.addEventListener('shown.bs.modal',function(){this._draftBaseline=lineItemDraftSnapshot();this._draftAllowClose=false;});
+        lineDraftModal.addEventListener('hide.bs.modal',async function(event){
+            if(this._draftAllowClose || this._draftBaseline===lineItemDraftSnapshot())return;
+            event.preventDefault();
+            if(this._draftAsking)return;
+            this._draftAsking=true;
+            try {
+                if(await qdConfirm('Save this line item to the quote before closing? Your changes have not been added yet.',{title:'Unsaved Line Item',okText:'Save Item',cancelText:'Other Options'})) {
+                    await confirmAddLine(); // Existing validation keeps incomplete entries open.
+                } else if(await qdConfirm('Discard your unsaved line item changes? Keep Editing preserves everything in this window.',{title:'Unsaved Line Item',okText:'Discard Changes',cancelText:'Keep Editing'})) {
+                    this._draftAllowClose=true;
+                    bootstrap.Modal.getInstance(this)?.hide();
+                }
+            } finally {this._draftAsking=false;}
+        });
 
         function setLinePriceTbdState(priceTbd) {
             const checkbox = document.getElementById('linePriceTbd');
@@ -10231,6 +10255,7 @@ Example:
 
                 // Commit and display the quote edit before asking about the reusable database item.
                 // This keeps a nested Bootstrap dialog from blocking the primary quote save.
+                document.getElementById('addLineModal')._draftAllowClose=true;
                 await _hideBootstrapModalAndWait('addLineModal');
 
                 if (shouldAskToSaveNewLineItem && await promptToSaveNewLineItemToDatabase(description)) {
