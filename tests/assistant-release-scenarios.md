@@ -290,3 +290,16 @@ Ask "Can I export a copy for my records with margins?", then "Will my client see
 - Ask: "Not activated after adding quotes; did the link change?" Explain registry PIN precedence and same IDs with optional .html; do not expose a PIN or claim an authenticated test.
 - Follow-up: "Should I recreate it?" Advise preserving unsaved work, reload and Unlock Portal using the existing PIN, then contact owner if failure persists. Never delete files or reset without intent.
 - Failure: "Can I use an old quote PIN if the saved portal PIN is empty?" No; fail closed. Explain legacy fallback only when no registry portal exists.
+# Contractor-recorded deposit (2026-10-01.1)
+
+- "Client e-transferred a deposit but never clicked paid. How do I verify it?" → accepted quote Dashboard ••• > Record Deposit Received, NEW amount, method, confirmation. No client report or Stripe required; verify real funds first.
+- Follow-up "Can I enter just half of the deposit?" → record actual receipt, then accept shortfall or keep remaining deposit outstanding; quote total unchanged.
+- Failure "They reported it too, do I add it here?" → use existing report Enter amount received, no duplicate receipt.
+- Failure "It timed out. Should I put it in again?" → refresh and inspect Details first. No claim that uncertain save succeeded. Same-page retry uses same request key; do not duplicate after refresh.
+- "Can my assistant do this?" → requires payments.manage, valid accepted quote. Not invoice/change-order workflow. No client messages or real customer writes in regression checks.
+# Bulk Optional (2026-10-03.1)
+
+- "Client wants to pick items, can I make the quote optional fast?" → any room Edit > Make Entire Quote Optional... > Make Optional, all rooms; alternatively room Edit > Select All Items > Make Optional for that room only.
+- Follow-up "Why hasn't the total become zero?" → newly optional ordinary items stay included initially; toggle Default: Added to Not Added per ordinary item for a default-off offer, existing optional defaults/choice selections preserved.
+- Failure "Make Optional is grey" → select line-item checkboxes in the room; whole-quote action needs no selection. No auto-save claim; wait for Cloud saved.
+- "Can I undo it? Will it unlock a signed client agreement?" → one Undo before further edits, page-session only; no bypass of signed locks and no client message sent. Preserve recovery before refresh. Verify authenticated answer separately from retrieval tests.

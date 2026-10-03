@@ -18,7 +18,9 @@ const legacyPayment = read('supabase/functions/stripe-deposit/index.ts');
 
 assert(payment.includes('assertDocumentAccess') && payment.includes('public_share_token_hash') && payment.includes('sha256Hex'), 'document payments must validate the secure document token');
 assert(payment.includes('const amountCents = dueAmount(type, state);'), 'the server must calculate the amount from document state');
-assert(!/Number\(body\.amount|body\.amountCents|body\.amount_cents/.test(payment), 'the payment function must not trust a browser-supplied amount');
+const clientPaymentPaths = payment.slice(payment.indexOf('async function createCheckout('), payment.indexOf('async function recordOwnerDeposit('));
+assert(!/Number\(body\.amount|body\.amountCents|body\.amount_cents/.test(clientPaymentPaths), 'client checkout/report paths must calculate amounts from server state, never browser input');
+assert(payment.includes('ACCOUNT_PERMISSION.PAYMENTS_MANAGE') && payment.includes('amountCents > current.balanceDueCents'), 'contractor-entered actual receipts require payment permission and a server balance cap');
 assert(payment.includes('safeReturnUrl') && payment.includes('url.searchParams.get("token") !== token'), 'Stripe return URLs must be restricted to the active secure document');
 assert(payment.includes('headers.set("Stripe-Account", accountId)'), 'document charges must be created on the contractor connected account');
 assert(!payment.includes('application_fee_amount') && !payment.includes('transfer_data[destination]'), 'QuoteDr must not collect an application fee or create destination charges');

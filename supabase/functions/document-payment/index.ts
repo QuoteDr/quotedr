@@ -369,9 +369,9 @@ async function evidenceForDocument(admin: any, documentId: string) {
   return data || [];
 }
 
-async function documentPaymentState(admin: any, row: QuoteRow, settings: Record<string, any>) {
+async function documentPaymentState(admin: any, row: QuoteRow, settings: Record<string, any>, projectedRecords?: any[]) {
   const [records, evidence] = await Promise.all([
-    recordsForDocument(admin, row.id),
+    projectedRecords ? Promise.resolve(projectedRecords) : recordsForDocument(admin, row.id),
     evidenceForDocument(admin, row.id),
   ]);
   const terms = resolveDepositTerms(row, settings);
@@ -573,7 +573,7 @@ async function updateQuotePaymentState(admin: any, row: QuoteRow, record: any, p
   else nextPayments.push(paymentEntry);
 
   const { settings } = await paymentSettings(admin, row.user_id);
-  const state: Awaited<ReturnType<typeof documentPaymentState>> & {continueWorkSecured?: boolean; continueWorkDueCents?: number} = await documentPaymentState(admin, { ...row, data }, settings);
+  const state: Awaited<ReturnType<typeof documentPaymentState>> & {continueWorkSecured?: boolean; continueWorkDueCents?: number} = await documentPaymentState(admin, { ...row, data }, settings, options.projectedRecords);
   const nextReceived = state.paidCents / 100;
   const changeOrderPayment = isChangeOrder(row);
   const nextData: Record<string, any> = {
@@ -619,6 +619,7 @@ async function updateQuotePaymentState(admin: any, row: QuoteRow, record: any, p
   const update: Record<string, any> = { data: nextData, updated_at: paidAt };
   if (state.fullPaid && !changeOrderPayment) update.status = "paid";
   else if (isInvoice(row) && String(row.status || "").toLowerCase() === "paid") update.status = "invoiced";
+  if (options.previewOnly) return { state, update };
   const { error } = await admin.from("quotes").update(update).eq("id", row.id).eq("user_id", row.user_id);
   if (error) throw error;
   return state;
@@ -818,6 +819,51 @@ async function verifyCheckout(admin: any, body: Record<string, any>, row: QuoteR
   const refreshedRow = await fetchQuote(admin, row.id) || row;
   const refreshed = await documentPaymentState(admin, refreshedRow, (await paymentSettings(admin, row.user_id)).settings);
   return publicStatus(refreshedRow, refreshed);
+}
+
+async function recordOwnerDeposit(req: Request, admin: any, body: Record<string, any>) {
+  const { ownerUserId, actorUserId } = await accountPaymentAccess(req, body, ACCOUNT_PERMISSION.PAYMENTS_MANAGE);
+  const documentId = normalizeId(body.documentId);
+  const row = documentId ? await fetchQuote(admin, documentId) : null;
+  if (!row || row.user_id !== ownerUserId) throw new PaymentError("Payment document not found", 404, "payment_document_not_found");
+  if (isInvoice(row) || isChangeOrder(row) || isInvalid(row) || !isAccepted(row)) {
+    throw new PaymentError("Record deposits on a valid accepted quote. Use the invoice or change-order payment workflow for other documents.", 409, "accepted_quote_required");
+  }
+  const amountCents = Number(body.amountCents);
+  const method = String(body.method || "").toLowerCase();
+  if (!Number.isSafeInteger(amountCents) || amountCents <= 0) throw new PaymentError("Enter a positive amount to the cent.", 400, "confirmed_amount_invalid");
+  if (!["etransfer", "cheque", "cash"].includes(method)) throw new PaymentError("Choose E-transfer, Cheque or Cash.", 400, "manual_method_invalid");
+  const key = idempotencyKey(body.idempotencyKey);
+  const records = await recordsForDocument(admin, row.id);
+  const previous = records.find((record: any) => record.idempotency_key === key);
+  if (previous) {
+    if (previous.amount_cents !== amountCents || previous.method !== method || previous.metadata?.source !== "dashboard_owner_deposit") throw new PaymentError("This receipt conflicts with an earlier attempt.", 409, "idempotency_conflict");
+    return { record: { id: previous.id }, payment: publicStatus(row, await documentPaymentState(admin, row, (await paymentSettings(admin, ownerUserId)).settings)), idempotentReplay: true };
+  }
+  if (records.some((record: any) => record.status === "client_reported")) throw new PaymentError("A client payment report is waiting. Enter amount received on that report instead, to avoid recording it twice.", 409, "payment_report_pending");
+  const current = await documentPaymentState(admin, row, (await paymentSettings(admin, ownerUserId)).settings, records);
+  if (amountCents > current.balanceDueCents) throw new PaymentError("The amount cannot exceed the outstanding quote balance.", 409, "confirmed_amount_exceeds_balance");
+  const now = new Date().toISOString();
+  const record = {
+    id: crypto.randomUUID(), user_id: ownerUserId, quote_id: row.id, invoice_id: null,
+    payment_type: "deposit", status: "confirmed", provider: "manual", method,
+    amount_cents: amountCents, currency: currencyFor(row), confirmed_at: now,
+    confirmed_by: actorUserId, paid_at: now, updated_at: now,
+    description: "Contractor-recorded deposit received", idempotency_key: key,
+    metadata: { source: "dashboard_owner_deposit", owner_confirmed_amount_cents: amountCents, recorded_by: actorUserId },
+  };
+  const projection: any = await updateQuotePaymentState(admin, row, record, now, {
+    clearDepositShortfallAcceptance: true, previewOnly: true, projectedRecords: [...records, record],
+  });
+  // Receipt and quote projection commit together, or neither does. The snapshot
+  // check rejects concurrent edits/payments rather than overwriting them.
+  const saved = await admin.rpc("record_owner_deposit", {
+    p_owner: ownerUserId, p_document: row.id, p_expected_updated_at: row.updated_at,
+    p_expected_records: records.map((item: any) => ({ id: item.id, status: item.status, amount_cents: item.amount_cents })),
+    p_record: record, p_next_data: projection.update.data, p_next_status: projection.update.status || row.status,
+  });
+  if (saved.error) throw new PaymentError("Deposit not saved. Refresh and check the payment history before retrying: " + saved.error.message, 409, "deposit_save_failed");
+  return { record: { id: saved.data.id }, payment: publicStatus({ ...row, data: projection.update.data }, projection.state), idempotentReplay: saved.data.replayed === true };
 }
 
 async function confirmManual(req: Request, admin: any, body: Record<string, any>) {
@@ -1221,6 +1267,7 @@ Deno.serve(async (req) => {
     if (action.startsWith("owner_") && action.includes("evidence")) {
       return json(await ownerEvidenceAction(req, admin, body, action));
     }
+    if (action === "owner_record_deposit") return json(await recordOwnerDeposit(req, admin, body));
     if (action === "confirm_manual") return json(await confirmManual(req, admin, body));
     if (action === "resolve_deposit_shortfall") return json(await resolveDepositShortfall(req, admin, body));
 

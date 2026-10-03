@@ -549,7 +549,7 @@
     <script src="modal-help.js?v=1777741200"></script>
     <script src="change-orders.js?v=1778060200"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026092501"></script>
+    <script src="supabase-v2.js?v=2026092901"></script>
     <script src="quote-backups.js?v=2026091404"></script>
     <script src="quote-folder-backups.js?v=2026091501"></script>
     <script src="birthday-rewards.js?v=2026082401"></script>
@@ -1251,6 +1251,44 @@
             }
         }
 
+        var dashboardDepositAttempts = {};
+        var dashboardDepositSaving = {};
+        async function recordDashboardDeposit(quoteId) {
+            if (dashboardDepositSaving[quoteId]) return;
+            dashboardDepositSaving[quoteId] = true;
+            var depositRecorded = false;
+            try {
+                var amount = await qdPrompt('Enter only the NEW deposit that actually arrived, not the total of earlier payments. Check Details for existing receipts first. This does not charge or message the client.', '', {
+                    title: 'Record Deposit Received', okText: 'Continue', okClass: 'btn-success'
+                });
+                if (amount === null) return;
+                var cents = dashboardPaymentAmountToCents(amount);
+                if (!cents || !Number.isSafeInteger(cents)) {
+                    await qdAlert('Enter a valid amount greater than $0, with no more than two decimal places.'); return;
+                }
+                var method = await qdPrompt('How did you receive it? Enter E-transfer, Cheque or Cash.', 'E-transfer', { title: 'Payment Method', okText: 'Continue' });
+                if (method === null) return;
+                method = method.toLowerCase().replace(/[\s-]/g, '');
+                if (!['etransfer', 'cheque', 'cash'].includes(method)) { await qdAlert('Choose E-transfer, Cheque or Cash.'); return; }
+                if (!await qdConfirm('Record $' + (cents / 100).toFixed(2) + ' as a NEW deposit received? Only continue after verifying the money arrived. This reduces the client-visible balance.', { title: 'Confirm Deposit Received', okText: 'Record deposit', okClass: 'btn-success' })) return;
+                var fingerprint = cents + ':' + method;
+                var attempt = dashboardDepositAttempts[quoteId];
+                if (!attempt || attempt.fingerprint !== fingerprint) {
+                    attempt = { fingerprint: fingerprint, key: crypto.randomUUID() };
+                    dashboardDepositAttempts[quoteId] = attempt;
+                }
+                var result = await callDocumentPaymentFunction({ action: 'owner_record_deposit', documentId: quoteId, amountCents: cents, method: method, idempotencyKey: attempt.key }, true);
+                depositRecorded = true;
+                delete dashboardFullQuoteRows[quoteId];
+                delete dashboardDepositAttempts[quoteId];
+                await refreshQuotes();
+                if (result && result.payment) await promptDashboardDepositShortfall(quoteId, result.payment);
+                qdToast({ title: 'Deposit recorded', message: 'Amount received and the client-visible balance are updated.', type: 'success' });
+            } catch (error) {
+                await qdAlert((depositRecorded ? 'The deposit was recorded, but the dashboard or deposit decision could not finish updating: ' : 'Could not confirm the deposit was saved: ') + (error.message || 'Please try again.') + ' Refresh and check Details. Do not record the same payment twice.');
+            } finally { dashboardDepositSaving[quoteId] = false; }
+        }
+
         async function decideDashboardManualPayment(recordId, decision, defaultAmountCents, isCorrection) {
             var confirmedAmountCents = null;
             if (decision === 'confirmed') {
@@ -1549,6 +1587,7 @@
                     ${pendingCos ? `<div class="alert alert-info py-1 px-2 mt-2 mb-0 small"><i class="fas fa-file-circle-plus me-1"></i><strong>${pendingCos} pending change order${pendingCos === 1 ? '' : 's'}</strong></div>` : ''}
                     ${status === 'in_review' ? `<button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview(${jsAttr(q.id)}, ${jsAttr(clientName)})"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
                     ${(!isChangeOrder && (status === 'accepted' || status === 'invoiced')) ? `<button class="btn btn-warning btn-sm w-100 mt-1" onclick="openQuoteForChangeOrder(${jsAttr(q.id)})"><i class="fas fa-file-circle-plus me-1"></i>Create Change Order</button>` : ''}
+                    ${(!isInvoice && !isChangeOrder && !isInvalid && status === 'accepted') ? `<button data-account-permission="payments.manage" class="btn btn-outline-success btn-sm w-100 mt-1" onclick="event.stopPropagation();recordDashboardDeposit(${jsAttr(q.id)})"><i class="fas fa-money-bill me-1"></i>Record Deposit Received</button>` : ''}
                     ${(isInvoice && !isInvalid) ? `<button data-account-permission="quotes.send" class="btn btn-danger btn-sm w-100 mt-1" onclick="invalidateInvoice(${jsAttr(q.id)})"><i class="fas fa-ban me-1"></i> Mark Invoice No Longer Valid</button>` : ''}
                     ${isInvalid ? `<button data-account-permission="quotes.send" class="btn btn-outline-secondary btn-sm w-100 mt-1" onclick="restoreInvalidInvoice(${jsAttr(q.id)})"><i class="fas fa-rotate-left me-1"></i> Restore Invoice</button>` : ''}
                     ${reviewReady && !reviewSentAt ? `<button class="btn btn-outline-success btn-sm w-100 mt-1" onclick="sendGoogleReviewRequest(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fab fa-google me-1"></i> Request Review</button>` : ''}

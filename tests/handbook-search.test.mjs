@@ -4,6 +4,14 @@ import {searchHandbook,validHandbook} from '../handbook-search.mjs';
 const book=JSON.parse(fs.readFileSync('qdr-handbook.json','utf8'));
 assert(validHandbook(book));
 const cases=[
+ ['Edit Select All Items Make Optional whole quote client pick choose','bulk-make-optional'],
+ ['Make Entire Quote Optional across every room','bulk-make-optional'],
+ ['Does Select All Items include other rooms when making optional','bulk-make-optional'],
+ ['Made all optional why still included total Default Not Added','bulk-make-optional'],
+ ['Client paid deposit outside app without reporting how record received dashboard','invoices-and-payments'],
+ ['Mark quote deposit received cash cheque e transfer amount','invoices-and-payments'],
+ ['Payment already reported should I record deposit again','invoices-and-payments'],
+ ['Offline deposit saving failed should I enter same receipt twice','invoices-and-payments'],
  ['Add item clicked outside lost unsaved changes','line-item-unsaved-close'],
  ['Escape edit line item save before closing','line-item-unsaved-close'],
  ['Portal visits design opens unknown location More info','notification-activity-location'],

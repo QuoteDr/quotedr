@@ -11313,6 +11313,45 @@ Example:
             if (message && typeof showToast === 'function') showToast(message, 'success');
         }
 
+        async function makeQuoteItemsOptional(roomId, entireQuote) {
+            var selectedRoom = quoteBuilderRoomById(roomId);
+            var indexes = entireQuote ? [] : getSelectedRoomItemIndexes(roomId);
+            var targets = [];
+            (entireQuote ? rooms : (selectedRoom ? [selectedRoom] : [])).forEach(function(room) {
+                (room.items || []).forEach(function(item, index) {
+                    if (!item || item._coRemoved || (!entireQuote && indexes.indexOf(index) === -1)) return;
+                    var group = item.choiceGroup;
+                    if (group ? group.required !== false : !item.optional) targets.push({ room: room, item: item });
+                });
+            });
+            if (!targets.length) {
+                await qdAlert(entireQuote ? 'All available items are already optional, or this quote has no items.' : 'Select one or more required line items first. Already optional items are unchanged.');
+                return;
+            }
+            if (!await qdConfirm('Make ' + targets.length + ' item' + (targets.length === 1 ? '' : 's') + ' optional' + (entireQuote ? ' across ALL rooms in this quote' : ' in this room') + '? Items remain included initially; existing optional defaults and choice selections are preserved. The client can deselect optional items or choice groups. No prices are changed and no client message is sent.', {
+                title: entireQuote ? 'Make Entire Quote Optional' : 'Make Selected Items Optional',
+                okText: 'Make Optional', okClass: 'btn-primary'
+            })) return;
+            // Do not apply a dialog opened for a different/removed quote draft.
+            if (targets.some(function(target) { return rooms.indexOf(target.room) === -1 || target.room.items.indexOf(target.item) === -1; })) {
+                await qdAlert('The quote changed while this dialog was open. Select the items again.'); return;
+            }
+            _pushUndo();
+            targets.forEach(function(target) {
+                var item = target.item;
+                if (item.choiceGroup) item.choiceGroup.required = false;
+                else {
+                    item.optional = true;
+                    // Required items were included, so keep them included when
+                    // first made optional. Already optional items are skipped.
+                    // Saved client selections remain untouched.
+                    item.optionalSelectedByDefault = true;
+                }
+                if (quoteBuilderIsChangeOrderMode() && typeof coRefreshItemDelta === 'function') coRefreshItemDelta(item, target.room);
+            });
+            finishRoomBulkItemAction(targets.length + ' item' + (targets.length === 1 ? '' : 's') + ' made optional. Use Undo to restore.');
+        }
+
         async function applyMarkupToRoomItems(roomId, itemIndexes) {
             var room = quoteBuilderRoomById(roomId);
             var selectedIndexes = Array.from(new Set((itemIndexes || []).map(function(index) {
@@ -15251,6 +15290,8 @@ Example:
                 html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="transferSelectedRoomItems(' + room.id + ', \'copy\')"><i class="fas fa-copy text-success"></i>Copy Selected to...</button></li>';
                 html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="duplicateSelectedRoomItems(' + room.id + ')"><i class="fas fa-clone text-info"></i>Duplicate Selected Here</button></li>';
                 html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="applyMarkupToSelectedRoomItems(' + room.id + ')"><i class="fas fa-percent text-danger"></i>Markup Selected</button></li>';
+                html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="makeQuoteItemsOptional(' + room.id + ', false)"><i class="fas fa-circle-check text-primary"></i>Make Optional</button></li>';
+                html += '<li><button type="button" class="dropdown-item" onclick="makeQuoteItemsOptional(' + room.id + ', true)"><i class="fas fa-list-check text-primary"></i>Make Entire Quote Optional...</button></li>';
                 html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="openSelectedLineItemHighlightModal(' + room.id + ')"><i class="fas fa-highlighter text-warning"></i>Highlight Selected...</button></li>';
                 html += '<li><button type="button" class="dropdown-item text-danger disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="deleteSelectedRoomItems(' + room.id + ')"><i class="fas fa-trash"></i>Delete Selected</button></li>';
                 html += '<li><hr class="dropdown-divider"></li>';
